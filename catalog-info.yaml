@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: template-devops
+  description: this should be populated on init of the service / resource
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - not-yet-defined
+spec:
+  type: library
+  lifecycle: production
+  owner: devops
+  system: ci-cd
