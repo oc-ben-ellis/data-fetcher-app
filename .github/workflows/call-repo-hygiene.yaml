@@ -17,16 +17,13 @@ permissions:
 
 on:
   pull_request:
-   branches: [ master ]
+    branches: [master]
   workflow_dispatch:
 
 jobs:
   call-repo-hygiene:
     uses: openc/gh-actions/.github/workflows/reusable-repo-hygiene.yaml@master
-    # with:
-    #     # Enabled conventional commit of PR used for automated semver tagging, defaults to true
-    #     enable-conventional-commit: true
 
     secrets:
       # Github token used to run git tagging
-      private-token: ${{ secrets.BYPASS}}
+      private-token: ${{ secrets.BYPASS }}

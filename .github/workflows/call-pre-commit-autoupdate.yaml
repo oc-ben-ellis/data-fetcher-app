@@ -18,7 +18,7 @@ permissions:
 on:
   schedule:
     # every sunday
-    - cron:  '0 0 * * MON'
+    - cron: "0 0 * * MON"
   workflow_dispatch:
 
 jobs:
@@ -26,6 +26,6 @@ jobs:
     uses: openc/gh-actions/.github/workflows/reusable-pre-commit-autoupdate.yaml@master
     secrets:
       # Github token used to run git tagging
-      private-token: ${{ secrets.BYPASS}}
-      PIPELINE_GPG_KEY: ${{ secrets.PIPELINE_GPG_KEY}}
-      PIPELINE_GPG_PASSPHRASE: ${{ secrets.PIPELINE_GPG_PASSPHRASE}}
+      private-token: ${{ secrets.BYPASS }}
+      PIPELINE_GPG_KEY: ${{ secrets.PIPELINE_GPG_KEY }}
+      PIPELINE_GPG_PASSPHRASE: ${{ secrets.PIPELINE_GPG_PASSPHRASE }}
