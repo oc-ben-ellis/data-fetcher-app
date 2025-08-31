@@ -11,21 +11,21 @@ The script:
 4. Logs the process for monitoring and troubleshooting
 """
 
-import os
-import paramiko
-import yaml
+import argparse
+import hashlib
+import json
 import logging
+import os
 import posixpath
-import boto3
 import sys
 import uuid
-import json
-import hashlib
-import argparse
 from datetime import datetime, timezone
 from stat import S_ISDIR
-from tenacity import retry, stop_after_attempt, wait_fixed
 
+import boto3
+import paramiko
+import yaml
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 # Create a logger
 logger = logging.getLogger(__name__)
@@ -647,7 +647,7 @@ def run_script() -> None:
     logger.info(
         {
             "process_id": process_id,
-            "job_name": "fetcher-sftp",
+            "job_name": "data-fetcher-sftp",
             "start_time": start_time.strftime("%Y-%m-%d %H:%M:%S"),
         }
     )
