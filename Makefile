@@ -17,7 +17,7 @@ PYTHON := python3
 POETRY := poetry
 
 # Project settings
-PROJECT_NAME := oc-data-fetcher-sftp
+PROJECT_NAME := data-fetcher-sftp
 
 GIT=git
 GIT_REPOSITORY_NAME=$$(basename `$(GIT) rev-parse --show-toplevel`)

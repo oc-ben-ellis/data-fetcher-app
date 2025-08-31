@@ -16,8 +16,8 @@ This guide provides instructions for setting up and testing the SFTP to S3 trans
 1. Clone the repository:
 
    ```bash
-   git clone github.com/openc/oc-data-fetcher-sftp
-   cd oc-data-fetcher-sftp
+   git clone github.com/openc/data-fetcher-sftp
+   cd data-fetcher-sftp
    ```
 
 2. Install dependencies using Poetry:
@@ -61,8 +61,8 @@ python src/sftp_to_s3.py YYYYMMDD ENV
 
 Where:
 
-- `YYYYMMDD` is the date in year-month-day format
-- `ENV` is the environment (playground, dev, idp, or prod)
+* `YYYYMMDD` is the date in year-month-day format
+* `ENV` is the environment (playground, dev, idp, or prod)
 
 Example:
 
@@ -146,5 +146,5 @@ Try the following:
      -e AWS_ACCESS_KEY_ID=your-access-key \
      -e AWS_SECRET_ACCESS_KEY=your-secret-key \
      -e AWS_SESSION_TOKEN=your-session-token \
-     oc-data-fetcher-sftp YYYYMMDD ENV
+     data-fetcher-sftp YYYYMMDD ENV
    ```
