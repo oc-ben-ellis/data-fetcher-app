@@ -19,4 +19,4 @@ spec:
   type: iac
   lifecycle: production
   owner: devops
-  system: fetchers
+  system: fetcher
