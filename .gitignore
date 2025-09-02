@@ -190,6 +190,6 @@ cython_debug/
 #.idea/
 
 .vscode/
-
+.DS_*
 logs/
 .ruff_cache/
