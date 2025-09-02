@@ -1,13 +1,14 @@
-import pytest
-import paramiko
-import json
-import yaml
 import hashlib
-from unittest.mock import patch, MagicMock, mock_open
-from datetime import datetime, timezone
-import sys
+import json
 import os
+import sys
+from datetime import datetime, timezone
 from io import BytesIO
+from unittest.mock import MagicMock, mock_open, patch
+
+import paramiko
+import pytest
+import yaml
 
 # Add the src directory to the path so we can import the module
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
@@ -972,4 +973,5 @@ class TestSftpToS3:
             assert result["source-filehash"] == expected_md5, (
                 "Should calculate MD5 hash when SFTP client is provided"
             )
+            mock_calculate_md5.assert_called_once_with(mock_sftp, remote_path)
             mock_calculate_md5.assert_called_once_with(mock_sftp, remote_path)
