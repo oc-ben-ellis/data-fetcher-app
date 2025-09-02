@@ -4,7 +4,7 @@ This guide provides instructions for setting up and testing the SFTP to S3 trans
 
 ## Prerequisites
 
-* Python 3.11+
+* Python 3.13+
 * Poetry for dependency management
 * Docker
 * The AWS CLI, configured for SSO from OpenCorporates accounts (see [SSO Playbook](https://opencorporates.atlassian.net/wiki/spaces/AWS/pages/397737995/SSO+Playbook+-+Add+a+new+account+profile+to+aws-cli))
