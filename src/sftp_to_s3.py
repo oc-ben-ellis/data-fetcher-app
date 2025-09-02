@@ -581,8 +581,10 @@ def validate_input_date(input_date: str) -> None:
     """Validate the input date format (YYYYMMDD)."""
     try:
         datetime.strptime(input_date, "%Y%m%d")
-    except ValueError:
-        raise ValueError("input_date must be in YYYYMMDD format (e.g., 20230101)")
+    except ValueError as e:
+        raise ValueError(
+            "input_date must be in YYYYMMDD format (e.g., 20230101)"
+        ) from e
 
 
 def validate_env(env: str) -> None:

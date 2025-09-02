@@ -27,4 +27,4 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-lint.select = ["F", "E", "I"]  # Enable specific rule codes (F - formatting, E - errors, B - bug risks, I - imports, S - security)
+lint.select = ["F", "E", "B", "I"]  # Enable specific rule codes (F - formatting, E - errors, B - bug risks, I - imports, S - security)
