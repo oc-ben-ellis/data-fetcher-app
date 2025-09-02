@@ -33,11 +33,24 @@ repos:
 
   # python checks
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    # Ruff version.
     rev: v0.12.11
     hooks:
-      # Run the linter.
+      # Run the linter
       - id: ruff-check
-        args: [--fix]
-      # Run the formatter.
+        args:
+          # Auto-fix linting issues (https://docs.astral.sh/ruff/linter/#fixes)
+          - --fix
+          # Ruff rules to check against (https://docs.astral.sh/ruff/rules/)
+          - --select=E # pycodestyle
+          - --select=F # pyflakes
+          - --select=I # isort
+          - --select=B # flake8-bugbear
+          - --select=SIM # flake8-simplify
+          - --select=S # flake8-bandit
+      # Run the formatter
       - id: ruff-format
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.17.1
+    hooks:
+      # Run the type checker
+      - id: mypy
