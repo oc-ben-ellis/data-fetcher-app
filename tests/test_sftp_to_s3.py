@@ -1,6 +1,5 @@
 import pytest
 import paramiko
-import boto3
 import json
 import yaml
 import hashlib
@@ -867,21 +866,21 @@ class TestSftpToS3:
         result = sftp_to_s3.generate_s3_key(s3_prefix, filename)
 
         # Verify: Check that the prefix and filename are joined correctly
-        assert (
-            result == "test/prefix/test_file.txt"
-        ), "Should join prefix and filename with a slash"
+        assert result == "test/prefix/test_file.txt", (
+            "Should join prefix and filename with a slash"
+        )
 
         # Case 2: Empty prefix
         result = sftp_to_s3.generate_s3_key("", filename)
-        assert (
-            result == "test_file.txt"
-        ), "Should return just the filename when prefix is empty"
+        assert result == "test_file.txt", (
+            "Should return just the filename when prefix is empty"
+        )
 
         # Case 3: Prefix ending with slash
         result = sftp_to_s3.generate_s3_key("test/prefix/", filename)
-        assert (
-            result == "test/prefix/test_file.txt"
-        ), "Should handle prefixes that already end with a slash"
+        assert result == "test/prefix/test_file.txt", (
+            "Should handle prefixes that already end with a slash"
+        )
 
     def test_generate_metadata(self, mock_config, mock_sftp):
         """
@@ -925,24 +924,24 @@ class TestSftpToS3:
             assert key in result, f"Missing required metadata field: {key}"
 
         # Verify: Check specific metadata values
-        assert (
-            result["source-filename"] == "file.txt"
-        ), "Should extract filename from path"
-        assert (
-            result["source-filehash"] == "test_md5_hash"
-        ), "Should use provided MD5 hash"
-        assert (
-            result["load-name"] == mock_config["meta_load_name"]
-        ), "Should use config value for load name"
-        assert (
-            result["load-version"] == mock_config["meta_load_version"]
-        ), "Should use config value for version"
-        assert (
-            result["source-system"] == mock_config["meta_source_system"]
-        ), "Should use config value for source system"
-        assert (
-            result["source-entity"] == mock_config["meta_source_entity"]
-        ), "Should use config value for source entity"
+        assert result["source-filename"] == "file.txt", (
+            "Should extract filename from path"
+        )
+        assert result["source-filehash"] == "test_md5_hash", (
+            "Should use provided MD5 hash"
+        )
+        assert result["load-name"] == mock_config["meta_load_name"], (
+            "Should use config value for load name"
+        )
+        assert result["load-version"] == mock_config["meta_load_version"], (
+            "Should use config value for version"
+        )
+        assert result["source-system"] == mock_config["meta_source_system"], (
+            "Should use config value for source system"
+        )
+        assert result["source-entity"] == mock_config["meta_source_entity"], (
+            "Should use config value for source entity"
+        )
 
         # Case 2: File without MD5 hash but with SFTP client for calculation
         # Setup: Create a mock file_info object without hash
@@ -970,7 +969,7 @@ class TestSftpToS3:
             )
 
             # Verify: Check that MD5 hash was calculated correctly
-            assert (
-                result["source-filehash"] == expected_md5
-            ), "Should calculate MD5 hash when SFTP client is provided"
+            assert result["source-filehash"] == expected_md5, (
+                "Should calculate MD5 hash when SFTP client is provided"
+            )
             mock_calculate_md5.assert_called_once_with(mock_sftp, remote_path)

@@ -1,33 +1,43 @@
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: no-commit-to-branch
+        args: [--branch, master]
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
 
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v6.0.0
-  hooks:
-  - id: no-commit-to-branch
-    args: [--branch, master]
-  - id: trailing-whitespace
-  - id: end-of-file-fixer
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.2.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
 
-- repo: https://github.com/compilerla/conventional-pre-commit
-  rev: v4.2.0
-  hooks:
-  - id: conventional-pre-commit
-    stages: [commit-msg]
+  - repo: https://github.com/gruntwork-io/pre-commit
+    rev: v0.1.30
+    hooks:
+      - id: terraform-fmt
 
-- repo: https://github.com/gruntwork-io/pre-commit
-  rev: v0.1.30
-  hooks:
-  - id: terraform-fmt
+  - repo: https://github.com/bridgecrewio/checkov.git
+    rev: 3.2.467
+    hooks:
+      - id: checkov
 
-- repo: https://github.com/bridgecrewio/checkov.git
-  rev: 3.2.467
-  hooks:
-  - id: checkov
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.100.0
+    hooks:
+      - id: terraform_docs
+        args:
+          - --hook-config=--path-to-file=README.md
+          - --hook-config=--add-to-existing-file=true
 
-- repo: https://github.com/antonbabenko/pre-commit-terraform
-  rev: v1.100.0
-  hooks:
-  - id: terraform_docs
-    args:
-      - --hook-config=--path-to-file=README.md
-      - --hook-config=--add-to-existing-file=true
+  # python checks
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.12.11
+    hooks:
+      # Run the linter.
+      - id: ruff-check
+        args: [--fix]
+      # Run the formatter.
+      - id: ruff-format

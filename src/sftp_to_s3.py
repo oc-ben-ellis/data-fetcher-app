@@ -162,7 +162,7 @@ def load_config_from_s3(bucket, key, source_id=None):
 
         # Parse YAML content
         all_configs = yaml.safe_load(file_content)
-        logger.info(f"Successfully loaded configuration from S3")
+        logger.info("Successfully loaded configuration from S3")
 
         # If no source_id is provided, return all configurations
         if source_id is None:
@@ -653,7 +653,6 @@ def run_script() -> None:
     )
 
     try:
-
         # Parse command line arguments
         args = parse_arguments()
 
