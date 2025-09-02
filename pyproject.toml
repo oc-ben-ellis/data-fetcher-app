@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "data-fetcher-sftp"
-version = "0.1.0"
+version = "0.0.1"
 description = "Data Fetcher SFTP service for Bots"
 readme = "README.md"
 package-mode = false
