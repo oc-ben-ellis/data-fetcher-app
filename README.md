@@ -24,7 +24,7 @@ This utility performs the following operations:
 
 ## Installation & Local Testing
 
-For detailed instructions on setting up the project locally and running tests, please refer to the [Local Testing Guide](doc/local-testing.md).
+For detailed instructions on setting up the project locally and running tests, please refer to the [Local Testing Guide](docs/local-testing.md).
 
 ## Configuration
 
@@ -54,7 +54,7 @@ The application uses one configuration source:
 
 ## Usage
 
-For detailed instructions on running the utility locally, please refer to the [Local Testing Guide](doc/local-testing.md).
+For detailed instructions on running the utility locally, please refer to the [Local Testing Guide](docs/local-testing.md).
 
 The utility accepts two parameters:
 
@@ -78,7 +78,7 @@ This project uses several tools to maintain code quality:
 
 ## Troubleshooting
 
-For troubleshooting common issues during local development and testing, please refer to the [Local Testing Guide](doc/local-testing.md).
+For troubleshooting common issues during local development and testing, please refer to the [Local Testing Guide](docs/local-testing.md).
 
 ## CI/CD
 
@@ -89,4 +89,4 @@ This project uses GitHub Actions for CI/CD:
 
 ## Architecture Decisions
 
-Architecture Decision Records (ADRs) are stored in the `doc/adr` directory.
+Architecture Decision Records (ADRs) are stored in the `docs/adr` directory.
