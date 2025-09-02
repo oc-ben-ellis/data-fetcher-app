@@ -24,7 +24,7 @@ def mock_config():
     Fixture that provides a mock configuration dictionary.
 
     This configuration mimics what would normally be loaded from the YAML config file
-    and AWS Secrets Manager, containing all necessary parameters for SFTP and S3 operations.
+    and AWS Secrets Manager, containing all necessary parameters for SFTP and S3 ops.
 
     Returns:
         dict: A dictionary containing all configuration parameters needed for testing
@@ -136,7 +136,8 @@ class TestSftpToS3:
     @patch("boto3.session.Session")
     def test_fetch_secrets(self, mock_session):
         """
-        Test that fetch_secrets correctly retrieves and parses secrets from AWS Secrets Manager.
+        Test that fetch_secrets correctly retrieves and parses secrets from
+        AWS Secrets Manager.
 
         This test verifies that:
         1. The function connects to AWS Secrets Manager with the correct parameters
@@ -163,7 +164,8 @@ class TestSftpToS3:
         # Execute: Call the function being tested
         result = sftp_to_s3.fetch_secrets("us_florida", "eu-west-2")
 
-        # Verify: Check that the returned data matches the expected secret with port converted to int
+        # Verify: Check that the returned data matches the expected secret with
+        #         port converted to int
         expected_result = secret_data.copy()
         expected_result["sftp_port"] = int(expected_result["sftp_port"])
         assert result == expected_result
@@ -673,7 +675,8 @@ class TestSftpToS3:
         3. Establishes an SFTP connection with the correct credentials
         4. Processes the file with the correct parameters
 
-        This is an integration test that verifies all components work together correctly.
+        This is an integration test that verifies all components work
+        together correctly.
         """
         # Setup mocks
         config_dict = {
