@@ -31,4 +31,4 @@ jobs:
 
     secrets:
       # Github token used to run git tagging
-      private-token: ${{ secrets.BYPASS}}
+      private-token: ${{ secrets.BYPASS }}
