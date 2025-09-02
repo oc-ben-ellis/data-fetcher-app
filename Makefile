@@ -7,7 +7,7 @@ ENV ?= play
 SOURCE_ID ?=
 AWS_REGION = eu-west-2
 AWS_ACCOUNT_ID ?= $(shell aws sts get-caller-identity --query Account --output text --profile $(AWS_PROFILE))
-ECR_REPOSITORY ?= fetcher-sftp
+ECR_REPOSITORY ?= data-fetcher-sftp
 
 # Default target
 .DEFAULT_GOAL := help
