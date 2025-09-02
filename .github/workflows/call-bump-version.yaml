@@ -1,4 +1,4 @@
-name: pre-commit autoupdate
+name: bump version
 
 permissions:
   actions: write
@@ -16,16 +16,19 @@ permissions:
   statuses: write
 
 on:
-  schedule:
-    # every sunday
-    - cron: "0 0 * * MON"
+  push:
+    branches: [master]
+    paths:
+      - "**/*.tf"
+      - "!infra/**"
+      - "src/**/*.py"
+      - "!docs/**"
   workflow_dispatch:
 
 jobs:
-  call-pre-commit-autoupdate:
-    uses: openc/gh-actions/.github/workflows/reusable-pre-commit-autoupdate.yaml@master
+  call-bump-version:
+    uses: openc/gh-actions/.github/workflows/reusable-bump-version.yaml@master
+
     secrets:
       # Github token used to run git tagging
       private-token: ${{ secrets.BYPASS }}
-      PIPELINE_GPG_KEY: ${{ secrets.PIPELINE_GPG_KEY }}
-      PIPELINE_GPG_PASSPHRASE: ${{ secrets.PIPELINE_GPG_PASSPHRASE }}

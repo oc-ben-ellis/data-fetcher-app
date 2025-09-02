@@ -1,14 +1,22 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: template-devops
-  description: this should be populated on init of the service / resource
+  name: data-fetcher-sftp
+  description: Deploys the SFTP Fetcher Resources
   annotations:
     backstage.io/techdocs-ref: dir:.
+  links:
+    - url: https://opencorporates.atlassian.net/wiki/spaces/DEV/pages/1185513523/Component+SFTP
+      title: Confluence
+      icon: dashboard
+      type: docs
   tags:
-    - not-yet-defined
+    - aws
+    - terraform
+    - docker
+    - python
 spec:
-  type: library
+  type: iac
   lifecycle: production
   owner: devops
-  system: ci-cd
+  system: fetcher
