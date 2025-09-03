@@ -1,0 +1,6 @@
+---
+description: Use a tmp directory for short-lived scripts
+globs:
+alwaysApply: true
+---
+For any temporary scripts or files you need to create to complete a task, use a tmp subdirectory. This makes it easier to clean up any lingering files left over from previous operations.

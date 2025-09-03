@@ -1,0 +1,26 @@
+[core]
+    pager = cat
+    editor = code --wait
+    autocrlf = input
+    filemode = false
+
+[init]
+    defaultBranch = main
+
+[push]
+    default = simple
+
+[pull]
+    rebase = false
+
+[color]
+    ui = auto
+
+[alias]
+    st = status
+    co = checkout
+    br = branch
+    ci = commit
+    unstage = reset HEAD --
+    last = log -1 HEAD
+    visual = !code

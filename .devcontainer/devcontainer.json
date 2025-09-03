@@ -1,0 +1,86 @@
+{
+    "name": "OC Fetcher",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {
+            "version": "latest",
+            "dockerDashComposeVersion": "v2"
+        },
+        "ghcr.io/devcontainers/features/aws-cli:1": {},
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "22.18.0"
+        },
+        "ghcr.io/devcontainers/features/python:1": {
+            "version": "3.10"
+        },
+        "./features/oc-fetcher-setup": {
+            "installPoetry": true,
+            "installMermaid": true,
+            "installPuppeteer": true
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.black-formatter",
+                "charliermarsh.ruff",
+                "ms-python.mypy-type-checker",
+                "ms-python.pylint",
+                "ms-vscode.vscode-json",
+                "ms-azuretools.vscode-docker",
+                "yzhang.markdown-all-in-one",
+                "bierner.markdown-mermaid"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.linting.enabled": true,
+                "python.linting.pylintEnabled": false,
+                "python.linting.flake8Enabled": false,
+                "python.linting.mypyEnabled": true,
+                "python.formatting.provider": "black",
+                "python.formatting.blackArgs": [
+                    "--line-length=88"
+                ],
+                "editor.formatOnSave": true,
+                "editor.codeActionsOnSave": {
+                    "source.organizeImports": "explicit"
+                },
+                "files.exclude": {
+                    "**/__pycache__": true,
+                    "**/*.pyc": true,
+                    "**/.pytest_cache": true,
+                    "**/.mypy_cache": true
+                },
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "terminal.integrated.profiles.linux": {
+                    "bash": {
+                        "path": "/bin/bash",
+                        "args": [
+                            "-l"
+                        ]
+                    },
+                    "zsh": {
+                        "path": "/bin/zsh",
+                        "args": [
+                            "-l"
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    "remoteUser": "vscode",
+    "postCreateCommand": "poetry install",
+    "remoteEnv": {
+        "PAGER": "cat",
+        "AWS_PAGER": "",
+        "GIT_PAGER": "cat",
+        "LESS": "",
+        "MORE": "",
+        "MANPAGER": "cat"
+    },
+    "postStartCommand": "mkdir -p ~/.aws && cp .devcontainer/shell-config.sh ~/ && cp .devcontainer/zsh-config.sh ~/ && cp .devcontainer/aws-config ~/.aws/config && cp .devcontainer/git-config ~/.gitconfig && echo 'source ~/shell-config.sh' >> ~/.bashrc && echo 'source ~/zsh-config.sh' >> ~/.zshrc"
+}

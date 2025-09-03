@@ -1,5 +1,0 @@
-boto3>=1.28.0
-pyyaml>=6.0
-psycopg2-binary>=2.9.5
-paramiko>=2.12.0
-tenacity>=8.2.0

@@ -1,0 +1,26 @@
+{
+    "id": "oc-fetcher-setup",
+    "version": "1.0.0",
+    "name": "OC Fetcher Development Setup",
+    "description": "Installs Poetry, project dependencies, Mermaid CLI, and Puppeteer for OC Fetcher development",
+    "options": {
+        "installPoetry": {
+            "type": "boolean",
+            "default": true,
+            "description": "Install Poetry package manager"
+        },
+        "installMermaid": {
+            "type": "boolean",
+            "default": true,
+            "description": "Install Mermaid CLI for diagram generation"
+        },
+        "installPuppeteer": {
+            "type": "boolean",
+            "default": true,
+            "description": "Install Puppeteer and Chrome headless shell"
+        }
+    },
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/python:1"
+    ]
+}

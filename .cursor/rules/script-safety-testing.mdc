@@ -1,0 +1,86 @@
+---
+description: Test scripts on small subsets before large-scale operations
+globs:
+alwaysApply: true
+---
+Script Safety Testing Rule
+
+Overview
+Before creating and running scripts that will impact a large number of files, agents will first test them on a smaller subset to confirm they work as expected.
+
+Core Requirements
+
+1. Small-Scale Testing First
+- ALWAYS test scripts on a small subset of files before running on large numbers
+- Use --dry-run or similar flags when available
+- Test on 1-5 files first, then gradually increase if needed
+- Verify the script produces expected results before scaling up
+
+2. Risk Assessment
+- Evaluate the potential impact of the script before execution
+- Consider using find with -print first to see what files would be affected
+- Use git status to understand current repository state
+- Check if files are tracked, untracked, or ignored
+
+3. Safe Testing Practices
+- Use the tmp/ directory for testing scripts
+- Create test files that mimic the target environment
+- Use --dry-run or --verbose flags when available
+- Test on non-critical files first
+
+4. Gradual Scaling
+- Start with 1-2 files
+- If successful, test on 5-10 files
+- Only proceed to large-scale operations after confirming success
+- Monitor progress and be ready to stop if issues arise
+
+Examples
+
+Do This Instead
+# First, see what files would be affected
+find . -name "*.py" -print
+
+# Test on a single file first
+sed -i 's/old/new/g' tmp/test_file.py
+
+# Test on a few files
+find . -name "*.py" | head -5 | xargs -I {} sed -i 's/old/new/g' {}
+
+# Only then proceed to all files
+find . -name "*.py" -exec sed -i 's/old/new/g' {} \;
+
+When This Rule Applies
+
+- File operations: sed, awk, find, grep replacements
+- Bulk renames: Moving, renaming multiple files
+- Code transformations: Refactoring across many files
+- Search and replace: Text substitutions across codebase
+- File deletions: Removing multiple files or directories
+- Permission changes: chmod, chown operations
+- Git operations: Large-scale git commands
+
+Safety Checklist
+
+Before running any script that affects multiple files:
+
+- Tested on 1-2 files first
+- Verified expected output/behavior
+- Checked current git status
+- Used appropriate safety flags (--dry-run, --verbose)
+- Have a rollback plan if needed
+- Understand the scope of changes
+- Tested in tmp/ directory if appropriate
+
+Emergency Procedures
+
+If a script causes unexpected issues:
+
+1. Stop immediately - Ctrl+C or kill the process
+2. Assess damage - Check what files were modified
+3. Use git - git checkout -- . to restore tracked files
+4. Check untracked - Remove any unwanted new files
+5. Learn and improve - Understand what went wrong
+
+Remember
+
+Safety first, efficiency second. It's always better to spend a few extra minutes testing than to spend hours fixing unexpected damage to your codebase.

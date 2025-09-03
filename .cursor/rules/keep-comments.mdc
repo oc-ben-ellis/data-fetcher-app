@@ -1,0 +1,6 @@
+---
+description: Keep code comments
+globs:
+alwaysApply: true
+---
+Always leave code comments in place unless they are no longer valid but do update them if they are out of date. Use comments to keep some context on why something may have been done.

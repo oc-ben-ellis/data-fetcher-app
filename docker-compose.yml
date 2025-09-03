@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  fetcher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles:
+      - run-app
+    volumes:
+      - .:/code
+      - poetry-cache:/opt/poetry-cache
+    environment:
+      - PYTHONPATH=/code
+    working_dir: /code
+    command: ["poetry", "run", "python", "-m", "oc_fetcher.main", "--help"]
+
+volumes:
+  poetry-cache:

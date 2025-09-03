@@ -1,4 +1,8 @@
-.PHONY: help install update test test-verbose test/with-coverage lint format clean build/for-local build/for-deployment push-to-ecr run run-local debug docker-lint pre-commit check all-checks
+SHELL=/bin/bash
+DOCKER=BUILDKIT_PROGRESS=plain docker
+DOCKER_COMPOSE=USER_ID=$$(id -u) GROUP_ID=$$(id -g) BUILDKIT_PROGRESS=plain docker-compose
+GIT_REPOSITORY_NAME=$$(basename `git rev-parse --show-toplevel`)
+GIT_COMMIT_ID=$$(git rev-parse --short HEAD)
 
 # Default parameter values
 AWS_PROFILE ?= default
@@ -9,125 +13,198 @@ AWS_REGION = eu-west-2
 AWS_ACCOUNT_ID ?= $(shell aws sts get-caller-identity --query Account --output text --profile $(AWS_PROFILE))
 ECR_REPOSITORY ?= data-fetcher-sftp
 
-# Default target
-.DEFAULT_GOAL := help
+# Auto-detect if we're running inside a container
+# Check for common container environment variables
+ifdef REMOTE_CONTAINERS
+	# Dev Container environment
+	CONTAINER_MODE=1
+else ifdef DOCKER_CONTAINER
+	# Docker container environment
+	CONTAINER_MODE=1
+else ifdef KUBERNETES_SERVICE_HOST
+	# Kubernetes environment
+	CONTAINER_MODE=1
+else ifdef AWS_EXECUTION_ENV
+	# AWS Lambda/ECS environment
+	CONTAINER_MODE=1
+else ifdef CONTAINER
+	# Generic container environment
+	CONTAINER_MODE=1
+else ifeq ($(USER),vscode)
+	# Dev Container environment (detected by USER=vscode)
+	CONTAINER_MODE=1
+else ifeq ($(TERM_PROGRAM),vscode)
+	# Dev Container environment (detected by TERM_PROGRAM=vscode)
+	CONTAINER_MODE=1
+else
+	# Check if /.dockerenv file exists (Docker container indicator)
+	CONTAINER_MODE=$$(shell ls /.dockerenv >/dev/null 2>&1 && echo 1 || echo 0)
+endif
 
-# Python settings
-PYTHON := python3
-POETRY := poetry
+# Set LOCAL mode automatically if in container, unless explicitly overridden
+ifdef CONTAINER_MODE
+	ifeq ($(CONTAINER_MODE),1)
+		ifeq ($(MODE),)
+			MODE=local
+		endif
+	endif
+endif
 
-# Project settings
-PROJECT_NAME := data-fetcher-sftp
+ifeq ($(MODE), local)
+	RUN=poetry run
+	RUN_NO_DEPS=poetry run
+else
+	RUN=$(DOCKER_COMPOSE) --profile run-app run --rm fetcher poetry run
+	RUN_NO_DEPS=$(DOCKER_COMPOSE) run --rm --no-deps fetcher poetry run
+endif
 
-GIT=git
-GIT_REPOSITORY_NAME=$$(basename `$(GIT) rev-parse --show-toplevel`)
-GIT_COMMIT_ID=$$($(GIT) rev-parse --short HEAD)
+ARGS=-v --tb=line
+# Default number of parallel workers for tests (auto-detect CPU cores)
+# Parallel execution can significantly speed up test runs, especially on multi-core systems
+# Use TEST_WORKERS=1 to run tests sequentially if you encounter issues
+TEST_WORKERS ?= auto
 
-
-# Directories
-SRC_DIR := src
-TEST_DIR := tests
-
-check:
-	@echo "Checking project settings..."
-	@echo "Project Name: $(PROJECT_NAME)"
-	@echo "AWS Profile: $(AWS_PROFILE)"
-	@echo "AWS Region: $(AWS_REGION)"
-	@echo "AWS Account ID: $(AWS_ACCOUNT_ID)"
-	@echo "ECR Repository: $(ECR_REPOSITORY)"
-	@echo "Date: $(DATE)"
-	@echo "Environment: $(ENV)"
-	@echo "Source ID: $(SOURCE_ID)"
-	@echo "GIT: $(GIT)"
-	@echo "Git Repository Name: $(GIT_REPOSITORY_NAME)"
-	@echo "Git Commit ID: $(GIT_COMMIT_ID)"
-	@echo "Mode: $(MODE)"
-	@echo "Run Command: $(RUN)"
-	@echo "Run No Deps Command: $(RUN_NO_DEPS)"
-	@echo "SRC_DIR: $(SRC_DIR)"
-	@echo "TEST_DIR: $(TEST_DIR)"
-	@echo "PYTHON: $(PYTHON)"
-	@echo "POETRY: $(POETRY)"
-	@echo "Done."
-
-# Colors for terminal output
-YELLOW := \033[1;33m
-NC := \033[0m # No Color
-
-help: ## Show this help message
-	@echo "$(YELLOW)$(PROJECT_NAME) Makefile$(NC)"
-	@echo "Usage: make [target]"
-	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
-
-install: ## Install dependencies using Poetry
-	@echo "Installing dependencies..."
-	$(POETRY) install
-
-update: ## Update dependencies to their latest versions
-	@echo "Updating dependencies..."
-	$(POETRY) update
-
+.PHONY: all-checks build/for-local build/for-deployment format lint test test/not-in-parallel test/parallel test/with-coverage test/snapshot-update run run/with-observability
+.PHONY: lint/black lint/ruff lint/mypy help examples debug docs docs/open headers pre-commit
 
 all-checks: format lint test/with-coverage
 
-lint: ## Run linting checks
-	@echo "Running linting checks..."
-	$(POETRY) run black $(SRC_DIR) $(TEST_DIR)
+build/for-local:
+	$(DOCKER_COMPOSE) build fetcher
 
-format: ## Format code using black and ruff
-	@echo "Formatting code..."
-	$(POETRY) run black $(SRC_DIR) $(TEST_DIR)
+build/for-deployment:
+	$(DOCKER) build -t "$(GIT_REPOSITORY_NAME):$(GIT_COMMIT_ID)" \
+	--build-arg POETRY_HTTP_BASIC_OCPY_USERNAME \
+	--build-arg POETRY_HTTP_BASIC_OCPY_PASSWORD \
+	.
 
-build/for-local: ## Build Docker image for local testing
-	@echo "Building Docker image for local testing..."
-	docker build -t "$(GIT_REPOSITORY_NAME):$(GIT_COMMIT_ID)" .
+format:
+	-$(RUN_NO_DEPS) black .
+	-$(RUN_NO_DEPS) ruff check --fix .
 
-build/for-deployment: ## Build Docker image for deployment (amd64 architecture)
-	@echo "Building Docker image for deployment (amd64 architecture)..."
-	docker buildx build --platform linux/amd64 -t "$(GIT_REPOSITORY_NAME):$(GIT_COMMIT_ID)" .
+headers:
+	@echo "Adding standard headers to Python files..."
+	$(RUN_NO_DEPS) python tmp/add_headers.py
+	@echo "Headers added. Use 'make headers/dry-run' to preview changes."
 
-push-to-ecr-play: build/for-deployment ## Push Docker image to ECR
-	@echo "Pushing Docker image to ECR..."
-	@echo "Authenticating with ECR..."
-	aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-	@echo "Tagging image for ECR..."
-	docker tag "$(GIT_REPOSITORY_NAME):$(GIT_COMMIT_ID)" "$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPOSITORY):$(GIT_COMMIT_ID)"
-	@echo "Pushing image to ECR..."
-	docker push "$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPOSITORY):$(GIT_COMMIT_ID)"
+headers/dry-run:
+	@echo "Previewing header changes (dry run)..."
+	$(RUN_NO_DEPS) python tmp/add_headers.py --dry-run
 
-run-local: ## Run the application locally using Poetry (make run-local DATE=YYYYMMDD ENV=play SOURCE_ID=us_florida)
-	@echo "Running application locally with date $(DATE), environment $(ENV), and source ID $(SOURCE_ID)..."
-	$(POETRY) run python $(SRC_DIR)/sftp_to_s3.py $(DATE) $(ENV) $(SOURCE_ID)
+pre-commit:
+	@echo "Installing pre-commit hooks..."
+	$(RUN_NO_DEPS) pre-commit install
+	@echo "Pre-commit hooks installed. They will run automatically on commit."
 
-run: build/for-local ## Run the application in Docker (make run DATE=YYYYMMDD ENV=play SOURCE_ID=us_florida)
-	@echo "Running Docker container with date $(DATE), environment $(ENV), and source ID $(SOURCE_ID)..."
-	@echo "Mounting AWS config from $(HOME)/.aws to /home/appuser/.aws in container"
-	docker run --rm \
-		-v $(HOME)/.aws:/home/appuser/.aws:ro \
-		-e AWS_PROFILE=$(AWS_PROFILE) \
-		-e AWS_SDK_LOAD_CONFIG=1 \
-		$(GIT_REPOSITORY_NAME):$(GIT_COMMIT_ID) $(DATE) $(ENV) $(SOURCE_ID)
+lint: lint/black lint/ruff lint/mypy
 
-test: ## Run tests
-	@echo "Running tests..."
-	$(POETRY) run pytest $(TEST_DIR)
+lint/black:
+	$(RUN_NO_DEPS) black --check .
 
-test-verbose: ## Run tests with verbose output
-	@echo "Running tests with verbose output..."
-	$(POETRY) run pytest -v $(TEST_DIR)
+lint/ruff:
+	$(RUN_NO_DEPS) ruff .
 
-test/with-coverage: ## Run tests with coverage report
-	@echo "Running tests with coverage..."
-	$(POETRY) run pytest --cov=$(SRC_DIR) $(TEST_DIR) --cov-report=term-missing
+lint/mypy:
+	$(RUN_NO_DEPS) mypy .
 
-clean: ## Clean up build artifacts and cache files
-	@echo "Cleaning up..."
-	rm -rf .pytest_cache
-	rm -rf .coverage
-	rm -rf htmlcov
-	rm -rf dist
-	rm -rf build
-	rm -rf *.egg-info
-	find . -type d -name __pycache__ -exec rm -rf {} +
-	find . -type d -name "*.pyc" -delete
+test:
+	$(RUN) pytest $(ARGS) -n $(TEST_WORKERS)
+
+test/not-in-parallel:
+	$(RUN) pytest $(ARGS)
+
+test/parallel:
+	$(RUN) pytest $(ARGS) -n $(TEST_WORKERS)
+
+test/with-coverage:
+	$(RUN) coverage run -m pytest $(ARGS) -n $(TEST_WORKERS)
+	$(RUN_NO_DEPS) coverage html --fail-under=0
+	@echo "Coverage report at file://$(PWD)/tmp/htmlcov/index.html"
+	$(RUN_NO_DEPS) coverage report
+
+run:
+ifeq ($(MODE),local)
+	$(RUN) python -m oc_fetcher.main $(ARGS)
+else
+	$(DOCKER_COMPOSE) --profile run-app up
+endif
+
+run/with-observability:
+ifeq ($(MODE),local)
+	echo $(MODE)
+	$(error $@ not available in MODE=$(MODE))
+else
+	$(DOCKER_COMPOSE) --profile run-app -f docker-compose.yml -f docker-compose.observability.yml up
+endif
+
+help:
+	@echo "Available commands:"
+	@echo "  all-checks          - Run format, lint, and tests with coverage"
+	@echo "  build/for-local     - Build Docker image for local development"
+	@echo "  build/for-deployment - Build Docker image for deployment"
+	@echo "  format              - Format code with black and ruff"
+	@echo "  headers             - Add standard headers to Python files"
+	@echo "  pre-commit          - Install pre-commit hooks for automatic checks"
+	@echo "  lint                - Run all linters"
+	@echo "  test                - Run tests in parallel (default, faster)"
+	@echo "  test/not-in-parallel - Run tests sequentially (fallback)"
+	@echo "  test/parallel      - Run tests in parallel (explicit)"
+	@echo "  test/with-coverage - Run tests with coverage report (parallel)"
+	@echo "  run                 - Run the fetcher (use ARGS=<fetcher_id>)"
+	@echo "  docs                - Build HTML documentation from markdown files"
+	@echo "  docs/open           - Build and open documentation in browser"
+	@echo "  examples            - Run example scripts"
+	@echo "  debug               - Show environment detection and mode settings"
+	@echo ""
+	@echo "Mode detection:"
+	@echo "  - Automatically detects container environments (Docker, DevContainer, etc.)"
+	@echo "  - Uses LOCAL mode (poetry run) when in containers"
+	@echo "  - Uses DOCKER mode when running from host"
+	@echo "  - Can be overridden with MODE=local or MODE=docker"
+	@echo ""
+	@echo "Usage examples:"
+	@echo "  make run ARGS=us-il"
+	@echo "  make test ARGS=tests/test_fetcher.py"
+	@echo "  make test/not-in-parallel ARGS=tests/test_fetcher.py"
+	@echo "  make test/parallel TEST_WORKERS=4 ARGS=tests/test_fetcher.py"
+	@echo "  make MODE=local run ARGS=us-fl"
+	@echo "  make MODE=docker run ARGS=us-fl"
+	@echo ""
+	@echo "Test parallelization:"
+	@echo "  TEST_WORKERS=auto  - Auto-detect CPU cores (default)"
+	@echo "  TEST_WORKERS=4     - Use 4 parallel workers"
+	@echo "  TEST_WORKERS=1     - Run tests sequentially"
+
+examples:
+	$(RUN) python examples/using_config_system.py
+
+debug:
+	@echo "Environment detection:"
+	@echo "  REMOTE_CONTAINERS: $(REMOTE_CONTAINERS)"
+	@echo "  DOCKER_CONTAINER: $(DOCKER_CONTAINER)"
+	@echo "  KUBERNETES_SERVICE_HOST: $(KUBERNETES_SERVICE_HOST)"
+	@echo "  AWS_EXECUTION_ENV: $(AWS_EXECUTION_ENV)"
+	@echo "  CONTAINER: $(CONTAINER)"
+	@echo "  USER: $(USER)"
+	@echo "  TERM_PROGRAM: $(TERM_PROGRAM)"
+	@echo "  /.dockerenv exists: $$(shell ls /.dockerenv >/dev/null 2>&1 && echo yes || echo no)"
+	@echo ""
+	@echo "Mode settings:"
+	@echo "  CONTAINER_MODE: $(CONTAINER_MODE)"
+	@echo "  MODE: $(MODE)"
+	@echo "  RUN command: $(RUN)"
+	@echo "  RUN_NO_DEPS command: $(RUN_NO_DEPS)"
+
+docs:
+	$(RUN_NO_DEPS) build-docs
+
+docs/open:
+	$(RUN_NO_DEPS) build-docs
+	@echo "Opening documentation in browser..."
+	@if command -v xdg-open >/dev/null 2>&1; then \
+		xdg-open docs/rendered/index.html; \
+	elif command -v open >/dev/null 2>&1; then \
+		open docs/rendered/index.html; \
+	else \
+		echo "Please open docs/rendered/index.html in your browser"; \
+	fi
