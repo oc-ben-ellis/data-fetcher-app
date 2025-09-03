@@ -1,5 +1,5 @@
 repos:
-  # generic hooks
+  # generic hooks (in accordance with https://opencorporates.atlassian.net/wiki/x/dgAFAg)
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -14,7 +14,7 @@ repos:
       - id: conventional-pre-commit
         stages: [commit-msg]
 
-  # iac hooks
+  # iac hooks (in accordance with https://opencorporates.atlassian.net/wiki/x/dgAFAg)
   - repo: https://github.com/bridgecrewio/checkov.git
     rev: 3.2.467
     hooks:
