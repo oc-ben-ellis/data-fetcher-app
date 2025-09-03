@@ -33,7 +33,7 @@ class GenericApiConfig(ApiConfiguration):
         super().__init__()
         self.name = "generic-api"
         self.description = "Generic API fetching configuration"
-        
+
     def build(self):
         return self.builder \
             .use_http_manager() \
@@ -51,7 +51,7 @@ class CustomApiConfig(ApiConfiguration):
         super().__init__()
         self.base_url = base_url
         self.auth_token = auth_token
-        
+
     def build(self):
         return self.builder \
             .use_http_manager(

@@ -199,79 +199,79 @@ Detailed view of component interactions organized by functional layers, showing 
 graph TB
     subgraph "OC Fetcher Framework"
         Fetcher[Fetcher<br/>Main Orchestrator]
-        
+
         subgraph "Bundle Locators"
             FP1[SFTP Directory<br/>Bundle Locator]
             FP2[SFTP File<br/>Bundle Locator]
             FP3[HTTP URL<br/>Bundle Locator]
         end
-        
+
         subgraph "Protocol Managers"
             PM1[HTTP Manager<br/>Rate Limiting<br/>Scheduling]
             PM2[SFTP Manager<br/>Rate Limiting<br/>Scheduling]
         end
-        
+
         subgraph "Bundle Loaders"
             DL1[HTTP Streaming<br/>Loader]
             DL2[SFTP<br/>Loader]
         end
-        
+
         subgraph "Storage Layer"
             BS1[File Storage]
             BS2[S3 Storage]
-            
+
             subgraph "Storage Decorators"
                 SD1[Unzip Resource<br/>Decorator]
                 SD2[WARC Decorator]
                 SD3[Bundle Resources<br/>Decorator]
             end
         end
-        
+
         subgraph "Supporting Systems"
             KV[Key-Value Store<br/>Redis/In-Memory]
             LOG[Structured Logging<br/>Structlog]
             CONFIG[Application Configuration]
         end
     end
-    
+
     subgraph "External Systems"
         HTTP[HTTP/HTTPS<br/>Endpoints]
         SFTP[SFTP Servers]
         AWS[AWS Services<br/>S3, Secrets Manager]
         REDIS[Redis Cache]
     end
-    
+
     %% Main flow
     Fetcher --> FP1
     Fetcher --> FP2
     Fetcher --> FP3
-    
+
     FP1 --> PM2
     FP2 --> PM2
     FP3 --> PM1
-    
+
     PM1 --> DL1
     PM2 --> DL2
-    
+
     DL1 --> SD1
     DL2 --> SD1
-    
+
     SD1 --> SD2
     SD2 --> SD3
     SD3 --> BS1
     SD3 --> BS2
-    
+
     %% External connections
     DL1 --> HTTP
     DL2 --> SFTP
     BS2 --> AWS
     KV --> REDIS
-    
+
     %% Supporting connections
     Fetcher --> KV
     Fetcher --> LOG
     Fetcher --> CONFIG
-    
+
     style Fetcher fill:#e1f5fe
     style FP1 fill:#f3e5f5
     style FP2 fill:#f3e5f5
@@ -296,19 +296,19 @@ sequenceDiagram
     participant Loader as Bundle Loader
     participant Storage as Storage Layer
     participant External as External Source
-    
+
     User->>Fetcher: Start Fetch Operation
     Fetcher->>BundleLocator: get_next_urls()
     BundleLocator-->>Fetcher: List[RequestMeta]
     Fetcher->>Queue: Add requests to queue
-    
+
     loop For each worker
         Fetcher->>Queue: Get next request
         Queue-->>Fetcher: RequestMeta
-        
+
         Fetcher->>Manager: Check rate limits & scheduling
         Manager-->>Fetcher: Allow/Deny
-        
+
         alt Request allowed
             Fetcher->>Loader: load(request, storage, ctx)
             Loader->>External: Fetch data
@@ -316,16 +316,16 @@ sequenceDiagram
             Loader->>Storage: Stream to storage
             Storage-->>Loader: BundleRefs
             Loader-->>Fetcher: BundleRefs
-            
+
             Fetcher->>BundleLocator: handle_url_processed(request, bundle_refs)
         end
-        
+
         alt Queue empty
                 Fetcher->>BundleLocator: get_next_urls()
     BundleLocator-->>Fetcher: New requests or empty
         end
     end
-    
+
     Fetcher-->>User: Fetch complete
 ```
 
@@ -339,30 +339,30 @@ graph LR
             WARC[WARC Decorator]
             Unzip[Unzip Resource<br/>Decorator]
         end
-        
+
         subgraph "Base Storage"
             File[File Storage<br/>Local Disk]
             S3[S3 Storage<br/>AWS S3]
         end
     end
-    
+
     subgraph "Data Flow"
         Raw[Raw Data Stream]
         Unzipped[Unzipped Data]
         WARCData[WARC Formatted]
         Bundled[Bundled Package]
     end
-    
+
     Raw --> Unzip
     Unzip --> Unzipped
     Unzipped --> WARC
     WARC --> WARCData
     WARCData --> Bundle
     Bundle --> Bundled
-    
+
     Bundle --> File
     Bundle --> S3
-    
+
     style Raw fill:#e3f2fd
     style Bundled fill:#e8f5e8
     style File fill:#fff3e0
@@ -378,35 +378,35 @@ graph TD
         Context[FetchContext]
         Plan[FetchPlan]
     end
-    
+
     subgraph "Bundle Locators"
         Provider1[SFTP Directory<br/>Bundle Locator]
         Provider2[SFTP File<br/>Bundle Locator]
         Provider3[HTTP URL<br/>Bundle Locator]
     end
-    
+
     subgraph "Protocol Layer"
         HttpManager[HTTP Manager]
         SftpManager[SFTP Manager]
     end
-    
+
     subgraph "Loader Layer"
         HttpLoader[HTTP Streaming<br/>Loader]
         SftpLoader[SFTP<br/>Loader]
     end
-    
+
     subgraph "Storage Layer"
         FileStorage[File Storage]
         S3Storage[S3 Storage]
         Decorators[Storage Decorators]
     end
-    
+
     subgraph "Supporting Systems"
         KVStore[Key-Value Store]
         Logger[Structured Logger]
         Config[Global Config]
     end
-    
+
     %% Core relationships
     Fetcher --> Context
     Fetcher --> Plan
@@ -417,20 +417,20 @@ graph TD
     Context --> SftpLoader
     Context --> FileStorage
     Context --> S3Storage
-    
+
     %% Protocol relationships
     HttpLoader --> HttpManager
     SftpLoader --> SftpManager
-    
+
     %% Storage relationships
     FileStorage --> Decorators
     S3Storage --> Decorators
-    
+
     %% Supporting relationships
     Fetcher --> KVStore
     Fetcher --> Logger
     Fetcher --> Config
-    
+
     style Fetcher fill:#e1f5fe
     style Context fill:#e1f5fe
     style Plan fill:#e1f5fe

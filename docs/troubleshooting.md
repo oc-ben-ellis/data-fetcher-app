@@ -13,7 +13,7 @@ KeyError: Unknown configuration: us-il
 
 **Cause**: The configuration doesn't exist in the registry.
 
-**Solution**: 
+**Solution**:
 - Check available configurations: `poetry run python -m oc_fetcher.main`
 - Use only available configurations: `us-fl` or `fr`
 
@@ -57,7 +57,7 @@ Example: For config 'us-fl' and key 'username', set: OC_CREDENTIAL_US_FL_USERNAM
 
 **Cause**: Missing environment variables for credentials.
 
-**Solution**: 
+**Solution**:
 1. Set the required environment variables:
    ```bash
    export OC_CREDENTIAL_US_FL_HOST="sftp.example.com"

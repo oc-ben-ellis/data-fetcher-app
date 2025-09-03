@@ -23,7 +23,7 @@ fi
 if [ "$INSTALLPUPPETEER" = "true" ]; then
     echo "Installing Puppeteer and Chrome headless shell..."
     npx puppeteer browsers install chrome-headless-shell
-    
+
     # Install system dependencies for Puppeteer
     apt-get update && apt-get install -y \
         libglib2.0-0t64 \

@@ -248,24 +248,24 @@ from oc_fetcher.kv_store import get_global_store
 class CachingFrontierProvider:
     def __init__(self, base_url: str):
         self.base_url = base_url
-    
+
     async def get_next_urls(self, ctx):
         store = await get_global_store()
-        
+
         # Check if we've already processed this recently
         cache_key = f"processed:{self.base_url}"
         if await store.exists(cache_key):
             return []  # Already processed
-        
+
         # Mark as processed with 1-hour TTL
         await store.put(cache_key, True, ttl=3600)
-        
+
         # Return URLs to process
         return [{"url": f"{self.base_url}/page1"}]
-    
+
     async def handle_url_processed(self, request, bundle_refs, ctx):
         store = await get_global_store()
-        
+
         # Store processing results
         result_key = f"result:{request['url']}"
         await store.put(result_key, {
@@ -283,20 +283,20 @@ from oc_fetcher.kv_store import put, get, exists
 async def cached_api_call(url: str, cache_ttl: int = 300):
     """Make an API call with caching."""
     cache_key = f"api_response:{url}"
-    
+
     # Check cache first
     if await exists(cache_key):
         cached_response = await get(cache_key)
         print(f"Cache hit for {url}")
         return cached_response
-    
+
     # Make API call
     print(f"Cache miss for {url}, making API call")
     response = await make_api_call(url)
-    
+
     # Cache the response
     await put(cache_key, response, ttl=cache_ttl)
-    
+
     return response
 ```
 
@@ -309,13 +309,13 @@ async def create_session(user_id: str, session_data: dict):
     """Create a new user session."""
     session_id = generate_session_id()
     session_key = f"session:{session_id}"
-    
+
     await put(session_key, {
         "user_id": user_id,
         "data": session_data,
         "created_at": datetime.now().isoformat(),
     }, ttl=timedelta(hours=24))
-    
+
     return session_id
 
 async def get_session(session_id: str):
@@ -337,7 +337,7 @@ from oc_fetcher.kv_store import put, get, range_get
 async def track_batch_progress(batch_id: str, total_items: int):
     """Track progress of a batch processing job."""
     progress_key = f"batch_progress:{batch_id}"
-    
+
     await put(progress_key, {
         "total_items": total_items,
         "processed_items": 0,
@@ -349,7 +349,7 @@ async def update_batch_progress(batch_id: str, processed: int = 1, failed: int =
     """Update batch processing progress."""
     progress_key = f"batch_progress:{batch_id}"
     progress = await get(progress_key)
-    
+
     if progress:
         progress["processed_items"] += processed
         progress["failed_items"] += failed

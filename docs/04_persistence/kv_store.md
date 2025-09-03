@@ -195,21 +195,21 @@ from oc_fetcher.kv_store import get_global_store
 class CachingBundleLocator:
     async def get_next_urls(self, ctx):
         store = await get_global_store()
-        
+
         # Check if we've already processed this recently
         cache_key = f"processed:{self.base_url}"
         if await store.exists(cache_key):
             return []  # Already processed
-        
+
         # Mark as processed
         await store.put(cache_key, True, ttl=3600)
-        
+
         # Return URLs to process
         return [{"url": f"{self.base_url}/page1"}]
-    
+
     async def handle_url_processed(self, request, bundle_refs, ctx):
         store = await get_global_store()
-        
+
         # Store processing results
         result_key = f"result:{request['url']}"
         await store.put(result_key, {
@@ -235,7 +235,7 @@ def _setup_my_fetcher() -> FetchContext:
         serializer="json",
         default_ttl=3600,
     )
-    
+
     # Rest of configuration...
     return create_fetcher_config().build()
 ```
@@ -403,13 +403,13 @@ For more information, see the test files and example configurations in the proje
 class CachingBundleLocator:
     async def get_next_urls(self, ctx):
         from oc_fetcher.kv_store import get_global_store
-        
+
         store = await get_global_store()
         cache_key = f"processed:{self.base_url}"
-        
+
         if await store.exists(cache_key):
             return []  # Already processed
-        
+
         await store.put(cache_key, True, ttl=3600)
         return [{"url": f"{self.base_url}/page1"}]
 ```

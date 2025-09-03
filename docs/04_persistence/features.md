@@ -69,11 +69,11 @@ retry_manager = await create_retry_manager(max_retries=3, backoff_factor=2.0)
 if await retry_manager.should_retry("failed_item"):
     # Record retry attempt
     retry_count = await retry_manager.record_retry("failed_item", "Error message")
-    
+
     # Get delay before next retry
     delay = await retry_manager.get_retry_delay("failed_item")
     await asyncio.sleep(delay)
-    
+
     # Clear retry data on success
     await retry_manager.clear_retry_data("failed_item")
 ```
@@ -167,18 +167,18 @@ from oc_fetcher.utils.persistence_utils import create_persistence_manager, creat
 async def handle_failed_request(request, error):
     persistence = await create_persistence_manager("my_provider")
     retry_manager = await create_retry_manager(max_retries=3)
-    
+
     # Save error
     await persistence.save_error(request.url, str(error))
-    
+
     # Check if we should retry
     if await retry_manager.should_retry(request.url):
         retry_count = await retry_manager.record_retry(request.url, str(error))
         delay = await retry_manager.get_retry_delay(request.url)
-        
+
         print(f"Retrying {request.url} in {delay:.2f} seconds (attempt {retry_count})")
         return True
-    
+
     return False
 ```
 
@@ -189,15 +189,15 @@ from oc_fetcher.utils.persistence_utils import create_state_tracker
 
 async def monitor_processing():
     tracker = await create_state_tracker("monitoring")
-    
+
     # Track various metrics
     await tracker.increment_counter("total_requests")
     await tracker.record_processing_time("api_request", duration)
-    
+
     # Get statistics
     stats = await tracker.get_processing_stats("api_request")
     total_requests = await tracker.get_counter("total_requests")
-    
+
     print(f"Total requests: {total_requests}")
     print(f"Average API request time: {stats['avg_time']:.2f}s")
 ```
@@ -209,15 +209,15 @@ from oc_fetcher.utils.persistence_utils import create_persistence_manager
 
 async def cleanup_and_recover():
     persistence = await create_persistence_manager("my_provider")
-    
+
     # Get failed items
     failed_items = await persistence.get_failed_items(max_retries=3)
-    
+
     # Retry failed items
     for item in failed_items:
         if await retry_item(item):
             await persistence.clear_errors(item['item_id'])
-    
+
     # Clear old data
     await persistence.clear_errors()  # Clear all errors
 ```

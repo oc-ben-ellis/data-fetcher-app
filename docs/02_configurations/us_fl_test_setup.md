@@ -158,12 +158,12 @@ from oc_fetcher.registry import get_fetcher
 async def test_us_fl_fetcher():
     """Test the US Florida SFTP fetcher."""
     print("=== US Florida SFTP Fetcher Test ===")
-    
+
     try:
         # Get the us-fl fetcher
         fetcher = get_fetcher("us-fl")
         print("✓ Successfully created US Florida fetcher")
-        
+
         # Create a fetch plan
         run_context = FetchRunContext(run_id="test-us-fl-manual")
         plan = FetchPlan(
@@ -172,20 +172,20 @@ async def test_us_fl_fetcher():
             concurrency=1
         )
         print("✓ Created fetch plan")
-        
+
         # Run the fetcher
         print("Running fetcher...")
         result = await fetcher.run(plan)
-        
+
         print(f"✓ Fetcher completed successfully")
         print(f"  Processed: {result.processed_count} files")
         print(f"  Errors: {len(result.errors)}")
-        
+
         if result.errors:
             print("  Error details:")
             for error in result.errors:
                 print(f"    - {error}")
-                
+
     except Exception as e:
         print(f"✗ Error: {e}")
         import traceback

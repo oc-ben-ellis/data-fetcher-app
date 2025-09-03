@@ -194,7 +194,7 @@ The build system automatically creates navigation based on:
 # In README.md files, use numbered lists for ordering:
 
 1. **[overview.md](overview.md)** - Start here for an overview
-2. **[api.md](api.md)** - API-based configurations  
+2. **[api.md](api.md)** - API-based configurations
 3. **[sftp.md](sftp.md)** - SFTP configurations
 4. **[scheduling.md](scheduling.md)** - Scheduling options
 ```

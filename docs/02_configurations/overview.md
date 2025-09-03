@@ -279,7 +279,7 @@ class MyCustomConfig(Configuration):
         super().__init__()
         self.name = "my-custom"
         self.description = "My custom fetching configuration"
-        
+
     def build(self):
         # Configure components
         return self.builder.build()

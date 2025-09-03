@@ -9,7 +9,7 @@
       .cls-2 {
         fill: #2b2f30;
       }
-      
+
       .fetcher-text {
         font-family: "Gotham", "Helvetica Neue", Arial, sans-serif;
         font-size: 12px;
@@ -30,7 +30,7 @@
     <ellipse id="Ellipse_4" data-name="Ellipse 4" class="cls-1" cx="2.602" cy="2.602" rx="2.602" ry="2.602" transform="translate(239.873 48.493)"></ellipse>
     <ellipse id="Ellipse_5" data-name="Ellipse 5" class="cls-1" cx="2.602" cy="2.602" rx="2.602" ry="2.602" transform="translate(228.562 48.493)"></ellipse>
     <ellipse id="Ellipse_6" data-name="Ellipse 6" class="cls-1" cx="2.602" cy="2.602" rx="2.602" ry="2.602" transform="translate(217.279 48.493)"></ellipse>
-    
+
     <!-- "fetcher" text positioned just before the dots -->
     <text x="210" y="51.095" class="fetcher-text">fetcher</text>
   </g>

@@ -56,7 +56,7 @@
         font-weight: 300;
         font-style: normal;
       }
-      
+
       .cls-1 {
         fill: #9f1f34;
       }
@@ -64,7 +64,7 @@
       .cls-2 {
         fill: #2b2f30;
       }
-      
+
       .fetcher-text {
         font-family: &quot;MagnaEF Light Regular&quot;, &quot;Gotham&quot;, &quot;Helvetica Neue&quot;, Arial, sans-serif;
         font-size: 44.65px;

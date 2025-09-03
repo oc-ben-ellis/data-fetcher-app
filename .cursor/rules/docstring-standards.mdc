@@ -21,21 +21,21 @@ Use Google-style docstring format for all docstrings:
 
 def function_name(param1: str, param2: int) -> bool:
     """Short description of what the function does.
-    
+
     Longer description if needed, explaining the purpose, behavior,
     and any important implementation details.
-    
+
     Args:
         param1: Description of the first parameter.
         param2: Description of the second parameter.
-            
+
     Returns:
         Description of what is returned.
-        
+
     Raises:
         ValueError: When something goes wrong.
         TypeError: When wrong type is passed.
-        
+
     Example:
         >>> function_name("test", 42)
         True
@@ -91,7 +91,7 @@ Common Patterns
 Simple Function
 def get_user_id() -> str:
     """Get the current user's ID.
-    
+
     Returns:
         The user ID as a string.
     """
@@ -99,28 +99,28 @@ def get_user_id() -> str:
 
 Complex Function
 async def fetch_data(
-    url: str, 
+    url: str,
     timeout: int = 30,
     retries: int = 3
 ) -> Dict[str, Any]:
     """Fetch data from a remote URL with retry logic.
-    
+
     Attempts to fetch data from the specified URL, with configurable
     timeout and retry settings. Uses exponential backoff for retries.
-    
+
     Args:
         url: The URL to fetch data from.
         timeout: Request timeout in seconds. Defaults to 30.
         retries: Number of retry attempts. Defaults to 3.
-            
+
     Returns:
         Dictionary containing the fetched data and metadata.
-        
+
     Raises:
         httpx.TimeoutException: When request times out.
         httpx.HTTPStatusError: When server returns error status.
         ValueError: When URL is invalid or empty.
-        
+
     Example:
         >>> data = await fetch_data("https://api.example.com/data")
         >>> print(data["status"])
@@ -131,20 +131,20 @@ async def fetch_data(
 Class Docstring
 class DataProcessor:
     """Process and transform data according to configured rules.
-    
+
     This class provides a flexible framework for processing data
     through a series of configurable transformation steps. It supports
     both synchronous and asynchronous processing modes.
-    
+
     Attributes:
         rules: List of processing rules to apply.
         cache: Optional cache for storing intermediate results.
         max_workers: Maximum number of worker threads/processes.
     """
-    
+
     def __init__(self, rules: List[Rule], cache: Optional[Cache] = None):
         """Initialize the data processor.
-        
+
         Args:
             rules: List of processing rules to apply.
             cache: Optional cache instance for storing results.

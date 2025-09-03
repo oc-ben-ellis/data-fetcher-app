@@ -26,7 +26,7 @@ diagrams=(
 
 for diagram in "${diagrams[@]}"; do
     echo "Converting $diagram..."
-    
+
     # Convert to PNG
     mmdc -i "$diagram.mmd" -o "png/$diagram.png" -b transparent
     if [ $? -eq 0 ]; then
@@ -34,7 +34,7 @@ for diagram in "${diagrams[@]}"; do
     else
         echo "  ✗ Failed to create png/$diagram.png"
     fi
-    
+
     # Convert to SVG
     mmdc -i "$diagram.mmd" -o "svg/$diagram.svg" -b transparent
     if [ $? -eq 0 ]; then

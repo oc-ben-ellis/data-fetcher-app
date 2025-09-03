@@ -182,7 +182,7 @@ services:
       - AWS_REGION=eu-west-2
     depends_on:
       - redis
-  
+
   redis:
     image: redis:7-alpine
     ports:

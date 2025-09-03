@@ -132,7 +132,7 @@ This documentation is organized into the following main sections:
 ### [⚙️ Configurations](docs/02_configurations/) - Framework overview and configurations
 - **Complete framework overview and quick start**
 - API-based configurations
-- SFTP configurations  
+- SFTP configurations
 - Scheduling options
 
 ### [🌐 Global Configuration](docs/03_global_configuration/) - System-wide settings and logging
@@ -231,4 +231,3 @@ See [Docstring Standards](docs/docstring_standards.md) for detailed guidelines a
 ---
 
 © 2025 OpenCorporates. All rights reserved.
-

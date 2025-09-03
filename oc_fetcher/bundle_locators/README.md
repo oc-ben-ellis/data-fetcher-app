@@ -19,11 +19,11 @@ class BundleLocator(Protocol):
     async def get_next_urls(self, ctx: FetchRunContext) -> List[RequestMeta]:
         """Generate the next batch of URLs to be processed."""
         pass
-    
+
     async def handle_url_processed(
-        self, 
-        request: RequestMeta, 
-        bundle_refs: List[BundleRef], 
+        self,
+        request: RequestMeta,
+        bundle_refs: List[BundleRef],
         ctx: FetchRunContext
     ) -> None:
         """Called when a URL has been successfully processed."""
@@ -230,7 +230,7 @@ Provider for APIs with complex pagination logic including cursor-based paginatio
 
 ```python
 from oc_fetcher.bundle_locators import (
-    ComplexPaginationProvider, 
+    ComplexPaginationProvider,
     CursorPaginationStrategy
 )
 
@@ -372,10 +372,10 @@ def setup_sftp_fetcher():
         connect_timeout=20.0,
         rate_limit_requests_per_second=2.0,
     )
-    
+
     # Create loader
     loader = create_sftp_loader(sftp_manager=sftp_manager)
-    
+
     # Create locator
     provider = SFTPDirectoryBundleLocator(
         sftp_manager=sftp_manager,
@@ -383,7 +383,7 @@ def setup_sftp_fetcher():
         filename_pattern="*.txt",
         max_files=1000
     )
-    
+
     # Build configuration
     return (
         create_fetcher_config()
@@ -410,10 +410,10 @@ def setup_api_fetcher():
             client_secret="your_client_secret"
         )
     )
-    
+
     # Create loader
     loader = create_tracking_api_loader(http_manager=http_manager)
-    
+
     # Create pagination strategy
     pagination_strategy = CursorPaginationStrategy(
         cursor_field="next_cursor",
@@ -421,7 +421,7 @@ def setup_api_fetcher():
         count_field="page_size",
         max_records=50000
     )
-    
+
     # Create locator
     provider = ComplexPaginationBundleLocator(
         http_manager=http_manager,
@@ -433,7 +433,7 @@ def setup_api_fetcher():
         query_builder=lambda date_str, narrowing: f"updated_at:[{date_str}]",
         pagination_strategy=pagination_strategy
     )
-    
+
     # Build configuration
     return (
         create_fetcher_config()
@@ -453,17 +453,17 @@ def setup_multi_provider_fetcher():
         remote_dir="/data/daily",
         filename_pattern="*.txt"
     )
-    
+
     quarterly_provider = SFTPFileBundleLocator(
         sftp_manager=sftp_manager,
         file_paths=["/data/quarterly/report.zip"]
     )
-    
+
     api_provider = SingleApiBundleLocator(
         http_manager=http_manager,
         urls=["https://api.example.com/status"]
     )
-    
+
     # Build configuration with multiple locators
     return (
         create_fetcher_config()
@@ -512,12 +512,12 @@ from oc_fetcher.kv_store import get_global_store
 
 async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
     store = await get_global_store()
-    
+
     # Check if we've already processed this
     cache_key = f"processed:{self.base_url}"
     if await store.exists(cache_key):
         return []
-    
+
     # Mark as processed
     await store.put(cache_key, True, ttl=3600)
     return urls

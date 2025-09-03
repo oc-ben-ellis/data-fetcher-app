@@ -417,7 +417,7 @@ def mock_credential_provider(mock_credentials: MagicMock) -> AsyncMock:
     return provider
 
 
-class TestUSFloridaFunctional:
+class TestUsfloridaFunctional:
     """Functional test for US Florida configuration."""
 
     @pytest.mark.asyncio

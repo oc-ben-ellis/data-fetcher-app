@@ -71,6 +71,7 @@ def contains_non_common_acronyms(class_name: str) -> bool:
         "XML",
         "CSV",
         "YAML",
+        "WARC",
         "ZIP",
         "GZIP",
         "BZIP",

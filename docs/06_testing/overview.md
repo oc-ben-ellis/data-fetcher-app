@@ -88,13 +88,13 @@ def _signal_handler(signum: int, frame: Any) -> None:
 def custom_exception_handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
     """Custom exception handler that ignores certain errors during shutdown."""
     global _shutdown_requested
-    
+
     if _shutdown_requested:
         exception = context.get('exception')
         if exception and isinstance(exception, (ValueError, OSError)):
             if "I/O operation on closed file" in str(exception):
                 return  # Silently ignore during shutdown
-    
+
     loop.default_exception_handler(context)
 ```
 
