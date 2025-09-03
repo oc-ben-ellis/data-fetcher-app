@@ -1,0 +1,40 @@
+name: python
+
+permissions:
+  actions: write
+  checks: write
+  contents: write
+  deployments: write
+  id-token: write
+  issues: write
+  discussions: write
+  packages: write
+  pages: write
+  pull-requests: write
+  repository-projects: write
+  security-events: write
+  statuses: write
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  call-python:
+    uses: openc/gh-actions/.github/workflows/reusable-python.yaml@DEV-3171-bot-migration
+    # with:
+    #   # turn on black (default is true!)
+    #   enable-black: true
+
+    #   # turn on flake8 (default is true)
+    #   enable-flake8: true
+
+    #   # turn on semgrep (default is true)
+    #   enable-semgrep: true
+
+    #   # set scan path for black (default is ./src)
+    #   black-src: "./src"
+
+    #   define which semgrep scans to run
+    #   semgrep-rules: "p/python"
