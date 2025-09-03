@@ -58,8 +58,8 @@ For detailed instructions on running the utility locally, please refer to the [L
 
 The utility accepts two parameters:
 
-* `YYYYMMDD` - The date in year-month-day format.
-* `ENV` - The environment (play, dev, idp, or prod).
+* `YYYYMMDD` - The date in year-month-day format
+* `ENV` - The environment (play, dev, idp, or prod)
 
 Example:
 
