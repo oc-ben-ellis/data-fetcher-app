@@ -2,7 +2,7 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: data-fetcher-sftp
-  description: Deploys the SFTP Fetcher Resources
+  description: Terraform module which deploys the Data Fetcher SFTP component that collects raw data from SFTP servers
   annotations:
     backstage.io/techdocs-ref: dir:.
   links:
