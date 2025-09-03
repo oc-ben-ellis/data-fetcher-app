@@ -24,5 +24,12 @@ jobs:
   call-python:
     uses: openc/gh-actions/.github/workflows/reusable-python.yaml@DEV-3171-bot-migration
     with:
-      # turn on ruff checks/formatting (default is true)
+      python-version: "3.13"
+
+      # ruff inputs
       enable-ruff: true
+      ruff-version: "0.12.11"
+
+      # mypy inputs
+      enable-mypy: true
+      mypy-version: "1.17.1"
