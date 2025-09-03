@@ -19,10 +19,10 @@ async def credential_provider_example() -> None:
     """Demonstrate different credential providers."""
     print("=== OC Fetcher Credential Provider Example ===")
 
-    from oc_fetcher.credentials import (
+    from data_fetcher.credentials import (
         EnvironmentCredentialProvider,
     )
-    from oc_fetcher.global_credential_provider import (
+    from data_fetcher.global_credential_provider import (
         configure_global_credential_provider,
         get_default_credential_provider,
     )
@@ -92,15 +92,15 @@ async def credential_provider_example() -> None:
     # Example 4: Command Line Usage
     print("\n4. Command Line Usage:")
     print("   To use environment variables for credentials:")
-    print("   python -m oc_fetcher.main --credentials-provider env us-fl")
+    print("   python -m data_fetcher.main --credentials-provider env us-fl")
     print("")
     print("   To use AWS Secrets Manager (default):")
-    print("   python -m oc_fetcher.main --credentials-provider aws us-fl")
+    print("   python -m data_fetcher.main --credentials-provider aws us-fl")
     print("   or simply:")
-    print("   python -m oc_fetcher.main us-fl")
+    print("   python -m data_fetcher.main us-fl")
     print("")
     print("   To see help:")
-    print("   python -m oc_fetcher.main --help")
+    print("   python -m data_fetcher.main --help")
 
     print("\n=== Credential provider example completed ===")
 

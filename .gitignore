@@ -210,3 +210,5 @@ cython_debug/
 
 # Ruff cache
 .ruff_cache/
+
+# No special devcontainer files needed - using npx

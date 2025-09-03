@@ -47,16 +47,16 @@ Complete environment variable reference and detailed configuration options for s
 ### **Environment Variables**
 ```bash
 # Logging configuration
-OC_FETCHER_LOG_LEVEL=INFO
-OC_FETCHER_LOG_FORMAT=json
+DATA_FETCHER_LOG_LEVEL=INFO
+DATA_FETCHER_LOG_FORMAT=json
 
 # Storage configuration
-OC_FETCHER_S3_BUCKET=my-fetcher-bucket
-OC_FETCHER_S3_REGION=us-east-1
+DATA_FETCHER_S3_BUCKET=my-fetcher-bucket
+DATA_FETCHER_S3_REGION=us-east-1
 
 # Protocol settings
-OC_FETCHER_HTTP_TIMEOUT=30
-OC_FETCHER_SFTP_TIMEOUT=60
+DATA_FETCHER_HTTP_TIMEOUT=30
+DATA_FETCHER_SFTP_TIMEOUT=60
 ```
 
 ### **Configuration Files**
@@ -85,7 +85,7 @@ protocols:
 
 ### **Code Configuration**
 ```python
-from oc_fetcher.config import GlobalConfig
+from data_fetcher.config import GlobalConfig
 
 config = GlobalConfig()
 config.logging.level = "DEBUG"

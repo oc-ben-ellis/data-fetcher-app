@@ -25,7 +25,7 @@ from testcontainers.core.waiting_utils import (  # type: ignore[import-untyped]
     wait_for_logs,
 )
 
-from oc_fetcher.protocols import (
+from data_fetcher.protocols import (
     BasicAuthenticationMechanism,
     BearerTokenAuthenticationMechanism,
     HttpManager,
@@ -400,7 +400,7 @@ class TestScheduledDailyGate:
     ) -> None:
         """Test that gate waits for target time."""
         # Mock the datetime.now function to return a specific time
-        with patch("oc_fetcher.protocols.sftp_manager.datetime") as mock_datetime:
+        with patch("data_fetcher.protocols.sftp_manager.datetime") as mock_datetime:
             # Mock current time to 14:29:59
             mock_now = datetime(2024, 1, 1, 14, 29, 59, tzinfo=timezone.utc)
             mock_datetime.now.return_value = mock_now

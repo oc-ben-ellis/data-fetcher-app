@@ -13,7 +13,7 @@ The framework includes an SFTP loader that provides enterprise-grade capabilitie
 ## Quick Start
 
 ```python
-from oc_fetcher import get_fetcher, FetchPlan
+from data_fetcher import get_fetcher, FetchPlan
 
 # Get the SFTP fetcher
 fetcher = get_fetcher("us-sftp")

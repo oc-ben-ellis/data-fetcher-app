@@ -19,13 +19,13 @@ The storage architecture diagram focuses on the composable storage system, showi
 
 ## Base Storage Implementations
 
-### 1. **FileStorage** (`oc_fetcher/storage/file_storage.py`)
+### 1. **FileStorage** (`data_fetcher/storage/file_storage.py`)
 - Stores files on local disk
 - Simple file-based persistence
 - Supports custom output directories
 - No external dependencies
 
-### 2. **S3Storage** (`oc_fetcher/storage/s3_storage.py`)
+### 2. **S3Storage** (`data_fetcher/storage/s3_storage.py`)
 - Stores files in S3 with metadata
 - Direct S3 upload with metadata
 - Supports environment-specific bucket naming
@@ -33,7 +33,7 @@ The storage architecture diagram focuses on the composable storage system, showi
 
 ## Storage Decorators
 
-Storage decorators are located in `oc_fetcher/storage/decorators/` and modify streams being passed to storage implementations:
+Storage decorators are located in `data_fetcher/storage/decorators/` and modify streams being passed to storage implementations:
 
 ### 1. **UnzipResourceDecorator** (`unzip_resource.py`)
 - Automatically decompresses gzip and zip resources
@@ -70,7 +70,7 @@ Storage Interface:
 
 ### Basic File Storage
 ```python
-from oc_fetcher.storage import FileStorage
+from data_fetcher.storage import FileStorage
 
 # Basic file storage
 storage = FileStorage("output/files")
@@ -78,7 +78,7 @@ storage = FileStorage("output/files")
 
 ### File Storage with WARC Formatting
 ```python
-from oc_fetcher.storage import FileStorage, ApplyWARCDecorator
+from data_fetcher.storage import FileStorage, ApplyWARCDecorator
 
 # File storage with WARC formatting
 base_storage = FileStorage("output/warc")
@@ -87,7 +87,7 @@ storage = ApplyWARCDecorator(base_storage)
 
 ### S3 Storage with Resource Bundling
 ```python
-from oc_fetcher.storage import S3Storage, BundleResourcesDecorator
+from data_fetcher.storage import S3Storage, BundleResourcesDecorator
 
 # S3 storage with resource bundling
 base_storage = S3Storage("my-bucket", "prefix/")
@@ -96,7 +96,7 @@ storage = BundleResourcesDecorator(base_storage)
 
 ### Complex Storage Stack
 ```python
-from oc_fetcher.storage import FileStorage, create_storage_stack
+from data_fetcher.storage import FileStorage, create_storage_stack
 
 # Complex storage stack with all decorators
 base_storage = FileStorage("output/complex")

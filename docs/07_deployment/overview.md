@@ -85,7 +85,7 @@ RUN pip install poetry
 
 # Copy project files
 COPY pyproject.toml poetry.lock ./
-COPY oc_fetcher ./oc_fetcher
+COPY data_fetcher ./data_fetcher
 
 # Install dependencies
 RUN poetry config virtualenvs.create false \
@@ -97,7 +97,7 @@ ENV OC_LOG_LEVEL=INFO
 ENV OC_LOG_FORMAT=json
 
 # Run the application
-CMD ["python", "-m", "oc_fetcher.main"]
+CMD ["python", "-m", "data_fetcher.main"]
 ```
 
 ### Docker Compose

@@ -30,16 +30,16 @@ All configurations use environment variables with sensible defaults, making the 
 
 ### Key-Value Store Configuration
 
-| Variable                       | Description                              | Default         | Example               |
-| ------------------------------ | ---------------------------------------- | --------------- | --------------------- |
-| `OC_KV_STORE_TYPE`             | Store type to use                        | `"memory"`      | `"redis"`             |
-| `OC_KV_STORE_SERIALIZER`       | Serializer to use                        | `"json"`        | `"pickle"`            |
-| `OC_KV_STORE_DEFAULT_TTL`      | Default TTL in seconds                   | `"3600"`        | `"7200"`              |
-| `OC_KV_STORE_REDIS_HOST`       | Redis host (when using redis)            | `"localhost"`   | `"redis.example.com"` |
-| `OC_KV_STORE_REDIS_PORT`       | Redis port (when using redis)            | `"6379"`        | `"6380"`              |
-| `OC_KV_STORE_REDIS_DB`         | Redis database number (when using redis) | `"0"`           | `"1"`                 |
-| `OC_KV_STORE_REDIS_PASSWORD`   | Redis password (when using redis)        | `""`            | `"secret123"`         |
-| `OC_KV_STORE_REDIS_KEY_PREFIX` | Redis key prefix (when using redis)      | `"oc_fetcher:"` | `"myapp:"`            |
+| Variable                       | Description                              | Default           | Example               |
+| ------------------------------ | ---------------------------------------- | ----------------- | --------------------- |
+| `OC_KV_STORE_TYPE`             | Store type to use                        | `"memory"`        | `"redis"`             |
+| `OC_KV_STORE_SERIALIZER`       | Serializer to use                        | `"json"`          | `"pickle"`            |
+| `OC_KV_STORE_DEFAULT_TTL`      | Default TTL in seconds                   | `"3600"`          | `"7200"`              |
+| `OC_KV_STORE_REDIS_HOST`       | Redis host (when using redis)            | `"localhost"`     | `"redis.example.com"` |
+| `OC_KV_STORE_REDIS_PORT`       | Redis port (when using redis)            | `"6379"`          | `"6380"`              |
+| `OC_KV_STORE_REDIS_DB`         | Redis database number (when using redis) | `"0"`             | `"1"`                 |
+| `OC_KV_STORE_REDIS_PASSWORD`   | Redis password (when using redis)        | `""`              | `"secret123"`         |
+| `OC_KV_STORE_REDIS_KEY_PREFIX` | Redis key prefix (when using redis)      | `"data_fetcher:"` | `"myapp:"`            |
 
 ### Credential Provider Configuration
 
@@ -68,10 +68,10 @@ export OC_CREDENTIAL_PROVIDER_TYPE=aws
 export AWS_REGION=eu-west-2
 
 # Use via command line (default behavior)
-poetry run python -m oc_fetcher.main us-fl
+poetry run python -m data_fetcher.main us-fl
 
 # Explicitly specify AWS provider
-poetry run python -m oc_fetcher.main --credentials-provider aws us-fl
+poetry run python -m data_fetcher.main --credentials-provider aws us-fl
 ```
 
 ### Environment Variables
@@ -84,7 +84,7 @@ export OC_CREDENTIAL_PROVIDER_TYPE=environment
 export OC_CREDENTIAL_PROVIDER_ENV_PREFIX=OC_CREDENTIAL_
 
 # Use via command line
-poetry run python -m oc_fetcher.main --credentials-provider env us-fl
+poetry run python -m data_fetcher.main --credentials-provider env us-fl
 ```
 
 #### Environment Variable Format
@@ -109,7 +109,7 @@ export OC_CREDENTIAL_FR_API_CLIENT_SECRET="client-secret"
 The environment provider provides detailed error messages when credentials are missing:
 
 ```bash
-$ poetry run python -m oc_fetcher.main --credentials-provider env us-fl
+$ poetry run python -m data_fetcher.main --credentials-provider env us-fl
 
 Environment variable 'OC_CREDENTIAL_US_FL_HOST' not found. Please set the following environment variables:
   OC_CREDENTIAL_US_FL_HOST
@@ -155,7 +155,7 @@ export OC_KV_STORE_TYPE=redis
 export OC_KV_STORE_REDIS_HOST=redis.example.com
 export OC_KV_STORE_REDIS_PORT=6379
 export OC_KV_STORE_REDIS_PASSWORD=secret123
-export OC_KV_STORE_REDIS_KEY_PREFIX=oc_fetcher:prod:
+export OC_KV_STORE_REDIS_KEY_PREFIX=data_fetcher:prod:
 
 # Use AWS Secrets Manager for credentials
 export OC_CREDENTIAL_PROVIDER_TYPE=aws

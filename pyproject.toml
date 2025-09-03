@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A composable, streaming-first fetch framework"
 authors = ["Ben Ellis <ben.ellis@opencorporates.com>"]
 readme = "README.md"
-packages = [{include = "oc_fetcher"}]
+packages = [{include = "data_fetcher"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"

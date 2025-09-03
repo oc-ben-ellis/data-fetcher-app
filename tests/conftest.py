@@ -20,7 +20,7 @@ from testcontainers.core.waiting_utils import (  # type: ignore[import-untyped]
     wait_for_logs,
 )
 
-from oc_fetcher.core import BundleRef
+from data_fetcher.core import BundleRef
 
 """Pytest configuration and shared fixtures for OC Fetcher tests."""
 

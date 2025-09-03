@@ -36,7 +36,7 @@ Utility classes for managing persistence operations:
 
 #### PersistenceManager
 ```python
-from oc_fetcher.utils.persistence_utils import create_persistence_manager
+from data_fetcher.utils.persistence_utils import create_persistence_manager
 
 # Create a persistence manager
 persistence = await create_persistence_manager("my_provider")
@@ -60,7 +60,7 @@ failed_items = await persistence.get_failed_items(max_retries=3)
 
 #### RetryManager
 ```python
-from oc_fetcher.utils.persistence_utils import create_retry_manager
+from data_fetcher.utils.persistence_utils import create_retry_manager
 
 # Create a retry manager
 retry_manager = await create_retry_manager(max_retries=3, backoff_factor=2.0)
@@ -80,7 +80,7 @@ if await retry_manager.should_retry("failed_item"):
 
 #### StateTracker
 ```python
-from oc_fetcher.utils.persistence_utils import create_state_tracker
+from data_fetcher.utils.persistence_utils import create_state_tracker
 
 # Create a state tracker
 tracker = await create_state_tracker("my_tracker")
@@ -114,7 +114,7 @@ export OC_KV_STORE_REDIS_PASSWORD=your_password
 export OC_KV_STORE_REDIS_DB=0
 
 # Key prefix for namespacing
-export OC_KV_STORE_REDIS_KEY_PREFIX=oc_fetcher:
+export OC_KV_STORE_REDIS_KEY_PREFIX=data_fetcher:
 
 # Serialization format
 export OC_KV_STORE_SERIALIZER=json
@@ -126,7 +126,7 @@ export OC_KV_STORE_DEFAULT_TTL=3600
 ### Programmatic Configuration
 
 ```python
-from oc_fetcher.kv_store import configure_global_store
+from data_fetcher.kv_store import configure_global_store
 
 # Configure for production
 configure_global_store(
@@ -134,7 +134,7 @@ configure_global_store(
     host="redis.example.com",
     port=6379,
     password="your_password",
-    key_prefix="oc_fetcher:",
+    key_prefix="data_fetcher:",
     serializer="json",
     default_ttl=3600
 )
@@ -147,7 +147,7 @@ configure_global_store(
 The bundle locators automatically handle persistence:
 
 ```python
-from oc_fetcher import run_fetcher
+from data_fetcher import run_fetcher
 
 # Run with persistence (automatic)
 result = await run_fetcher("fr-api", concurrency=2)
@@ -162,7 +162,7 @@ result = await run_fetcher("fr-api", concurrency=2)
 ### 2. Custom Error Handling
 
 ```python
-from oc_fetcher.utils.persistence_utils import create_persistence_manager, create_retry_manager
+from data_fetcher.utils.persistence_utils import create_persistence_manager, create_retry_manager
 
 async def handle_failed_request(request, error):
     persistence = await create_persistence_manager("my_provider")
@@ -185,7 +185,7 @@ async def handle_failed_request(request, error):
 ### 3. Monitoring and Statistics
 
 ```python
-from oc_fetcher.utils.persistence_utils import create_state_tracker
+from data_fetcher.utils.persistence_utils import create_state_tracker
 
 async def monitor_processing():
     tracker = await create_state_tracker("monitoring")
@@ -205,7 +205,7 @@ async def monitor_processing():
 ### 4. Recovery and Cleanup
 
 ```python
-from oc_fetcher.utils.persistence_utils import create_persistence_manager
+from data_fetcher.utils.persistence_utils import create_persistence_manager
 
 async def cleanup_and_recover():
     persistence = await create_persistence_manager("my_provider")
@@ -356,7 +356,7 @@ Enable debug logging to see persistence operations:
 
 ```python
 import logging
-logging.getLogger("oc_fetcher.kv_store").setLevel(logging.DEBUG)
+logging.getLogger("data_fetcher.kv_store").setLevel(logging.DEBUG)
 ```
 
 ### Monitoring

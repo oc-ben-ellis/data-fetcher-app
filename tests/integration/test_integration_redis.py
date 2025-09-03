@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 import redis.asyncio as redis
 
-from oc_fetcher.kv_store import (
+from data_fetcher.kv_store import (
     RedisKeyValueStore,
     configure_global_store,
     delete,

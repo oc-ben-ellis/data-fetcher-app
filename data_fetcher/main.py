@@ -32,9 +32,9 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m oc_fetcher.main my-config                    # Use specific configuration
-  python -m oc_fetcher.main --credentials-provider env   # Use environment variables for credentials
-  python -m oc_fetcher.main --help                      # Show this help message
+  python -m data_fetcher.main my-config                    # Use specific configuration
+  python -m data_fetcher.main --credentials-provider env   # Use environment variables for credentials
+  python -m data_fetcher.main --help                      # Show this help message
         """,
     )
 

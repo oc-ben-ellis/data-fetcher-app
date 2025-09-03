@@ -63,7 +63,7 @@ Advanced persistence features including state persistence, error tracking, proce
 
 ### **Basic KV Store Usage**
 ```python
-from oc_fetcher.kv_store import get_kv_store
+from data_fetcher.kv_store import get_kv_store
 
 # Get KV store instance
 kv_store = get_kv_store()
@@ -77,7 +77,7 @@ value = await kv_store.get("key")
 
 ### **Storage Configuration**
 ```python
-from oc_fetcher.storage import FileStorage, S3Storage
+from data_fetcher.storage import FileStorage, S3Storage
 
 # Local file storage
 storage = FileStorage("data/")
@@ -88,7 +88,7 @@ storage = S3Storage("my-bucket", "prefix/")
 
 ### **Caching Configuration**
 ```python
-from oc_fetcher.config import GlobalConfig
+from data_fetcher.config import GlobalConfig
 
 config = GlobalConfig()
 config.cache.enabled = True

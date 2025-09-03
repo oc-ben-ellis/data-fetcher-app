@@ -122,7 +122,7 @@ Data Source → Unzip Decorator → WARC Decorator → Bundle Decorator → Base
 The framework uses a registry-based configuration system:
 
 ```python
-from oc_fetcher.registry import get_fetcher
+from data_fetcher.registry import get_fetcher
 
 # Get a configured fetcher
 fetcher = get_fetcher("us-fl")  # SFTP configuration

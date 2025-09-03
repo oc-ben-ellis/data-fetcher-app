@@ -16,13 +16,13 @@ from collections.abc import AsyncGenerator, Generator
 import pytest
 
 # testcontainers imports moved to integration tests
-from oc_fetcher.core import BundleRef
-from oc_fetcher.storage.decorators import (
+from data_fetcher.core import BundleRef
+from data_fetcher.storage.decorators import (
     ApplyWARCDecorator,
     BundleResourcesDecorator,
     UnzipResourceDecorator,
 )
-from oc_fetcher.storage.file_storage import FileStorage
+from data_fetcher.storage.file_storage import FileStorage
 
 # S3Storage import moved to integration tests
 

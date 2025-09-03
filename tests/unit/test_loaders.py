@@ -9,11 +9,11 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
-from oc_fetcher.bundle_loaders.api_loader import ApiLoader
-from oc_fetcher.bundle_loaders.http_loader import HttpxStreamingLoader
-from oc_fetcher.bundle_loaders.sftp_loader import SFTPLoader
-from oc_fetcher.core import FetchRunContext, RequestMeta
-from oc_fetcher.storage import FileStorage
+from data_fetcher.bundle_loaders.api_loader import ApiLoader
+from data_fetcher.bundle_loaders.http_loader import HttpxStreamingLoader
+from data_fetcher.bundle_loaders.sftp_loader import SFTPLoader
+from data_fetcher.core import FetchRunContext, RequestMeta
+from data_fetcher.storage import FileStorage
 
 
 def create_mock_storage() -> Mock:

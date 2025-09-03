@@ -4,7 +4,7 @@ This module contains unit tests for the core framework components,
 including FetcherContextBuilder and configuration utilities.
 """
 
-from oc_fetcher.core import (
+from data_fetcher.core import (
     BundleRef,
     FetchPlan,
     FetchRunContext,

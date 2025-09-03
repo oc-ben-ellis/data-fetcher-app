@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from oc_fetcher.core import FetchContext, FetchPlan, FetchRunContext, RequestMeta
-from oc_fetcher.fetcher import Fetcher, FetchResult
+from data_fetcher.core import FetchContext, FetchPlan, FetchRunContext, RequestMeta
+from data_fetcher.fetcher import Fetcher, FetchResult
 
 
 class TestFetchContext:

@@ -24,10 +24,10 @@ from testcontainers.core.waiting_utils import (  # type: ignore[import-untyped]
     wait_for_logs,
 )
 
-from oc_fetcher.configurations.fr import _setup_fr_api_fetcher
-from oc_fetcher.core import FetchRunContext
-from oc_fetcher.global_storage import configure_global_storage
-from oc_fetcher.kv_store import configure_global_store, get_global_store
+from data_fetcher.configurations.fr import _setup_fr_api_fetcher
+from data_fetcher.core import FetchRunContext
+from data_fetcher.global_storage import configure_global_storage
+from data_fetcher.kv_store import configure_global_store, get_global_store
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -246,7 +246,7 @@ class TestFrenchFunctional:
 
     def test_fr_date_filtering(self) -> None:
         """Test that the FR date filtering works correctly."""
-        from oc_fetcher.configurations.fr import _create_fr_date_filter
+        from data_fetcher.configurations.fr import _create_fr_date_filter
 
         date_filter = _create_fr_date_filter("2024-01-15")
 
@@ -279,7 +279,7 @@ class TestFrenchFunctional:
 
     def test_sirene_query_builder(self) -> None:
         """Test the Sirene query builder."""
-        from oc_fetcher.configurations.fr import _create_sirene_query_builder
+        from data_fetcher.configurations.fr import _create_sirene_query_builder
 
         query_builder = _create_sirene_query_builder()
 
@@ -305,7 +305,7 @@ class TestFrenchFunctional:
 
     def test_siren_narrowing_strategy(self) -> None:
         """Test the SIREN narrowing strategy."""
-        from oc_fetcher.configurations.fr import _create_siren_narrowing_strategy
+        from data_fetcher.configurations.fr import _create_siren_narrowing_strategy
 
         narrowing_strategy = _create_siren_narrowing_strategy()
 
@@ -330,7 +330,7 @@ class TestFrenchFunctional:
 
     def test_sirene_error_handler(self) -> None:
         """Test the Sirene error handler."""
-        from oc_fetcher.configurations.fr import _create_sirene_error_handler
+        from data_fetcher.configurations.fr import _create_sirene_error_handler
 
         error_handler = _create_sirene_error_handler()
 
@@ -351,7 +351,7 @@ class TestFrenchFunctional:
     @pytest.mark.asyncio
     async def test_fr_configuration_structure(self) -> None:
         """Test that the FR configuration has the expected structure."""
-        from oc_fetcher.configurations.fr import _setup_fr_api_fetcher
+        from data_fetcher.configurations.fr import _setup_fr_api_fetcher
 
         # Mock the credential provider
         mock_credential_provider = AsyncMock()
@@ -370,7 +370,7 @@ class TestFrenchFunctional:
 
         # Create the FR configuration with mocked credential provider
         with patch(
-            "oc_fetcher.global_credential_provider.get_default_credential_provider"
+            "data_fetcher.global_credential_provider.get_default_credential_provider"
         ) as mock_get_provider:
             mock_get_provider.return_value = mock_credential_provider
 
@@ -399,7 +399,7 @@ class TestFrenchFunctional:
 
     def test_fr_configuration_imports(self) -> None:
         """Test that the FR configuration can be imported and basic functions work."""
-        from oc_fetcher.configurations.fr import (
+        from data_fetcher.configurations.fr import (
             _create_fr_date_filter,
             _create_siren_narrowing_strategy,
             _create_sirene_error_handler,
@@ -491,8 +491,8 @@ class TestFrenchFunctional:
         print("Configuring S3 storage for localstack...")
         import os
 
-        from oc_fetcher.global_storage import configure_global_storage
-        from oc_fetcher.kv_store import configure_global_store
+        from data_fetcher.global_storage import configure_global_storage
+        from data_fetcher.kv_store import configure_global_store
 
         # Get localstack port
         localstack_port = localstack_container.get_exposed_port(4566)
@@ -556,7 +556,7 @@ class TestFrenchFunctional:
 
         # Configure global credential provider with LocalStack
         print("About to configure global credential provider")
-        from oc_fetcher.global_credential_provider import (
+        from data_fetcher.global_credential_provider import (
             clear_default_credential_provider,
             configure_global_credential_provider,
             get_default_credential_provider,
@@ -603,7 +603,7 @@ class TestFrenchFunctional:
 
         # Use the real FR configuration (which will use LocalStack Secrets Manager)
         print("About to import FR configuration...")
-        from oc_fetcher.configurations.fr import _setup_fr_api_fetcher
+        from data_fetcher.configurations.fr import _setup_fr_api_fetcher
 
         print("FR configuration imported")
 
@@ -623,7 +623,7 @@ class TestFrenchFunctional:
 
         # Verify that the configuration is using the credential provider correctly
         print("Verifying credential provider configuration...")
-        from oc_fetcher.global_credential_provider import (
+        from data_fetcher.global_credential_provider import (
             get_default_credential_provider,
         )
 
@@ -707,7 +707,7 @@ class TestFrenchFunctional:
         )  # siren, gap, and failed companies providers
 
         # Create a fetch plan
-        from oc_fetcher.core import FetchPlan
+        from data_fetcher.core import FetchPlan
 
         plan = FetchPlan(
             requests=[],
@@ -718,7 +718,7 @@ class TestFrenchFunctional:
         print("Creating and running fetcher...")
 
         # Create and run the fetcher
-        from oc_fetcher.fetcher import Fetcher
+        from data_fetcher.fetcher import Fetcher
 
         fetcher = Fetcher(fetch_context)
 
@@ -764,8 +764,8 @@ class TestFrenchFunctional:
 
         # Test API loader directly with one of the URLs
         print("Testing API loader directly...")
-        from oc_fetcher.core import RequestMeta
-        from oc_fetcher.storage.builder import get_global_storage
+        from data_fetcher.core import RequestMeta
+        from data_fetcher.storage.builder import get_global_storage
 
         test_url = (
             f"http://{api_host}:{api_port}/entreprises/sirene/V3.11/siren?q=siren:00*"
@@ -972,7 +972,7 @@ class TestFrenchFunctional:
 
         # Create a custom FR configuration
         with patch(
-            "oc_fetcher.global_credential_provider.get_default_credential_provider"
+            "data_fetcher.global_credential_provider.get_default_credential_provider"
         ) as mock_get_provider:
             mock_get_provider.return_value = mock_credential_provider
 
@@ -1005,7 +1005,7 @@ class TestFrenchFunctional:
             assert loader.meta_load_name == "fr_sirene_api_loader"
 
             # Run a quick test to verify the configuration works
-            from oc_fetcher.core import FetchPlan
+            from data_fetcher.core import FetchPlan
 
             plan = FetchPlan(
                 requests=[],
@@ -1013,7 +1013,7 @@ class TestFrenchFunctional:
                 concurrency=1,
             )
 
-            from oc_fetcher.fetcher import Fetcher
+            from data_fetcher.fetcher import Fetcher
 
             fetcher = Fetcher(fetch_context)
 

@@ -30,10 +30,10 @@ from testcontainers.core.waiting_utils import (  # type: ignore[import-untyped]
     wait_for_logs,
 )
 
-from oc_fetcher.configurations.us_fl import _setup_us_fl_sftp_fetcher
-from oc_fetcher.core import FetchRunContext
-from oc_fetcher.global_storage import configure_global_storage
-from oc_fetcher.kv_store import configure_global_store, get_global_store
+from data_fetcher.configurations.us_fl import _setup_us_fl_sftp_fetcher
+from data_fetcher.core import FetchRunContext
+from data_fetcher.global_storage import configure_global_storage
+from data_fetcher.kv_store import configure_global_store, get_global_store
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -520,8 +520,8 @@ class TestUsfloridaFunctional:
         print("Configuring S3 storage for localstack...")
         import os
 
-        from oc_fetcher.global_storage import configure_global_storage
-        from oc_fetcher.kv_store import configure_global_store
+        from data_fetcher.global_storage import configure_global_storage
+        from data_fetcher.kv_store import configure_global_store
 
         # Get localstack port
         localstack_port = localstack_container.get_exposed_port(4566)
@@ -581,7 +581,7 @@ class TestUsfloridaFunctional:
 
         # Configure global credential provider with LocalStack
         print("About to configure global credential provider")
-        from oc_fetcher.global_credential_provider import (
+        from data_fetcher.global_credential_provider import (
             configure_global_credential_provider,
         )
 
@@ -603,7 +603,7 @@ class TestUsfloridaFunctional:
 
         # Use the real US FL configuration (which will use LocalStack Secrets Manager)
         print("About to import US FL configuration...")
-        from oc_fetcher.configurations.us_fl import _setup_us_fl_sftp_fetcher
+        from data_fetcher.configurations.us_fl import _setup_us_fl_sftp_fetcher
 
         print("US FL configuration imported")
 
@@ -613,7 +613,7 @@ class TestUsfloridaFunctional:
 
         # Verify that the configuration is using the credential provider correctly
         print("Verifying credential provider configuration...")
-        from oc_fetcher.global_credential_provider import (
+        from data_fetcher.global_credential_provider import (
             get_default_credential_provider,
         )
 
@@ -646,7 +646,7 @@ class TestUsfloridaFunctional:
         assert len(fetch_context.bundle_locators) == 2
 
         # Create a fetch plan
-        from oc_fetcher.core import FetchPlan
+        from data_fetcher.core import FetchPlan
 
         plan = FetchPlan(
             requests=[],
@@ -657,7 +657,7 @@ class TestUsfloridaFunctional:
         print("Creating and running fetcher...")
 
         # Create and run the fetcher
-        from oc_fetcher.fetcher import Fetcher
+        from data_fetcher.fetcher import Fetcher
 
         fetcher = Fetcher(fetch_context)
 
@@ -703,8 +703,8 @@ class TestUsfloridaFunctional:
 
         # Test SFTP loader directly with one of the URLs
         print("Testing SFTP loader directly...")
-        from oc_fetcher.core import RequestMeta
-        from oc_fetcher.storage.builder import get_global_storage
+        from data_fetcher.core import RequestMeta
+        from data_fetcher.storage.builder import get_global_storage
 
         test_url = "sftp://doc/cor/20230728_daily_data.txt"
         test_request = RequestMeta(url=test_url)
@@ -1061,7 +1061,7 @@ class TestUsfloridaFunctional:
 
         # Create a custom US FL configuration
         with patch(
-            "oc_fetcher.global_credential_provider.get_default_credential_provider"
+            "data_fetcher.global_credential_provider.get_default_credential_provider"
         ) as mock_get_provider:
             mock_get_provider.return_value = mock_credential_provider
 
@@ -1089,7 +1089,7 @@ class TestUsfloridaFunctional:
             assert loader.meta_load_name == "us_fl_sftp_loader"
 
             # Run a quick test to verify the configuration works
-            from oc_fetcher.core import FetchPlan
+            from data_fetcher.core import FetchPlan
 
             plan = FetchPlan(
                 requests=[],
@@ -1097,7 +1097,7 @@ class TestUsfloridaFunctional:
                 concurrency=1,
             )
 
-            from oc_fetcher.fetcher import Fetcher
+            from data_fetcher.fetcher import Fetcher
 
             fetcher = Fetcher(fetch_context)
 

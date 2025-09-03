@@ -4,19 +4,19 @@ The framework uses a composable storage architecture with two base storage imple
 
 ## Base Storage Implementations
 
-1. **FileStorage** (`oc_fetcher/storage/file_storage.py`): Stores files on local disk
+1. **FileStorage** (`data_fetcher/storage/file_storage.py`): Stores files on local disk
    - Simple file-based persistence
    - Supports custom output directories
    - No external dependencies
 
-2. **S3Storage** (`oc_fetcher/storage/s3_storage.py`): Stores files in S3
+2. **S3Storage** (`data_fetcher/storage/s3_storage.py`): Stores files in S3
    - Direct S3 upload with metadata
    - Supports environment-specific bucket naming
    - Requires boto3 and AWS credentials
 
 ## Storage Decorators
 
-Storage decorators are located in `oc_fetcher/storage/decorators/` and modify streams being passed to storage implementations:
+Storage decorators are located in `data_fetcher/storage/decorators/` and modify streams being passed to storage implementations:
 
 1. **UnzipResourceDecorator** (`unzip_resource.py`): Automatically decompresses gzip and zip resources
 2. **ApplyWARCDecorator** (`apply_warc.py`): Formats resources as WARC records for web archiving
@@ -25,7 +25,7 @@ Storage decorators are located in `oc_fetcher/storage/decorators/` and modify st
 ## Usage Examples
 
 ```python
-from oc_fetcher.storage import FileStorage, S3Storage, ApplyWARCDecorator, BundleResourcesDecorator
+from data_fetcher.storage import FileStorage, S3Storage, ApplyWARCDecorator, BundleResourcesDecorator
 
 # Basic file storage
 storage = FileStorage("output/files")

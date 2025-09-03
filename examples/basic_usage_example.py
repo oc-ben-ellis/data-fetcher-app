@@ -18,8 +18,8 @@ async def basic_usage_example() -> None:
     print("=== OC Fetcher Basic Usage Example ===")
 
     # Import the necessary modules
-    from oc_fetcher.core import FetchPlan, FetchRunContext
-    from oc_fetcher.registry import get_fetcher, list_configurations
+    from data_fetcher.core import FetchPlan, FetchRunContext
+    from data_fetcher.registry import get_fetcher, list_configurations
 
     # List available fetcher configurations
     print(f"\nAvailable fetcher configurations: {list_configurations()}")
@@ -71,14 +71,14 @@ async def configuration_example() -> None:
     """Demonstrate configuration system usage."""
     print("\n=== Configuration System Example ===")
 
-    from oc_fetcher.registry import list_configurations
+    from data_fetcher.registry import list_configurations
 
     # Show available configurations
     configs = list_configurations()
     print(f"Available configurations: {configs}")
 
     # Demonstrate getting configuration setup function
-    from oc_fetcher.registry import get_configuration_setup_function
+    from data_fetcher.registry import get_configuration_setup_function
 
     for config_name in configs:
         try:

@@ -13,12 +13,12 @@ from typing import Any
 import boto3
 import pytest
 
-from oc_fetcher.core import BundleRef
-from oc_fetcher.storage.decorators import (
+from data_fetcher.core import BundleRef
+from data_fetcher.storage.decorators import (
     ApplyWARCDecorator,
     BundleResourcesDecorator,
 )
-from oc_fetcher.storage.s3_storage import S3Storage
+from data_fetcher.storage.s3_storage import S3Storage
 
 
 class TestS3Integration:

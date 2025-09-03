@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from oc_fetcher.kv_store import (
+from data_fetcher.kv_store import (
     InMemoryKeyValueStore,
     configure_global_store,
     delete,

@@ -39,8 +39,8 @@ class BundleLocator(Protocol):
 Generates SFTP URLs for files in a remote directory.
 
 ```python
-from oc_fetcher.bundle_locators import SFTPDirectoryBundleLocator
-from oc_fetcher.protocols import SftpManager
+from data_fetcher.bundle_locators import SFTPDirectoryBundleLocator
+from data_fetcher.protocols import SftpManager
 
 # Create SFTP manager
 sftp_manager = SftpManager(
@@ -58,7 +58,7 @@ provider = SFTPDirectoryBundleLocator(
 )
 
 # Usage in fetcher configuration
-from oc_fetcher.core import create_fetcher_config
+from data_fetcher.core import create_fetcher_config
 
 config = (
     create_fetcher_config()
@@ -79,7 +79,7 @@ config = (
 Generates SFTP URLs for specific individual files.
 
 ```python
-from oc_fetcher.bundle_locators import SFTPFileBundleLocator
+from data_fetcher.bundle_locators import SFTPFileBundleLocator
 
 # Create file locator for specific files
 provider = SFTPFileBundleLocator(
@@ -103,7 +103,7 @@ provider = SFTPFileBundleLocator(
 SFTP directory provider with custom filtering and sorting.
 
 ```python
-from oc_fetcher.bundle_locators import GenericDirectoryBundleLocator
+from data_fetcher.bundle_locators import GenericDirectoryBundleLocator
 from datetime import datetime
 
 # Create custom file filter
@@ -149,7 +149,7 @@ provider = GenericDirectoryBundleLocator(
 Generic provider for specific file lists with custom logic.
 
 ```python
-from oc_fetcher.bundle_locators import GenericFileBundleLocator
+from data_fetcher.bundle_locators import GenericFileBundleLocator
 
 provider = GenericFileBundleLocator(
     sftp_manager=sftp_manager,
@@ -164,8 +164,8 @@ provider = GenericFileBundleLocator(
 Generic API provider with date-based pagination support.
 
 ```python
-from oc_fetcher.bundle_locators import ApiPaginationBundleLocator
-from oc_fetcher.protocols import HttpManager
+from data_fetcher.bundle_locators import ApiPaginationBundleLocator
+from data_fetcher.protocols import HttpManager
 
 # Create HTTP manager
 http_manager = HttpManager(
@@ -204,7 +204,7 @@ provider = ApiPaginationBundleLocator(
 Provider for single API endpoints or predefined URL lists.
 
 ```python
-from oc_fetcher.bundle_locators import SingleApiBundleLocator
+from data_fetcher.bundle_locators import SingleApiBundleLocator
 
 provider = SingleApiBundleLocator(
     http_manager=http_manager,
@@ -229,7 +229,7 @@ provider = SingleApiBundleLocator(
 Provider for APIs with complex pagination logic including cursor-based pagination and search narrowing.
 
 ```python
-from oc_fetcher.bundle_locators import (
+from data_fetcher.bundle_locators import (
     ComplexPaginationProvider,
     CursorPaginationStrategy
 )
@@ -289,7 +289,7 @@ provider = ComplexPaginationProvider(
 Provider for reverse date progression, useful for gap filling or historical data collection.
 
 ```python
-from oc_fetcher.bundle_locators import ReversePaginationBundleLocator
+from data_fetcher.bundle_locators import ReversePaginationBundleLocator
 
 # Create reverse pagination provider for gap filling
 provider = ReversePaginationProvider(
@@ -313,7 +313,7 @@ provider = ReversePaginationProvider(
 Strategy for cursor-based pagination commonly used in modern APIs.
 
 ```python
-from oc_fetcher.bundle_locators import CursorPaginationStrategy
+from data_fetcher.bundle_locators import CursorPaginationStrategy
 
 strategy = CursorPaginationStrategy(
     cursor_field="curseurSuivant",  # Field name for next cursor
@@ -328,7 +328,7 @@ strategy = CursorPaginationStrategy(
 The framework provides factory functions for easier provider creation:
 
 ```python
-from oc_fetcher.factory import (
+from data_fetcher.factory import (
     create_directory_provider,
     create_file_provider,
     create_complex_pagination_provider,
@@ -361,9 +361,9 @@ api_provider = create_complex_pagination_provider(
 ### Basic SFTP Configuration
 
 ```python
-from oc_fetcher import create_fetcher_config
-from oc_fetcher.bundle_locators import SFTPDirectoryBundleLocator
-from oc_fetcher.factory import create_sftp_manager, create_sftp_loader
+from data_fetcher import create_fetcher_config
+from data_fetcher.bundle_locators import SFTPDirectoryBundleLocator
+from data_fetcher.factory import create_sftp_manager, create_sftp_loader
 
 def setup_sftp_fetcher():
     # Create SFTP manager
@@ -396,9 +396,9 @@ def setup_sftp_fetcher():
 ### Advanced API Configuration
 
 ```python
-from oc_fetcher import create_fetcher_config
-from oc_fetcher.bundle_locators import ComplexPaginationBundleLocator, CursorPaginationStrategy
-from oc_fetcher.factory import create_http_manager, create_tracking_api_loader
+from data_fetcher import create_fetcher_config
+from data_fetcher.bundle_locators import ComplexPaginationBundleLocator, CursorPaginationStrategy
+from data_fetcher.factory import create_http_manager, create_tracking_api_loader
 
 def setup_api_fetcher():
     # Create HTTP manager with authentication
@@ -508,7 +508,7 @@ async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
 Use the key-value store for persistent state management:
 
 ```python
-from oc_fetcher.kv_store import get_global_store
+from data_fetcher.kv_store import get_global_store
 
 async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
     store = await get_global_store()

@@ -5,7 +5,7 @@ The framework provides built-in support for scheduling at the protocol level:
 ## SFTP Scheduling
 
 ```python
-from oc_fetcher.protocols import SftpManager, ScheduledDailyGate, OncePerIntervalGate
+from data_fetcher.protocols import SftpManager, ScheduledDailyGate, OncePerIntervalGate
 
 # Create SFTP manager with scheduling
 sftp_manager = SftpManager(

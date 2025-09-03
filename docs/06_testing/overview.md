@@ -20,7 +20,7 @@ poetry run pytest tests/test_fetcher.py
 poetry run pytest tests/test_fetcher.py::TestFetcher::test_run_with_requests
 
 # Run with coverage
-poetry run pytest --cov=oc_fetcher
+poetry run pytest --cov=data_fetcher
 ```
 
 ### Test Configuration
@@ -146,7 +146,7 @@ docker-compose -f tests/mocks/siren-api/docker-compose.yml down
 
 ```python
 import pytest
-from oc_fetcher.registry import get_fetcher
+from data_fetcher.registry import get_fetcher
 
 @pytest.mark.asyncio
 async def test_basic_fetch():

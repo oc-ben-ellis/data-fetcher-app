@@ -139,7 +139,7 @@ export OC_CREDENTIAL_PROVIDER_AWS_ENDPOINT_URL=http://localhost:4566
 
 ```bash
 # Run the us-fl configuration
-poetry run python -m oc_fetcher.main us-fl
+poetry run python -m data_fetcher.main us-fl
 ```
 
 ### Method 2: Using Python Script
@@ -152,8 +152,8 @@ Create a test script (`tmp/test_us_fl.py`):
 
 import asyncio
 import os
-from oc_fetcher.core import FetchPlan, FetchRunContext
-from oc_fetcher.registry import get_fetcher
+from data_fetcher.core import FetchPlan, FetchRunContext
+from data_fetcher.registry import get_fetcher
 
 async def test_us_fl_fetcher():
     """Test the US Florida SFTP fetcher."""

@@ -6,9 +6,9 @@ __copyright__ = "Copyright (c) 2024 OpenCorporates Ltd"
 import asyncio
 from datetime import datetime, timedelta
 
-from oc_fetcher import run_fetcher
-from oc_fetcher.kv_store import configure_global_store, get_global_store, range_get
-from oc_fetcher.utils.persistence_utils import (
+from data_fetcher import run_fetcher
+from data_fetcher.kv_store import configure_global_store, get_global_store, range_get
+from data_fetcher.utils.persistence_utils import (
     create_persistence_manager,
     create_retry_manager,
     create_state_tracker,

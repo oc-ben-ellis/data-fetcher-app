@@ -16,7 +16,7 @@
 ### 3) Configuration System
 - The system MUST support named configurations discoverable and runnable by ID.
   - CLI MUST accept a configuration name argument; listing available configurations MUST be supported.
-  - Programmatic access via `oc_fetcher.registry.get_fetcher(config_name: str)` MUST return a configured fetcher ready to run with a `FetchPlan`.
+  - Programmatic access via `data_fetcher.registry.get_fetcher(config_name: str)` MUST return a configured fetcher ready to run with a `FetchPlan`.
 - Built-in configurations MUST include at least:
   - `us-fl` (SFTP batch processing)
   - `fr` (HTTP/API fetcher)
@@ -28,7 +28,7 @@
   - Environment-specific overrides (dev/staging/prod) and sensitive settings via env
 
 ### 4) CLI Requirements
-- Provide a CLI entry point `python -m oc_fetcher.main [CONFIG]`.
+- Provide a CLI entry point `python -m data_fetcher.main [CONFIG]`.
   - If no config is provided, the CLI MUST list available configurations.
   - Support `--credentials-provider {aws,env}` with default `aws`.
   - Respect `OC_CONFIG_ID` environment variable as a default configuration identifier.
@@ -128,9 +128,9 @@
 - Documentation MUST align with current code (APIs, examples) and follow the project’s documentation guide, including internal links and assets.
 
 ### Acceptance Criteria (selected, testable)
-- Running `poetry run python -m oc_fetcher.main` lists available configurations.
-- Running `poetry run python -m oc_fetcher.main us-fl` with valid credentials streams SFTP files to configured storage with logs.
-- Running `poetry run python -m oc_fetcher.main fr` fetches API resources via HTTP streaming and stores results with configured decorators.
+- Running `poetry run python -m data_fetcher.main` lists available configurations.
+- Running `poetry run python -m data_fetcher.main us-fl` with valid credentials streams SFTP files to configured storage with logs.
+- Running `poetry run python -m data_fetcher.main fr` fetches API resources via HTTP streaming and stores results with configured decorators.
 - `get_fetcher("us-fl")` returns a fetcher that completes `await fetcher.run(plan)` with a `FetchResult` capturing success/errors.
 - Environment credential selection works with `--credentials-provider env` and documented env var names.
 - Storage decorators can be stacked and operate in streaming fashion without loading entire payloads into memory.

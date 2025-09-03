@@ -35,7 +35,8 @@ else ifeq ($(USER),vscode)
 	CONTAINER_MODE=1
 else ifeq ($(TERM_PROGRAM),vscode)
 	# Dev Container environment (detected by TERM_PROGRAM=vscode)
-	CONTAINER_MODE=1
+	# Note: This is also set when running in VS Code terminal on host
+	CONTAINER_MODE=0
 else
 	# Check if /.dockerenv file exists (Docker container indicator)
 	CONTAINER_MODE=$$(shell ls /.dockerenv >/dev/null 2>&1 && echo 1 || echo 0)
@@ -54,9 +55,23 @@ ifeq ($(MODE), local)
 	RUN=poetry run
 	RUN_NO_DEPS=poetry run
 else
-	RUN=$(DOCKER_COMPOSE) --profile run-app run --rm fetcher poetry run
-	RUN_NO_DEPS=$(DOCKER_COMPOSE) run --rm --no-deps fetcher poetry run
+	# Use devcontainer CLI to run commands in the dev-container environment
+	RUN=@if command -v devcontainer >/dev/null 2>&1; then devcontainer exec --workspace-folder . poetry run; else ./node_modules/.bin/devcontainer exec --workspace-folder . poetry run; fi
+	RUN_NO_DEPS=@if command -v devcontainer >/dev/null 2>&1; then devcontainer exec --workspace-folder . poetry run; else ./node_modules/.bin/devcontainer exec --workspace-folder . poetry run; fi
 endif
+
+# Define a function to run commands in the appropriate environment
+define run_in_container
+	@if [ "$(MODE)" = "local" ]; then \
+		poetry run $(1); \
+	else \
+		if command -v devcontainer >/dev/null 2>&1; then \
+			devcontainer exec --workspace-folder . poetry run $(1); \
+		else \
+			npx @devcontainers/cli exec --workspace-folder . poetry run $(1); \
+		fi; \
+	fi
+endef
 
 ARGS=-v --tb=line
 # Default number of parallel workers for tests (auto-detect CPU cores)
@@ -64,69 +79,85 @@ ARGS=-v --tb=line
 # Use TEST_WORKERS=1 to run tests sequentially if you encounter issues
 TEST_WORKERS ?= auto
 
-.PHONY: all-checks build/for-local build/for-deployment format lint test test/not-in-parallel test/parallel test/with-coverage test/snapshot-update run run/with-observability
+.PHONY: all-checks build/for-deployment format lint test test/not-in-parallel test/parallel test/with-coverage test/snapshot-update run run/with-observability
 .PHONY: lint/black lint/ruff lint/mypy help examples debug docs docs/open headers pre-commit
 
 all-checks: format lint test/with-coverage
 
-build/for-local:
-	$(DOCKER_COMPOSE) build fetcher
+
 
 build/for-deployment:
 	$(DOCKER) build -t "$(GIT_REPOSITORY_NAME):$(GIT_COMMIT_ID)" \
-	--build-arg POETRY_HTTP_BASIC_OCPY_USERNAME \
 	--build-arg POETRY_HTTP_BASIC_OCPY_PASSWORD \
 	.
 
-format:
-	-$(RUN_NO_DEPS) black .
-	-$(RUN_NO_DEPS) ruff check --fix .
+# Ensure dev-container is running for Docker mode
+ensure-devcontainer:
+	@if [ "$(MODE)" != "local" ]; then \
+		if ! command -v devcontainer >/dev/null 2>&1; then \
+			if ! command -v npx >/dev/null 2>&1; then \
+				echo "Error: npx not found. Please install Node.js to use this feature."; \
+				exit 1; \
+			fi; \
+		fi; \
+		echo "Starting dev-container..."; \
+		if command -v devcontainer >/dev/null 2>&1; then \
+			devcontainer up --workspace-folder . --skip-post-attach; \
+		else \
+			npx --yes --silent @devcontainers/cli up --workspace-folder . --skip-post-attach; \
+		fi; \
+	fi
 
-headers:
+format: ensure-devcontainer
+	-$(call run_in_container,black .)
+	-$(call run_in_container,ruff check --fix .)
+
+headers: ensure-devcontainer
 	@echo "Adding standard headers to Python files..."
-	$(RUN_NO_DEPS) python tmp/add_headers.py
+	$(call run_in_container,python tmp/add_headers.py)
 	@echo "Headers added. Use 'make headers/dry-run' to preview changes."
 
-headers/dry-run:
+headers/dry-run: ensure-devcontainer
 	@echo "Previewing header changes (dry run)..."
-	$(RUN_NO_DEPS) python tmp/add_headers.py --dry-run
+	$(call run_in_container,python tmp/add_headers.py --dry-run)
 
-pre-commit:
+pre-commit: ensure-devcontainer
 	@echo "Installing pre-commit hooks..."
-	$(RUN_NO_DEPS) pre-commit install
+	$(call run_in_container,pre-commit install)
 	@echo "Pre-commit hooks installed. They will run automatically on commit."
 
 lint: lint/black lint/ruff lint/mypy
 
-lint/black:
-	$(RUN_NO_DEPS) black --check .
+lint/black: ensure-devcontainer
+	$(call run_in_container,black --check .)
 
-lint/ruff:
-	$(RUN_NO_DEPS) ruff .
+lint/ruff: ensure-devcontainer
+	$(call run_in_container,ruff .)
 
-lint/mypy:
-	$(RUN_NO_DEPS) mypy .
+lint/mypy: ensure-devcontainer
+	$(call run_in_container,mypy .)
 
-test:
-	$(RUN) pytest $(ARGS) -n $(TEST_WORKERS)
+test: ensure-devcontainer
+	$(call run_in_container,pytest $(ARGS) -n $(TEST_WORKERS))
 
-test/not-in-parallel:
-	$(RUN) pytest $(ARGS)
+test/not-in-parallel: ensure-devcontainer
+	$(call run_in_container,pytest $(ARGS))
 
-test/parallel:
-	$(RUN) pytest $(ARGS) -n $(TEST_WORKERS)
+test/parallel: ensure-devcontainer
+	$(call run_in_container,pytest $(ARGS) -n $(TEST_WORKERS))
 
-test/with-coverage:
-	$(RUN) coverage run -m pytest $(ARGS) -n $(TEST_WORKERS)
-	$(RUN_NO_DEPS) coverage html --fail-under=0
+test/with-coverage: ensure-devcontainer
+	$(call run_in_container,coverage run -m pytest $(ARGS) -n $(TEST_WORKERS))
+	$(call run_in_container,coverage html --fail-under=0)
 	@echo "Coverage report at file://$(PWD)/tmp/htmlcov/index.html"
-	$(RUN_NO_DEPS) coverage report
+	$(call run_in_container,coverage report)
 
-run:
+run: ensure-devcontainer
 ifeq ($(MODE),local)
-	$(RUN) python -m oc_fetcher.main $(ARGS)
+	$(RUN) python -m data_fetcher.main $(ARGS)
 else
-	$(DOCKER_COMPOSE) --profile run-app up
+	# Use devcontainer CLI for running the app
+	$(RUN) python -m data_fetcher.main $(ARGS)
 endif
 
 run/with-observability:
@@ -134,13 +165,13 @@ ifeq ($(MODE),local)
 	echo $(MODE)
 	$(error $@ not available in MODE=$(MODE))
 else
-	$(DOCKER_COMPOSE) --profile run-app -f docker-compose.yml -f docker-compose.observability.yml up
+	$(error $@ not available in MODE=$(MODE) - observability requires docker-compose)
 endif
 
 help:
 	@echo "Available commands:"
 	@echo "  all-checks          - Run format, lint, and tests with coverage"
-	@echo "  build/for-local     - Build Docker image for local development"
+
 	@echo "  build/for-deployment - Build Docker image for deployment"
 	@echo "  format              - Format code with black and ruff"
 	@echo "  headers             - Add standard headers to Python files"
@@ -159,7 +190,7 @@ help:
 	@echo "Mode detection:"
 	@echo "  - Automatically detects container environments (Docker, DevContainer, etc.)"
 	@echo "  - Uses LOCAL mode (poetry run) when in containers"
-	@echo "  - Uses DOCKER mode when running from host"
+	@echo "  - Uses DOCKER mode when running from host (uses dev-container CLI)"
 	@echo "  - Can be overridden with MODE=local or MODE=docker"
 	@echo ""
 	@echo "Usage examples:"
@@ -175,8 +206,8 @@ help:
 	@echo "  TEST_WORKERS=4     - Use 4 parallel workers"
 	@echo "  TEST_WORKERS=1     - Run tests sequentially"
 
-examples:
-	$(RUN) python examples/using_config_system.py
+examples: ensure-devcontainer
+	$(call run_in_container,python examples/using_config_system.py)
 
 debug:
 	@echo "Environment detection:"
@@ -195,8 +226,8 @@ debug:
 	@echo "  RUN command: $(RUN)"
 	@echo "  RUN_NO_DEPS command: $(RUN_NO_DEPS)"
 
-docs:
-	$(RUN_NO_DEPS) build-docs
+docs: ensure-devcontainer
+	$(call run_in_container,build-docs)
 
 docs/open:
 	$(RUN_NO_DEPS) build-docs

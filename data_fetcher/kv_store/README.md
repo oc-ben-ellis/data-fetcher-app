@@ -19,7 +19,7 @@ The key-value store system offers:
 ### Basic Usage
 
 ```python
-from oc_fetcher.kv_store import put, get, delete, exists
+from data_fetcher.kv_store import put, get, delete, exists
 
 # The global store is automatically configured when the module is imported
 # Store and retrieve data
@@ -38,7 +38,7 @@ await delete("user:123")
 ### Range Operations
 
 ```python
-from oc_fetcher.kv_store import range_get
+from data_fetcher.kv_store import range_get
 
 # Store multiple items
 for i in range(10):
@@ -64,7 +64,7 @@ limited_results = await range_get("item:", limit=5)
 Perfect for testing and development:
 
 ```python
-from oc_fetcher.kv_store import InMemoryKeyValueStore
+from data_fetcher.kv_store import InMemoryKeyValueStore
 
 # Create an in-memory store
 store = InMemoryKeyValueStore(
@@ -90,7 +90,7 @@ await store.close()
 Designed for production use:
 
 ```python
-from oc_fetcher.kv_store import RedisKeyValueStore
+from data_fetcher.kv_store import RedisKeyValueStore
 
 # Create a Redis store
 store = RedisKeyValueStore(
@@ -140,7 +140,7 @@ await put("permanent_data", "value")
 Choose between JSON and pickle serialization:
 
 ```python
-from oc_fetcher.kv_store import configure_global_store
+from data_fetcher.kv_store import configure_global_store
 
 # JSON serialization (default, human-readable)
 configure_global_store(
@@ -167,7 +167,7 @@ await put("complex_data", {
 Use stores as context managers for automatic cleanup:
 
 ```python
-from oc_fetcher.kv_store import get_store_context
+from data_fetcher.kv_store import get_store_context
 
 async with get_store_context("memory", serializer="json") as store:
     await store.put("key", "value")
@@ -180,7 +180,7 @@ async with get_store_context("memory", serializer="json") as store:
 Access the global store directly:
 
 ```python
-from oc_fetcher.kv_store import get_global_store
+from data_fetcher.kv_store import get_global_store
 
 # Get the global store instance
 store = await get_global_store()
@@ -206,7 +206,7 @@ The global store is automatically configured when the module is imported:
 # No explicit configuration needed
 
 # Override for production
-from oc_fetcher.kv_store import configure_global_store
+from data_fetcher.kv_store import configure_global_store
 
 configure_global_store(
     store_type="redis",
@@ -214,7 +214,7 @@ configure_global_store(
     port=6379,
     password="your_password",
     db=0,
-    key_prefix="oc_fetcher:",
+    key_prefix="data_fetcher:",
     serializer="json",
     default_ttl=3600,
 )
@@ -234,7 +234,7 @@ configure_global_store(
 - `ssl`: Use SSL connection (default: False)
 - `timeout`: Connection timeout in seconds (default: 10.0)
 - `max_connections`: Maximum connections in pool (default: 10)
-- `key_prefix`: Prefix for all keys (default: "oc_fetcher:")
+- `key_prefix`: Prefix for all keys (default: "data_fetcher:")
 - `serializer`: "json" or "pickle" (default: "json")
 - `default_ttl`: Default time-to-live in seconds (default: None)
 
@@ -243,7 +243,7 @@ configure_global_store(
 ### Frontier Provider Caching
 
 ```python
-from oc_fetcher.kv_store import get_global_store
+from data_fetcher.kv_store import get_global_store
 
 class CachingFrontierProvider:
     def __init__(self, base_url: str):
@@ -278,7 +278,7 @@ class CachingFrontierProvider:
 ### API Response Caching
 
 ```python
-from oc_fetcher.kv_store import put, get, exists
+from data_fetcher.kv_store import put, get, exists
 
 async def cached_api_call(url: str, cache_ttl: int = 300):
     """Make an API call with caching."""
@@ -303,7 +303,7 @@ async def cached_api_call(url: str, cache_ttl: int = 300):
 ### Session Management
 
 ```python
-from oc_fetcher.kv_store import put, get, delete
+from data_fetcher.kv_store import put, get, delete
 
 async def create_session(user_id: str, session_data: dict):
     """Create a new user session."""
@@ -332,7 +332,7 @@ async def delete_session(session_id: str):
 ### Batch Processing State
 
 ```python
-from oc_fetcher.kv_store import put, get, range_get
+from data_fetcher.kv_store import put, get, range_get
 
 async def track_batch_progress(batch_id: str, total_items: int):
     """Track progress of a batch processing job."""
@@ -401,7 +401,7 @@ await put("user:123:profile", profile_data)  # No expiration
 Handle store errors gracefully:
 
 ```python
-from oc_fetcher.kv_store import get_global_store
+from data_fetcher.kv_store import get_global_store
 
 async def safe_get(key: str, default=None):
     try:

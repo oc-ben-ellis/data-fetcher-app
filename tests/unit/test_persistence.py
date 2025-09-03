@@ -10,8 +10,8 @@ from datetime import datetime
 
 import pytest
 
-from oc_fetcher.kv_store import configure_global_store, get_global_store
-from oc_fetcher.utils.persistence_utils import (
+from data_fetcher.kv_store import configure_global_store, get_global_store
+from data_fetcher.utils.persistence_utils import (
     create_persistence_manager,
     create_retry_manager,
     create_state_tracker,

@@ -12,7 +12,7 @@ Environment Variables:
     OC_KV_STORE_REDIS_PORT: Redis port (when using redis). Default: "6379"
     OC_KV_STORE_REDIS_DB: Redis database number (when using redis). Default: "0"
     OC_KV_STORE_REDIS_PASSWORD: Redis password (when using redis). Default: ""
-    OC_KV_STORE_REDIS_KEY_PREFIX: Redis key prefix (when using redis). Default: "oc_fetcher:"
+    OC_KV_STORE_REDIS_KEY_PREFIX: Redis key prefix (when using redis). Default: "data_fetcher:"
 """
 
 import os
@@ -62,7 +62,7 @@ def configure_global_kv_store() -> None:
             config["key_prefix"] = redis_key_prefix
         elif not config.get("key_prefix"):
             # Use default Redis prefix if no config_id or Redis-specific prefix
-            config["key_prefix"] = "oc_fetcher:"
+            config["key_prefix"] = "data_fetcher:"
 
         # Only add password if it's set
         password = os.getenv("OC_KV_STORE_REDIS_PASSWORD")

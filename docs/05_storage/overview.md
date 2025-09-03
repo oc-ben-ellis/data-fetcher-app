@@ -79,7 +79,7 @@ All storage operations are streaming-based, allowing efficient processing of lar
 
 ### **Basic File Storage**
 ```python
-from oc_fetcher.storage import FileStorage
+from data_fetcher.storage import FileStorage
 
 # Create file storage
 storage = FileStorage("output/files")
@@ -96,7 +96,7 @@ async with storage.open_bundle("bundle-1", {"source": "example.com"}) as bundle:
 
 ### **S3 Storage with Decorators**
 ```python
-from oc_fetcher.storage import S3Storage, create_storage_stack
+from data_fetcher.storage import S3Storage, create_storage_stack
 
 # Create S3 storage with decorators
 base_storage = S3Storage("my-bucket", "prefix/")
@@ -110,7 +110,7 @@ storage = create_storage_stack(
 
 ### **Custom Storage Configuration**
 ```python
-from oc_fetcher.storage import FileStorage, ApplyWARCDecorator
+from data_fetcher.storage import FileStorage, ApplyWARCDecorator
 
 # Custom storage configuration
 base_storage = FileStorage("output/custom")

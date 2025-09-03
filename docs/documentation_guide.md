@@ -138,7 +138,7 @@ Brief description of the framework...
 ## Quick Start
 
 ```bash
-poetry run python -m oc_fetcher.main us-fl
+poetry run python -m data_fetcher.main us-fl
 ```
 ```
 
@@ -207,7 +207,7 @@ Use language-specific code blocks:
 
 ```python
 # Python code
-from oc_fetcher.registry import get_fetcher
+from data_fetcher.registry import get_fetcher
 
 fetcher = get_fetcher("us-fl")
 result = await fetcher.run(plan)
@@ -215,7 +215,7 @@ result = await fetcher.run(plan)
 
 ```bash
 # Shell commands
-poetry run python -m oc_fetcher.main us-fl
+poetry run python -m data_fetcher.main us-fl
 make docs
 ```
 

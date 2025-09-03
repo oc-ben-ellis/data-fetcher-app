@@ -18,16 +18,16 @@ from testcontainers.core.waiting_utils import (  # type: ignore[import-untyped]
     wait_for_logs,
 )
 
-from oc_fetcher.bundle_loaders.sftp_loader import SFTPLoader
-from oc_fetcher.bundle_locators.api_generic_bundle_locators import (
+from data_fetcher.bundle_loaders.sftp_loader import SFTPLoader
+from data_fetcher.bundle_locators.api_generic_bundle_locators import (
     GenericDirectoryBundleLocator,
     GenericFileBundleLocator,
 )
-from oc_fetcher.core import FetchContext, FetchPlan, FetchRunContext, RequestMeta
-from oc_fetcher.fetcher import Fetcher
-from oc_fetcher.kv_store import configure_global_store
-from oc_fetcher.protocols.sftp_manager import SftpManager
-from oc_fetcher.storage.builder import (
+from data_fetcher.core import FetchContext, FetchPlan, FetchRunContext, RequestMeta
+from data_fetcher.fetcher import Fetcher
+from data_fetcher.kv_store import configure_global_store
+from data_fetcher.protocols.sftp_manager import SftpManager
+from data_fetcher.storage.builder import (
     create_storage_config,
     get_global_storage,
     set_global_storage,
@@ -129,7 +129,7 @@ class TestSFTPIntegration:
         # Create a simple credentials provider for testing
         class TestCredentialsProvider:
             async def get_credentials(self) -> Any:
-                from oc_fetcher.credentials.sftp_credentials import SftpCredentials
+                from data_fetcher.credentials.sftp_credentials import SftpCredentials
 
                 return SftpCredentials(
                     host="localhost",
@@ -189,7 +189,7 @@ class TestSFTPIntegration:
         # Create a simple credentials provider for testing
         class TestCredentialsProvider:
             async def get_credentials(self) -> Any:
-                from oc_fetcher.credentials.sftp_credentials import SftpCredentials
+                from data_fetcher.credentials.sftp_credentials import SftpCredentials
 
                 return SftpCredentials(
                     host="localhost",
@@ -244,7 +244,7 @@ class TestSFTPIntegration:
         # Create a simple credentials provider for testing
         class TestCredentialsProvider:
             async def get_credentials(self) -> Any:
-                from oc_fetcher.credentials.sftp_credentials import SftpCredentials
+                from data_fetcher.credentials.sftp_credentials import SftpCredentials
 
                 return SftpCredentials(
                     host="localhost",
@@ -303,7 +303,7 @@ class TestSFTPIntegration:
         # Create a simple credentials provider for testing
         class TestCredentialsProvider:
             async def get_credentials(self) -> Any:
-                from oc_fetcher.credentials.sftp_credentials import SftpCredentials
+                from data_fetcher.credentials.sftp_credentials import SftpCredentials
 
                 return SftpCredentials(
                     host="localhost",
@@ -398,7 +398,7 @@ class TestSFTPIntegration:
         # Create a simple credentials provider for testing (like other tests)
         class TestCredentialsProvider:
             async def get_credentials(self) -> Any:
-                from oc_fetcher.credentials.sftp_credentials import SftpCredentials
+                from data_fetcher.credentials.sftp_credentials import SftpCredentials
 
                 return SftpCredentials(
                     host="localhost",

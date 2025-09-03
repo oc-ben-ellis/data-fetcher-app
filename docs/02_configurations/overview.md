@@ -19,13 +19,13 @@ OC Fetcher is a composable, streaming-first fetch framework for Python that pull
 
 ```bash
 # Run US Florida SFTP fetcher
-poetry run python -m oc_fetcher.main us-fl
+poetry run python -m data_fetcher.main us-fl
 
 # Run France API fetcher
-poetry run python -m oc_fetcher.main fr
+poetry run python -m data_fetcher.main fr
 
 # List all available configurations
-poetry run python -m oc_fetcher.main
+poetry run python -m data_fetcher.main
 ```
 
 ### Credential Providers
@@ -35,16 +35,16 @@ The framework supports multiple credential providers for different deployment sc
 #### AWS Secrets Manager (Default)
 ```bash
 # Use AWS Secrets Manager for credentials (default behavior)
-poetry run python -m oc_fetcher.main us-fl
+poetry run python -m data_fetcher.main us-fl
 
 # Explicitly specify AWS provider
-poetry run python -m oc_fetcher.main --credentials-provider aws us-fl
+poetry run python -m data_fetcher.main --credentials-provider aws us-fl
 ```
 
 #### Environment Variables
 ```bash
 # Use environment variables for credentials
-poetry run python -m oc_fetcher.main --credentials-provider env us-fl
+poetry run python -m data_fetcher.main --credentials-provider env us-fl
 ```
 
 When using environment variables, set them in this format:
@@ -66,7 +66,7 @@ See [examples/credential_provider_example.py](../../examples/credential_provider
 ### Basic Usage with Configuration System
 
 ```python
-from oc_fetcher.registry import get_fetcher
+from data_fetcher.registry import get_fetcher
 
 # Run a predefined configuration
 fetcher = get_fetcher("us-fl")
@@ -218,18 +218,18 @@ Enterprise-grade SFTP configurations with AWS integration, secrets management, a
 ### **Command Line Usage**
 ```bash
 # Run US Florida SFTP fetcher
-poetry run python -m oc_fetcher.main us-fl
+poetry run python -m data_fetcher.main us-fl
 
 # Run France API fetcher
-poetry run python -m oc_fetcher.main fr
+poetry run python -m data_fetcher.main fr
 
 # List all available configurations
-poetry run python -m oc_fetcher.main
+poetry run python -m data_fetcher.main
 ```
 
 ### **Programmatic Usage**
 ```python
-from oc_fetcher.registry import get_fetcher
+from data_fetcher.registry import get_fetcher
 
 # Run a predefined configuration
 fetcher = get_fetcher("us-fl")
@@ -242,7 +242,7 @@ result = await fetcher.run(plan)
 
 ### **Configuration Overrides**
 ```python
-from oc_fetcher.registry import get_fetcher
+from data_fetcher.registry import get_fetcher
 
 # Get fetcher with custom configuration
 fetcher = get_fetcher("fr")
@@ -272,7 +272,7 @@ result = await fetcher.run(plan)
 
 ### **Basic Configuration**
 ```python
-from oc_fetcher.configurations import Configuration
+from data_fetcher.configurations import Configuration
 
 class MyCustomConfig(Configuration):
     def __init__(self):
@@ -287,7 +287,7 @@ class MyCustomConfig(Configuration):
 
 ### **Configuration Registration**
 ```python
-from oc_fetcher.registry import register_configuration
+from data_fetcher.registry import register_configuration
 
 register_configuration(MyCustomConfig())
 ```

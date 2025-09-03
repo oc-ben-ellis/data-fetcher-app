@@ -23,19 +23,19 @@ For the best reading experience, view the [rendered documentation](docs/rendered
 
 ```bash
 # Run US Florida SFTP fetcher
-poetry run python -m oc_fetcher.main us-fl
+poetry run python -m data_fetcher.main us-fl
 
 # Run France API fetcher
-poetry run python -m oc_fetcher.main fr
+poetry run python -m data_fetcher.main fr
 
 # List all available configurations
-poetry run python -m oc_fetcher.main
+poetry run python -m data_fetcher.main
 ```
 
 ### Basic Usage with Configuration System
 
 ```python
-from oc_fetcher.registry import get_fetcher
+from data_fetcher.registry import get_fetcher
 
 # Run a predefined configuration
 fetcher = get_fetcher("us-fl")
@@ -53,16 +53,16 @@ The framework supports multiple credential providers for different deployment sc
 #### AWS Secrets Manager (Default)
 ```bash
 # Use AWS Secrets Manager for credentials (default behavior)
-poetry run python -m oc_fetcher.main us-fl
+poetry run python -m data_fetcher.main us-fl
 
 # Explicitly specify AWS provider
-poetry run python -m oc_fetcher.main --credentials-provider aws us-fl
+poetry run python -m data_fetcher.main --credentials-provider aws us-fl
 ```
 
 #### Environment Variables
 ```bash
 # Use environment variables for credentials
-poetry run python -m oc_fetcher.main --credentials-provider env us-fl
+poetry run python -m data_fetcher.main --credentials-provider env us-fl
 ```
 
 When using environment variables, set them in this format:

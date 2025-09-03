@@ -4,7 +4,7 @@ The OC Fetcher project uses [structlog](https://www.structlog.org/) for structur
 
 ## Overview
 
-Structlog is automatically configured when the `oc_fetcher` package is imported. The configuration provides:
+Structlog is automatically configured when the `data_fetcher` package is imported. The configuration provides:
 
 - **Structured logging** with key-value pairs
 - **Automatic context variables** from `structlog.contextvars`
@@ -18,12 +18,12 @@ Structlog is automatically configured when the `oc_fetcher` package is imported.
 
 Configure logging behavior using environment variables:
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `OC_LOGGING_LEVEL` | Overall logging level | `"INFO"` | `"DEBUG"` |
-| `OC_LOGGING_HANDLER` | Output format | `"console-text"` | `"console-json"` |
-| `OC_LOGGING_CONSOLE_COLOR` | Color mode | `"auto"` | `"force"` |
-| `OC_LOGGING_PACKAGE_LEVELS` | Package-specific levels | `""` | `"httpx:DEBUG,boto3:WARNING"` |
+| Variable                    | Description             | Default          | Example                       |
+| --------------------------- | ----------------------- | ---------------- | ----------------------------- |
+| `OC_LOGGING_LEVEL`          | Overall logging level   | `"INFO"`         | `"DEBUG"`                     |
+| `OC_LOGGING_HANDLER`        | Output format           | `"console-text"` | `"console-json"`              |
+| `OC_LOGGING_CONSOLE_COLOR`  | Color mode              | `"auto"`         | `"force"`                     |
+| `OC_LOGGING_PACKAGE_LEVELS` | Package-specific levels | `""`             | `"httpx:DEBUG,boto3:WARNING"` |
 
 ### Log Levels
 
@@ -288,7 +288,7 @@ clear_contextvars()
 
 1. Check the log level configuration
 2. Verify environment variables are set correctly
-3. Ensure the `oc_fetcher` package is imported (triggers logging setup)
+3. Ensure the `data_fetcher` package is imported (triggers logging setup)
 
 ### JSON Output Issues
 

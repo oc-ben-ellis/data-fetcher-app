@@ -14,7 +14,7 @@ KeyError: Unknown configuration: us-il
 **Cause**: The configuration doesn't exist in the registry.
 
 **Solution**:
-- Check available configurations: `poetry run python -m oc_fetcher.main`
+- Check available configurations: `poetry run python -m data_fetcher.main`
 - Use only available configurations: `us-fl` or `fr`
 
 #### Missing Environment Variables
@@ -87,27 +87,27 @@ If you need to switch between credential providers:
 **From AWS to Environment Variables:**
 ```bash
 # Use command line flag to override
-poetry run python -m oc_fetcher.main --credentials-provider env us-fl
+poetry run python -m data_fetcher.main --credentials-provider env us-fl
 
 # Or set environment variable
 export OC_CREDENTIAL_PROVIDER_TYPE=environment
-poetry run python -m oc_fetcher.main us-fl
+poetry run python -m data_fetcher.main us-fl
 ```
 
 **From Environment Variables to AWS:**
 ```bash
 # Use command line flag to override
-poetry run python -m oc_fetcher.main --credentials-provider aws us-fl
+poetry run python -m data_fetcher.main --credentials-provider aws us-fl
 
 # Or set environment variable
 export OC_CREDENTIAL_PROVIDER_TYPE=aws
-poetry run python -m oc_fetcher.main us-fl
+poetry run python -m data_fetcher.main us-fl
 ```
 
 **Check Current Provider:**
 ```bash
 # View help to see current options
-poetry run python -m oc_fetcher.main --help
+poetry run python -m data_fetcher.main --help
 ```
 
 #### API Authentication Failed
@@ -252,7 +252,7 @@ ERROR: Storage upload failed
 
 Check configuration before running:
 ```python
-from oc_fetcher.registry import get_fetcher
+from data_fetcher.registry import get_fetcher
 
 try:
     fetcher = get_fetcher("us-fl")
@@ -289,10 +289,10 @@ Check log files for detailed error information:
 
 ```bash
 # Test configuration
-poetry run python -m oc_fetcher.main
+poetry run python -m data_fetcher.main
 
 # Run with verbose logging
-OC_LOG_LEVEL=DEBUG poetry run python -m oc_fetcher.main us-fl
+OC_LOG_LEVEL=DEBUG poetry run python -m data_fetcher.main us-fl
 
 # Check dependencies
 poetry show
