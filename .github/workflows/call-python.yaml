@@ -22,7 +22,7 @@ on:
 
 jobs:
   call-python:
-    uses: openc/gh-actions/.github/workflows/reusable-python.yaml@DEV-3171-bot-migration
+    uses: openc/gh-actions/.github/workflows/reusable-python.yaml@bot-migration-python
     with:
       python-version: "3.13"
 
