@@ -43,4 +43,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import sys, boto3, paramiko, yaml, tenacity; sys.exit(0)"
 
 # Set entrypoint to run the Python script
-ENTRYPOINT ["python", "src/<to_be_updated>.py"]
+ENTRYPOINT ["python", "src/sftp_to_s3.py"]
