@@ -25,3 +25,77 @@ pytest-cov = "^6.1.1"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+# see https://opencorporates.atlassian.net/wiki/spaces/ENGINEERIN/pages/382337032/Platform+ADR+002+004+Baseline+Linting+Type-Checking
+[tool.ruff.lint]
+select = [
+    "A", # A: flake8-builtins
+    "ANN", # ANN: flake8-annotations
+    "ARG", # ARG: flake8-unusedargs
+    "B", # B: flake8-bugbear
+    "BLE", # BLE: flake8-blind-except
+    "C4", # C4:  flake8-comprehensions
+    "C90", # C90: McCabe Complexity
+    "COM", # COM: flake8-commas
+    "D", # D: pydocstyle
+    "DTZ", # DTZ: flake8-datetimez
+    "ERA", # ERA: eradicate
+    "F", # F: pyflakes
+    "FBT", # FBT: flake8-boolean-trap
+    "G", # G: flake8-logging-format
+    "I", # I: isort
+    "ICN", # ICN: flake8-import-conventions
+    "INP", # INP: flake8-no-pep420
+    "INT", # INT: flake8-gettext
+    "ISC", # ISC: flake8-implicit-str-concat
+    "N", # N: pep8-naming
+    "NPY", # NPY: NumPy-specific rules
+    "PD", # PD:: pandas-vet
+    "PGH", # PGH: pygrep-hooks
+    "PIE", # PIE: flake8-pie
+    "PL", # PLC: Pylint
+    "PT", # PT: flake8-pytest-style
+    "PTH", # PTH: flake8-use-pathlib
+    "PYI", # PYI: flake8-PYI
+    "Q", # Q: flake8-quotes
+    "RET", # RET: flake8-return
+    "RSE", # RSE: flake8-raise
+    "RUF", # RUF: Ruff-specific rules
+    "S", # S: flake8-bandit
+    "SIM", # SIM: flake8-simplify
+    "SLF", # SLF: flake8-self
+    "T20", # T20: flake8-print
+    "TC", # TCH: flake8-type-checking
+    "TID", # TID: flake8-tidy-imports
+    "TRY", # TRY: tryceratops
+    "UP", # UP: PyUpgrade
+    "W", # W: pycodestyles Warnings
+]
+ignore = [
+    # D1* (undocumented) ignored for service code
+    "D1",
+    # PYI014 PYI015 ignored due to breaking mypy attrs support.
+    "PYI014",
+    "PYI015",
+    # Q000 Q001 Q002 ignored as conflicts with black quotes formatting.
+    "Q000",
+    "Q001",
+    "Q002",
+    # PLR0913 ignored because keyword arguments exist
+    "PLR0913",
+    # COM812, COM813 ignored due to conflicts with black formatting.
+    "COM812",
+]
+pydocstyle.convention = "google"
+
+[tool.ruff.format]
+quote-style = "double" # Like Black, use double quotes for strings.
+indent-style = "space" # Like Black, indent with spaces, rather than tabs.
+skip-magic-trailing-comma = false # Like Black, respect magic trailing commas.
+line-ending = "auto" # Like Black, auto-detect the appropriate line ending.
+docstring-code-format = false # auto-format code examples in docstrings
+docstring-code-line-length = "dynamic" # use dynamic line length for code examples in docstrings.
+
+[tool.mypy]
+strict = true
+mypy_path = "$MYPY_CONFIG_FILE_DIR/stubs:$MYPY_CONFIG_FILE_DIR/test"
