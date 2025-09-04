@@ -28,7 +28,7 @@ def check_class_naming(file_path: Path) -> list[tuple[int, str, str]]:
                     class_name = match.group(1)
 
                     # Check if this looks like an acronym followed by lowercase
-                    # Examples: SFTPLoader, HTTPManager, WARCBundle
+                    # Examples: SFTPLoader, HTTPManager
                     if re.search(r"[A-Z]{2,}[a-z]", class_name):
                         # Check if this contains any non-common acronyms that should be converted
                         if contains_non_common_acronyms(class_name):
@@ -48,7 +48,6 @@ def contains_non_common_acronyms(class_name: str) -> bool:
     Examples:
         SFTPLoader -> False (SFTP is a common acronym)
         HTTPManager -> False (HTTP is a common acronym)
-        WARCBundle -> True (WARC is not a common acronym)
         OAuthProvider -> False (OAUTH is a common acronym)
         TestUSFloridaFunctional -> True (US is not a common acronym)
     """
@@ -71,7 +70,6 @@ def contains_non_common_acronyms(class_name: str) -> bool:
         "XML",
         "CSV",
         "YAML",
-        "WARC",
         "ZIP",
         "GZIP",
         "BZIP",
@@ -116,7 +114,6 @@ def convert_to_pascal_case(class_name: str) -> str:
     Examples:
         SFTPLoader -> SftpLoader
         HTTPManager -> HttpManager
-        WARCBundle -> WarcBundle
         OAuthProvider -> OauthProvider
     """
     # Common acronyms that should remain as-is
@@ -138,7 +135,6 @@ def convert_to_pascal_case(class_name: str) -> str:
         "XML",
         "CSV",
         "YAML",
-        "WARC",
         "ZIP",
         "GZIP",
         "BZIP",
@@ -159,7 +155,7 @@ def convert_to_pascal_case(class_name: str) -> str:
             # Check if this is a common acronym that should remain as-is
             if acronym.upper() in common_acronyms:
                 return acronym  # Keep common acronyms unchanged
-            # Convert other acronyms like "WARC" -> "Warc"
+            # Convert other acronyms to proper case
             return acronym[0] + acronym[1:].lower()
         return acronym
 
@@ -211,7 +207,6 @@ def main() -> None:
         print("\nTo fix these violations, rename the classes to use proper PascalCase:")
         print("- SFTP -> Sftp")
         print("- HTTP -> Http")
-        print("- WARC -> Warc")
         print("- OAuth -> Oauth")
         print("- etc.")
 

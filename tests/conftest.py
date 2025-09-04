@@ -8,7 +8,7 @@ import asyncio
 import os
 import signal
 import tempfile
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Coroutine, Generator
 from typing import Any
 
 import boto3
@@ -41,6 +41,8 @@ def _signal_handler(signum: int, frame: Any) -> None:
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     """Create an instance of the default event loop for the test session."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
+    # Ensure the newly created loop is the current event loop for the session
+    asyncio.set_event_loop(loop)
 
     # Override the default exception handler to avoid logging errors during shutdown
     def custom_exception_handler(
@@ -79,6 +81,21 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
                 asyncio.gather(*pending_tasks, return_exceptions=True)
             )
 
+    # Ensure async generators are properly shut down before closing the loop
+    shutdown_coro: Coroutine[Any, Any, None] | None = None
+    try:
+        if not loop.is_closed():
+            shutdown_coro = loop.shutdown_asyncgens()
+            loop.run_until_complete(shutdown_coro)
+    except Exception:
+        # If we created the coroutine but could not await it, close it to avoid warnings
+        if shutdown_coro is not None:
+            shutdown_coro.close()
+        # Best-effort shutdown; ignore errors here to avoid masking test results
+        pass
+
+    # Detach the loop and close it to avoid unclosed loop warnings
+    asyncio.set_event_loop(None)
     loop.close()
 
 

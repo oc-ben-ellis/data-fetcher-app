@@ -549,8 +549,6 @@ class TestFrenchFunctional:
         os.environ["AWS_ACCESS_KEY_ID"] = "test"
         os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
 
-        # Explicitly enable WARC formatting for proper web archiving
-        os.environ["OC_STORAGE_USE_WARC"] = "true"
         os.environ["OC_STORAGE_USE_BUNDLER"] = "true"
         os.environ["OC_STORAGE_USE_UNZIP"] = "false"
 
@@ -835,9 +833,8 @@ class TestFrenchFunctional:
             # Check for specific bundle files
             bundle_keys = [obj["Key"] for obj in objects]
 
-            # TODO: The API loader should create WARC files with embedded metadata, but currently creates JSON files
-            # This is a storage system issue that needs to be addressed separately
-            # For now, we accept JSON files as the current behavior
+            # The API loader creates JSON files with embedded metadata
+            # This is the expected behavior for API-based data fetching
             json_files = [key for key in bundle_keys if key.endswith(".json")]
             assert len(json_files) > 0, "No JSON bundle files found in S3"
 

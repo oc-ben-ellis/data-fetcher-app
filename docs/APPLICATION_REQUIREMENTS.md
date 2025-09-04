@@ -2,14 +2,14 @@
 
 ### 1) Purpose and Scope
 - **Purpose**: Provide a composable, streaming-first Python framework to fetch resources from heterogeneous remote sources and store them in a standardized package with metadata for downstream ETL.
-- **In Scope**: Orchestration, configuration-driven runs, HTTP(S) and SFTP fetching, streaming storage with decorators (e.g., WARC, unzip), credential management, logging, scheduling, and persistence/kv store.
+- **In Scope**: Orchestration, configuration-driven runs, HTTP(S) and SFTP fetching, streaming storage with decorators (e.g., unzip, bundle), credential management, logging, scheduling, and persistence/kv store.
 - **Out of Scope**: Downstream ETL processing, data modeling beyond packaging, visualization.
 
 ### 2) Core Concepts and Actors
 - **Fetcher**: Orchestrates fetching via a two-phase pipeline with concurrency.
 - **Bundle Locator**: Produces URLs/targets to fetch (e.g., API pagination, SFTP directories/files).
 - **Bundle Loader**: Fetches a single target and streams content to storage (HTTP/S, SFTP, API).
-- **Storage**: Base storages (local files, S3) plus composable decorators (e.g., unzip, WARC, bundle resources).
+- **Storage**: Base storages (local files, S3) plus composable decorators (e.g., unzip, bundle resources).
 - **Protocol Manager**: Cross-cutting policies (rate limiting, scheduling) for protocols (HTTP, SFTP).
 - **Fetch Context/Plan**: Holds runtime configuration and execution parameters (e.g., concurrency).
 
@@ -59,15 +59,14 @@
 - **Bundle Loaders** MUST:
   - Stream payloads directly to storage (no full-RAM buffering).
   - Attach or emit metadata needed for downstream bundling.
-  - Integrate with storage decorators (e.g., on-the-fly WARC wrapping).
+  - Integrate with storage decorators (e.g., on-the-fly bundling).
 
 ### 8) Storage and Decorators
 - **Base Storage**:
   - MUST support local file storage.
   - MUST support S3 storage; users MUST be able to configure bucket, key prefixes, and credentials resolution consistent with the credential provider.
 - **Storage Decorators**:
-  - MUST allow stacking (e.g., unzip → warc → bundle).
-  - WARC decorator MUST format streaming data into WARC during transfer.
+  - MUST allow stacking (e.g., unzip → bundle).
   - Unzip decorator MUST extract archives and route their contents to underlying storage.
 - All storage write operations MUST be streaming-friendly and fault-tolerant where possible.
 

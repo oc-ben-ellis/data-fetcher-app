@@ -4,6 +4,7 @@ This module provides decorators for bundling multiple resources together
 during storage operations, creating logical groupings of related data.
 """
 
+import gzip
 import io
 import os
 import tempfile
@@ -67,13 +68,18 @@ class BundleResourcesBundle:
             temp_file.flush()
             temp_file.close()
 
+            # If the resource appears to be gzipped (by magic bytes) or URL ends with .gz,
+            # transparently decompress before adding to the bundle so that downstream
+            # consumers see the actual payload (e.g., HTML) rather than the compressed blob.
+            decompressed_path = self._maybe_decompress_gzip(url, temp_file.name)
+
             # Store temp file info (not content)
             self.temp_files.append(
                 {
                     "url": url,
                     "content_type": content_type,
                     "status_code": status_code,
-                    "temp_file": temp_file.name,
+                    "temp_file": decompressed_path,
                 }
             )
         except Exception:
@@ -142,3 +148,43 @@ class BundleResourcesBundle:
     async def _stream_from_bytes(self, data: bytes) -> AsyncGenerator[bytes, None]:
         """Create a stream from bytes."""
         yield data
+
+    def _maybe_decompress_gzip(self, url: str, temp_path: str) -> str:
+        """Decompress using gzip if required.
+
+        If the given temp file is gzipped (or URL ends with .gz), return a path to a decompressed temp file; otherwise return the original path.
+
+        Args:
+            url: Original URL (used to detect .gz suffix).
+            temp_path: Path to the streamed content.
+
+        Returns:
+            Path to a file containing the decompressed content (or original).
+        """
+        try:
+            is_gz = False
+            if url.endswith(".gz"):
+                is_gz = True
+            else:
+                with open(temp_path, "rb") as f:
+                    header = f.read(2)
+                    is_gz = header.startswith(b"\x1f\x8b")
+
+            if not is_gz:
+                return temp_path
+
+            # Decompress into a new temp file
+            with open(temp_path, "rb") as src:
+                with gzip.GzipFile(fileobj=src, mode="rb") as gz:
+                    decompressed = gz.read()
+
+            out = tempfile.NamedTemporaryFile(delete=False)
+            out.write(decompressed)
+            out.flush()
+            out.close()
+
+            # Keep original around for later cleanup; caller manages lifecycle
+            return out.name
+        except Exception:
+            # On any failure, fall back to original content
+            return temp_path

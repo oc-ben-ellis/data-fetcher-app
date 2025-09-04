@@ -16,16 +16,16 @@ All configurations use environment variables with sensible defaults, making the 
 
 ### Storage Configuration
 
-| Variable                 | Description                                                 | Default             | Example             |
-| ------------------------ | ----------------------------------------------------------- | ------------------- | ------------------- |
-| `OC_STORAGE_TYPE`        | Storage type to use                                         | `"s3"`              | `"file"`            |
-| `OC_S3_BUCKET`           | S3 bucket name                                              | `"oc-fetcher-data"` | `"my-company-data"` |
-| `OC_S3_PREFIX`           | S3 key prefix                                               | `""`                | `"captures/2024/"`  |
-| `AWS_REGION`             | Standard AWS region environment variable (takes precedence) | `"eu-west-2"`       | `"us-east-1"`       |
-| `OC_S3_REGION`           | AWS region for S3 (fallback if AWS_REGION not set)          | `"eu-west-2"`       | `"eu-west-1"`       |
-| `OC_STORAGE_FILE_PATH`   | File storage path (when using file storage)                 | `"default_capture"` | `"/data/captures"`  |
-| `OC_STORAGE_USE_UNZIP`   | Enable unzip decorator                                      | `"true"`            | `"false"`           |
-| `OC_STORAGE_USE_WARC`    | Enable WARC decorator                                       | `"true"`            | `"false"`           |
+| Variable               | Description                                                 | Default             | Example             |
+| ---------------------- | ----------------------------------------------------------- | ------------------- | ------------------- |
+| `OC_STORAGE_TYPE`      | Storage type to use                                         | `"s3"`              | `"file"`            |
+| `OC_S3_BUCKET`         | S3 bucket name                                              | `"oc-fetcher-data"` | `"my-company-data"` |
+| `OC_S3_PREFIX`         | S3 key prefix                                               | `""`                | `"captures/2024/"`  |
+| `AWS_REGION`           | Standard AWS region environment variable (takes precedence) | `"eu-west-2"`       | `"us-east-1"`       |
+| `OC_S3_REGION`         | AWS region for S3 (fallback if AWS_REGION not set)          | `"eu-west-2"`       | `"eu-west-1"`       |
+| `OC_STORAGE_FILE_PATH` | File storage path (when using file storage)                 | `"default_capture"` | `"/data/captures"`  |
+| `OC_STORAGE_USE_UNZIP` | Enable unzip decorator                                      | `"true"`            | `"false"`           |
+
 | `OC_STORAGE_USE_BUNDLER` | Enable bundler decorator                                    | `"true"`            | `"false"`           |
 
 ### Key-Value Store Configuration
@@ -198,7 +198,7 @@ Boolean environment variables accept various formats:
 
 Examples:
 ```bash
-export OC_STORAGE_USE_WARC=true
+
 export OC_STORAGE_USE_BUNDLER=1
 export OC_STORAGE_USE_UNZIP=yes
 ```

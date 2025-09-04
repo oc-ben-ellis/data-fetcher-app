@@ -68,7 +68,7 @@ The OC Fetcher framework is built around a composable, streaming-first architect
 #### 2. **Streaming-First**
 - Data flows through the system without loading entire files into memory
 - Bundle loaders stream large payloads directly to storage
-- WARC formatting happens during the streaming process
+
 
 #### 3. **Protocol Independence**
 - Managers handle protocol-specific concerns (rate limiting, scheduling)
@@ -101,7 +101,7 @@ The OC Fetcher framework is built around a composable, streaming-first architect
 
 #### **Storage Layer**
 - **Base Storage**: File Storage and S3 Storage
-- **Storage Decorators**: Unzip, WARC, Bundle Resources
+- **Storage Decorators**: Unzip, Bundle Resources
 
 #### **Supporting Systems**
 - **Protocol Managers**: Rate limiting and scheduling

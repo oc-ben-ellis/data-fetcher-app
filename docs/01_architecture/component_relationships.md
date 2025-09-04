@@ -46,7 +46,7 @@ The storage layer contains components that persist fetched data:
 
 - **FileStorage**: Stores files on local disk
 - **S3Storage**: Stores files in S3 with metadata
-- **Storage Decorators**: Unzip, WARC, Bundle Resources decorators
+- **Storage Decorators**: Unzip, Bundle Resources decorators
 
 ### **Supporting Systems**
 The supporting systems layer contains cross-cutting concerns:

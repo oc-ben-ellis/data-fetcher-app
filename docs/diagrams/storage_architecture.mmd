@@ -2,7 +2,6 @@ graph LR
     subgraph "Storage Stack"
         subgraph "Decorators (Top to Bottom)"
             Bundle[Bundle Resources<br/>Decorator]
-            WARC[WARC Decorator]
             Unzip[Unzip Resource<br/>Decorator]
         end
 
@@ -15,15 +14,12 @@ graph LR
     subgraph "Data Flow"
         Raw[Raw Data Stream]
         Unzipped[Unzipped Data]
-        WARCData[WARC Formatted]
         Bundled[Bundled Package]
     end
 
     Raw --> Unzip
     Unzip --> Unzipped
-    Unzipped --> WARC
-    WARC --> WARCData
-    WARCData --> Bundle
+    Unzipped --> Bundle
     Bundle --> Bundled
 
     Bundle --> File

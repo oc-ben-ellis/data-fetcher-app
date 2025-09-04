@@ -398,7 +398,7 @@ class TestLoaderIntegration:
     async def test_loader_with_storage_decorators(self) -> None:
         """Test loader with storage decorators."""
         # This test would verify that loaders work correctly with storage decorators
-        # like WARC decorators, unzip decorators, etc.
+        # like unzip decorators, bundle decorators, etc.
         pass
 
     @pytest.mark.asyncio

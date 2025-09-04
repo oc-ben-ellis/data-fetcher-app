@@ -6,13 +6,13 @@ The framework uses a composable storage architecture with two base storage imple
 
 ![Storage Architecture](../diagrams/png/storage_architecture.png)
 
-The storage architecture diagram focuses on the composable storage system, showing how data transforms as it flows through different decorators before reaching the final storage destination. It illustrates the decorator pattern where each decorator adds specific functionality (unzipping, WARC formatting, bundling) while maintaining the same storage interface.
+The storage architecture diagram focuses on the composable storage system, showing how data transforms as it flows through different decorators before reaching the final storage destination. It illustrates the decorator pattern where each decorator adds specific functionality (unzipping, bundling) while maintaining the same storage interface.
 
 **Key Components**:
 
 - **Raw Data Stream** - Initial data received from remote sources (may be compressed)
 - **Unzip Resource Decorator** - Automatically decompresses gzip and zip resources before processing
-- **WARC Decorator** - Formats resources as WARC records for web archiving standards compliance
+
 - **Bundle Resources Decorator** - Collects all resources in a bundle and creates a single zip file
 - **File Storage** - Stores files on local disk with custom output directory support
 - **S3 Storage** - Stores files in AWS S3 with metadata and environment-specific bucket naming
@@ -40,10 +40,7 @@ Storage decorators are located in `data_fetcher/storage/decorators/` and modify 
 - Handles common compression formats
 - Preserves original file structure
 
-### 2. **ApplyWARCDecorator** (`apply_warc.py`)
-- Formats resources as WARC records for web archiving
-- Adds WARC metadata to each resource
-- Ensures compliance with web archiving standards
+
 
 ### 3. **BundleResourcesDecorator** (`bundle_resources.py`)
 - Collects all resources in a bundle and creates a single zip file
@@ -76,14 +73,7 @@ from data_fetcher.storage import FileStorage
 storage = FileStorage("output/files")
 ```
 
-### File Storage with WARC Formatting
-```python
-from data_fetcher.storage import FileStorage, ApplyWARCDecorator
 
-# File storage with WARC formatting
-base_storage = FileStorage("output/warc")
-storage = ApplyWARCDecorator(base_storage)
-```
 
 ### S3 Storage with Resource Bundling
 ```python
@@ -102,7 +92,7 @@ from data_fetcher.storage import FileStorage, create_storage_stack
 base_storage = FileStorage("output/complex")
 storage = create_storage_stack(
     base_storage=base_storage,
-    use_warc=True,
+
     bundle_resources=True,
     unzip_resources=True,
 )
@@ -112,7 +102,7 @@ storage = create_storage_stack(
 
 1. **Raw Data**: Initial data received from bundle loaders
 2. **Unzip Decorator**: Decompresses any compressed resources
-3. **WARC Decorator**: Formats resources as WARC records
+
 4. **Bundle Decorator**: Packages resources into a single bundle
 5. **Base Storage**: Persists the final bundle to disk or S3
 

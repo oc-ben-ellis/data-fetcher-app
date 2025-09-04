@@ -15,10 +15,11 @@ import asyncio
 import os
 import tempfile
 import time
-from collections.abc import AsyncGenerator, Callable, Generator
+from collections.abc import Callable, Generator
+from collections.abc import Generator as TypingGenerator
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import boto3
@@ -33,11 +34,11 @@ from testcontainers.core.waiting_utils import (  # type: ignore[import-untyped]
 from data_fetcher.configurations.us_fl import _setup_us_fl_sftp_fetcher
 from data_fetcher.core import FetchRunContext
 from data_fetcher.global_storage import configure_global_storage
-from data_fetcher.kv_store import configure_global_store, get_global_store
+from data_fetcher.kv_store import configure_global_store
 
 
 @pytest.fixture(scope="session", autouse=True)
-def setup_early_s3() -> Generator[None, None, None]:
+def setup_early_s3() -> TypingGenerator[None, None, None]:
     """Set up S3 configuration early to prevent auto-execution issues."""
     print("EARLY S3 SETUP - before any containers")
 
@@ -53,8 +54,8 @@ def setup_early_s3() -> Generator[None, None, None]:
     print("EARLY S3 CLEANUP")
 
 
-@pytest.fixture(scope="class")
-def sftp_server_container() -> Generator[DockerContainer, None, None]:
+@pytest.fixture(scope="function")
+def sftp_server_container() -> TypingGenerator[DockerContainer, None, None]:
     """Start an SFTP server container with mock data for testing."""
     try:
         # Create a temporary directory for SFTP data
@@ -279,8 +280,8 @@ def sftp_server_container() -> Generator[DockerContainer, None, None]:
         pytest.fail(f"Failed to start SFTP server container: {e}")
 
 
-@pytest.fixture(scope="class")
-def localstack_container() -> Generator[DockerContainer, None, None]:
+@pytest.fixture(scope="function")
+def localstack_container() -> TypingGenerator[DockerContainer, None, None]:
     """Start localstack container for S3 testing."""
     try:
         container = DockerContainer("localstack/localstack:3.0")
@@ -353,9 +354,9 @@ def test_bucket(s3_client: Any) -> str:
 
 
 @pytest.fixture
-async def setup_storage_and_kvstore(
+def setup_storage_and_kvstore(
     test_bucket: str, localstack_container: DockerContainer
-) -> AsyncGenerator[None, None]:
+) -> Generator[None, None, None]:
     """Set up global storage and KV store for testing."""
     print("SETUP_STORAGE_AND_KVSTORE FIXTURE STARTED")
 
@@ -391,12 +392,26 @@ async def setup_storage_and_kvstore(
     )
 
     print("STORAGE AND KVSTORE SETUP COMPLETE - yielding")
+
+    # Debug: Check what global storage was configured
+    from data_fetcher.storage.builder import get_global_storage
+
+    global_storage = get_global_storage()
+    print(f"Fixture: Global storage type: {type(global_storage).__name__}")
+    if global_storage is not None:
+        gs = cast(Any, global_storage)
+        if hasattr(gs, "bucket_name"):
+            print(f"Fixture: Global storage bucket: {gs.bucket_name}")
+        if hasattr(gs, "prefix"):
+            print(f"Fixture: Global storage prefix: {gs.prefix}")
+        if hasattr(gs, "endpoint_url"):
+            print(f"Fixture: Global storage endpoint: {gs.endpoint_url}")
+
     yield
     print("STORAGE AND KVSTORE CLEANUP")
 
     # Cleanup
-    store = await get_global_store()
-    await store.close()
+    # Note: Global store cleanup is handled automatically
 
 
 @pytest.fixture
@@ -429,6 +444,7 @@ class TestUsfloridaFunctional:
         s3_client: Any,
         test_bucket: str,
         test_secrets: dict[str, str],
+        setup_storage_and_kvstore: Any,
     ) -> None:
         """Test the complete US Florida SFTP workflow.
 
@@ -440,6 +456,7 @@ class TestUsfloridaFunctional:
                 5. Checks that data is properly uploaded to S3
         """
         print("TEST METHOD STARTED - beginning test execution")
+        print("DEBUG: About to wait for fixtures to be ready")
 
         # First, wait a moment to ensure all fixtures are completely ready
         import asyncio
@@ -588,9 +605,37 @@ class TestUsfloridaFunctional:
         configure_global_credential_provider()
         print("Global credential provider configured")
 
+        # Configure global storage manually since the fixture is not working
+        print("Configuring global storage manually...")
+
+        # Get localstack port
+        localstack_port = localstack_container.get_exposed_port(4566)
+        print(f"Localstack port: {localstack_port}")
+
+        # Set environment variables for S3 configuration
+        os.environ["OC_STORAGE_TYPE"] = "s3"
+        os.environ["OC_S3_BUCKET"] = test_bucket
+        os.environ["OC_S3_PREFIX"] = "test-us-fl/"
+        os.environ["OC_S3_ENDPOINT_URL"] = f"http://localhost:{localstack_port}"
+        os.environ["AWS_REGION"] = "us-east-1"
+
         # Configure global storage
         configure_global_storage()
-        print("Global storage configured")
+        print("Global storage configured manually")
+
+        # Debug: Check what global storage was configured
+        from data_fetcher.storage.builder import get_global_storage
+
+        global_storage = get_global_storage()
+        print(f"Manual: Global storage type: {type(global_storage).__name__}")
+        if global_storage is not None:
+            gs = cast(Any, global_storage)
+            if hasattr(gs, "bucket_name"):
+                print(f"Manual: Global storage bucket: {gs.bucket_name}")
+            if hasattr(gs, "prefix"):
+                print(f"Manual: Global storage prefix: {gs.prefix}")
+            if hasattr(gs, "endpoint_url"):
+                print(f"Manual: Global storage endpoint: {gs.endpoint_url}")
 
         # Configure global KV store
         configure_global_store(
@@ -599,7 +644,7 @@ class TestUsfloridaFunctional:
             default_ttl=3600,
             key_prefix="test_us_fl:",
         )
-        print("KV store configured")
+        print("KV store configured manually")
 
         # Use the real US FL configuration (which will use LocalStack Secrets Manager)
         print("About to import US FL configuration...")
@@ -610,6 +655,18 @@ class TestUsfloridaFunctional:
         # Get the real US FL configuration
         fetch_context = _setup_us_fl_sftp_fetcher()
         print("US FL configuration created")
+
+        # Debug: Check what storage is being used
+        print(f"Fetch context storage type: {type(fetch_context.storage).__name__}")
+        storage = fetch_context.storage
+        if storage is not None:
+            st = cast(Any, storage)
+            if hasattr(st, "bucket_name"):
+                print(f"Storage bucket: {st.bucket_name}")
+            if hasattr(st, "prefix"):
+                print(f"Storage prefix: {st.prefix}")
+            if hasattr(st, "endpoint_url"):
+                print(f"Storage endpoint: {st.endpoint_url}")
 
         # Verify that the configuration is using the credential provider correctly
         print("Verifying credential provider configuration...")
@@ -1035,7 +1092,7 @@ class TestUsfloridaFunctional:
         localstack_container: DockerContainer,
         s3_client: Any,
         test_bucket: str,
-        setup_storage_and_kvstore: None,
+        setup_storage_and_kvstore: Any,
         mock_credential_provider: AsyncMock,
     ) -> None:
         """Test that the US FL configuration creates bundles with the expected structure."""

@@ -62,6 +62,23 @@ class UnzipResourceBundle:
         stream: AsyncGenerator[bytes, None],
     ) -> None:
         """Write a resource with decompression using streaming."""
+        logger.debug(
+            "UnzipResourceDecorator.write_resource called",
+            url=url,
+            content_type=content_type,
+        )
+
+        # If this looks like an intentional archive artifact (e.g., a final
+        # bundle.zip), bypass decompression entirely and stream as-is.
+        if self._should_bypass_decompression(url, content_type):
+            await self._stream_temp_file_to_storage(
+                self._strip_compression_suffix(url),
+                content_type,
+                status_code,
+                await self._persist_stream_to_tempfile(stream),
+            )
+            return
+
         # Stream to temporary file
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             try:
@@ -71,19 +88,31 @@ class UnzipResourceBundle:
                 temp_file.flush()
                 temp_file.close()
 
+                logger.debug(
+                    "Content written to temp file",
+                    temp_file=temp_file.name,
+                    size=os.path.getsize(temp_file.name),
+                )
+
                 # Check if content is compressed
                 if self._is_gzipped_file(temp_file.name):
+                    logger.debug("Detected gzipped content, decompressing")
                     await self._write_decompressed_gzip_file(
                         url, content_type, status_code, temp_file.name
                     )
                 elif self._is_zipped_file(temp_file.name):
+                    logger.debug("Detected zipped content, extracting")
                     await self._write_decompressed_zip_file(
                         url, content_type, status_code, temp_file.name
                     )
                 else:
+                    logger.debug("Content not compressed, streaming as-is")
                     # Stream original content from temp file
                     await self._stream_temp_file_to_storage(
-                        url, content_type, status_code, temp_file.name
+                        self._strip_compression_suffix(url),
+                        content_type,
+                        status_code,
+                        temp_file.name,
                     )
 
             finally:
@@ -140,7 +169,7 @@ class UnzipResourceBundle:
                         yield chunk
 
             await self.base_bundle.write_resource(
-                url=f"{url}.decompressed",
+                url=self._strip_compression_suffix(url),
                 content_type=content_type,
                 status_code=status_code,
                 stream=gzip_stream(),
@@ -151,7 +180,10 @@ class UnzipResourceBundle:
             )
             # Stream original content as fallback
             await self._stream_temp_file_to_storage(
-                url, content_type, status_code, filepath
+                self._strip_compression_suffix(url),
+                content_type,
+                status_code,
+                filepath,
             )
 
     async def _write_decompressed_zip_file(
@@ -178,7 +210,7 @@ class UnzipResourceBundle:
                                 yield chunk
 
                     # Write extracted file
-                    extracted_url = f"{url}/{filename}"
+                    extracted_url = f"{self._strip_compression_suffix(url)}/{filename}"
                     await self.base_bundle.write_resource(
                         url=extracted_url,
                         content_type="application/octet-stream",
@@ -191,7 +223,10 @@ class UnzipResourceBundle:
             )
             # Stream original content as fallback
             await self._stream_temp_file_to_storage(
-                url, content_type, status_code, filepath
+                self._strip_compression_suffix(url),
+                content_type,
+                status_code,
+                filepath,
             )
 
     async def _write_decompressed_gzip(
@@ -201,7 +236,7 @@ class UnzipResourceBundle:
         try:
             decompressed = gzip.decompress(content)
             await self.base_bundle.write_resource(
-                url=f"{url}.decompressed",
+                url=self._strip_compression_suffix(url),
                 content_type=content_type,
                 status_code=status_code,
                 stream=self._stream_from_bytes(decompressed),
@@ -212,7 +247,7 @@ class UnzipResourceBundle:
             )
             # Write original content as fallback
             await self.base_bundle.write_resource(
-                url=url,
+                url=self._strip_compression_suffix(url),
                 content_type=content_type,
                 status_code=status_code,
                 stream=self._stream_from_bytes(content),
@@ -259,3 +294,72 @@ class UnzipResourceBundle:
     async def close(self) -> None:
         """Close the unzip bundle."""
         await self.base_bundle.close()
+
+    def _strip_compression_suffix(self, url: str) -> str:
+        """Strip common compression suffixes from the URL path.
+
+        This helps produce expected filenames like `page.html` when the input
+        URL is `page.html.gz`, regardless of whether decompression actually
+        happened (e.g., in error fallbacks).
+
+        Args:
+            url: Original resource URL that may end with a compression suffix.
+
+        Returns:
+            URL string with trailing `.gz`/`.gzip` removed from the path.
+        """
+        try:
+            from urllib.parse import urlparse, urlunparse
+
+            parsed = urlparse(url)
+            path = parsed.path
+            for suffix in (".gz", ".gzip"):
+                if path.endswith(suffix):
+                    path = path[: -len(suffix)]
+                    break
+            parsed = parsed._replace(path=path)
+            return urlunparse(parsed)
+        except Exception:
+            # Safe fallback: best-effort suffix strip
+            if url.endswith(".gz"):
+                return url[:-3]
+            if url.endswith(".gzip"):
+                return url[:-5]
+            return url
+
+    def _should_bypass_decompression(self, url: str, content_type: str | None) -> bool:
+        """Determine whether to bypass decompression for this resource.
+
+        We avoid decompressing when the URL indicates a final bundle artifact
+        (e.g., ends with .zip) so that higher-level decorators can persist
+        archives without this layer extracting them.
+
+        Args:
+            url: Resource URL.
+            content_type: Optional content type.
+
+        Returns:
+            True if decompression should be bypassed.
+        """
+        try:
+            from urllib.parse import urlparse
+
+            path = urlparse(url).path or ""
+            if path.endswith(".zip"):
+                return True
+            # Respect explicit zip content-type as an additional signal
+            if content_type and "application/zip" in content_type:
+                return True
+        except Exception:
+            pass
+        return False
+
+    async def _persist_stream_to_tempfile(
+        self, stream: AsyncGenerator[bytes, None]
+    ) -> str:
+        """Persist an async stream to a temporary file and return its path."""
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            async for chunk in stream:
+                temp_file.write(chunk)
+            temp_file.flush()
+            return temp_file.name

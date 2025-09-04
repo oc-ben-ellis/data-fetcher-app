@@ -12,7 +12,7 @@ The OC Fetcher framework is built around a composable, streaming-first architect
 ### 2. **Streaming-First**
 - Data flows through the system without loading entire files into memory
 - Bundle loaders stream large payloads directly to storage
-- WARC formatting happens during the streaming process
+
 
 ### 3. **Protocol Independence**
 - Managers handle protocol-specific concerns (rate limiting, scheduling)
@@ -45,7 +45,7 @@ The OC Fetcher framework is built around a composable, streaming-first architect
 
 ### **Storage Layer**
 - **Base Storage**: File Storage and S3 Storage
-- **Storage Decorators**: Unzip, WARC, Bundle Resources
+- **Storage Decorators**: Unzip, Bundle Resources
 
 ### **Supporting Systems**
 - **Protocol Managers**: Rate limiting and scheduling
@@ -66,7 +66,7 @@ The fetcher coordinates components in a two-phase pipeline with concurrent worke
 ### Phase 2: Data Loading
 1. **Bundle Loaders** fetch data from endpoints using protocol managers
 2. Data is streamed directly to **Storage** without loading into memory
-3. **Storage Decorators** transform data (Unzip → WARC → Bundle)
+3. **Storage Decorators** transform data (Unzip → Bundle)
 4. Workers coordinate shutdown when no more URLs are available
 
 ### Key Features
@@ -97,7 +97,7 @@ The fetcher coordinates components in a two-phase pipeline with concurrent worke
 - **Base Storage**: File system and S3 implementations
 - **Decorators**: Transform data during streaming
   - Unzip: Extract compressed files
-  - WARC: Format data as WARC records
+  
   - Bundle: Group related resources
 
 ## Storage Architecture
@@ -105,12 +105,12 @@ The fetcher coordinates components in a two-phase pipeline with concurrent worke
 The storage system uses a composable design with decorators:
 
 ```
-Data Source → Unzip Decorator → WARC Decorator → Bundle Decorator → Base Storage
+Data Source → Unzip Decorator → Bundle Decorator → Base Storage
 ```
 
 ### Storage Decorators
 - **Unzip**: Automatically extracts compressed files during streaming
-- **WARC**: Formats data as WARC records with metadata
+
 - **Bundle**: Groups related resources into logical bundles
 
 ### Base Storage
@@ -186,7 +186,7 @@ Detailed interfaces and relationships between Bundle Locators, Bundle Loaders, P
 System overview showing how data flows from external sources through processing layers to final storage, with supporting systems providing cross-cutting concerns.
 
 ### [Storage Architecture](storage_architecture.md)
-Composable storage system with decorators for data transformation (Unzip → WARC → Bundle) before reaching base storage implementations.
+Composable storage system with decorators for data transformation (Unzip → Bundle) before reaching base storage implementations.
 
 ### [Component Relationships](component_relationships.md)
 Detailed view of component interactions organized by functional layers, showing dependencies and data flow through the system.
@@ -222,7 +222,7 @@ graph TB
 
             subgraph "Storage Decorators"
                 SD1[Unzip Resource<br/>Decorator]
-                SD2[WARC Decorator]
+
                 SD3[Bundle Resources<br/>Decorator]
             end
         end
@@ -336,7 +336,7 @@ graph LR
     subgraph "Storage Stack"
         subgraph "Decorators (Top to Bottom)"
             Bundle[Bundle Resources<br/>Decorator]
-            WARC[WARC Decorator]
+
             Unzip[Unzip Resource<br/>Decorator]
         end
 
@@ -349,15 +349,13 @@ graph LR
     subgraph "Data Flow"
         Raw[Raw Data Stream]
         Unzipped[Unzipped Data]
-        WARCData[WARC Formatted]
+
         Bundled[Bundled Package]
     end
 
     Raw --> Unzip
     Unzip --> Unzipped
-    Unzipped --> WARC
-    WARC --> WARCData
-    WARCData --> Bundle
+            Unzipped --> Bundle
     Bundle --> Bundled
 
     Bundle --> File

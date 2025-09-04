@@ -2914,24 +2914,6 @@ docs = ["furo (>=2023.7.26)", "proselint (>=0.13)", "sphinx (>=7.1.2,!=7.3)", "s
 test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess (>=1)", "flaky (>=3.7)", "packaging (>=23.1)", "pytest (>=7.4)", "pytest-env (>=0.8.2)", "pytest-freezer (>=0.4.8)", "pytest-mock (>=3.11.1)", "pytest-randomly (>=3.12)", "pytest-timeout (>=2.1)", "setuptools (>=68)", "time-machine (>=2.10)"]
 
 [[package]]
-name = "warcio"
-version = "1.7.5"
-description = "Streaming WARC (and ARC) IO library"
-optional = false
-python-versions = "*"
-files = [
-    {file = "warcio-1.7.5-py2.py3-none-any.whl", hash = "sha256:ca96130bde7747e49da714097d144c6ff939458d4f93e1beb1e42455db4326d4"},
-    {file = "warcio-1.7.5.tar.gz", hash = "sha256:7247b57e68074cfd9433cb6dc226f8567d6777052abec2d3c78346cffa4d19b9"},
-]
-
-[package.dependencies]
-six = "*"
-
-[package.extras]
-all = ["brotlipy"]
-testing = ["hookdns", "httpbin (>=0.10.2)", "pytest", "pytest-cov", "requests", "urllib3 (>=1.26.5,<1.26.16)", "wsgiprox"]
-
-[[package]]
 name = "webencodings"
 version = "0.5.1"
 description = "Character encoding aliases for legacy web content"
@@ -3153,4 +3135,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "6033f61785ae37b6223b60294172def92c012d7351023907f857ea669c282715"
+content-hash = "fe7620b1f5245d5b97f34fcaf32013778cab92b7467d92fb8c469890fccbf2e5"

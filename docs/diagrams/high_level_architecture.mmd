@@ -22,7 +22,7 @@ graph TB
 
             subgraph "Storage Decorators"
                 SD1[Unzip Resource<br/>Decorator]
-                SD2[WARC Decorator]
+
                 SD3[Bundle Resources<br/>Decorator]
             end
         end
@@ -58,8 +58,7 @@ graph TB
     DL2 --> SD1
     DL3 --> SD1
 
-    SD1 --> SD2
-    SD2 --> SD3
+    SD1 --> SD3
     SD3 --> BS1
     SD3 --> BS2
 

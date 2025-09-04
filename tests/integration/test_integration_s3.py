@@ -15,7 +15,6 @@ import pytest
 
 from data_fetcher.core import BundleRef
 from data_fetcher.storage.decorators import (
-    ApplyWARCDecorator,
     BundleResourcesDecorator,
 )
 from data_fetcher.storage.s3_storage import S3Storage
@@ -345,26 +344,7 @@ class TestS3Integration:
         bundle_ref: BundleRef,
     ) -> None:
         """Test S3 storage with various decorators."""
-        # Test with WARC decorator
-        warc_storage = ApplyWARCDecorator(s3_storage)
-
-        test_content = b"<html><body>WARC test</body></html>"
-
-        async with warc_storage.open_bundle(bundle_ref) as bundle:
-            await bundle.write_resource(
-                url="https://example.com/warc_test.html",
-                content_type="text/html",
-                status_code=200,
-                stream=self.create_test_stream(test_content),
-            )
-
-        # Verify WARC file was created
-        response = s3_client.list_objects_v2(Bucket=test_bucket, Prefix="test-prefix/")
-        objects = response.get("Contents", [])
-
-        # Should have WARC file
-        warc_objects = [obj for obj in objects if obj["Key"].endswith(".warc")]
-        assert len(warc_objects) >= 1
+        test_content = b"<html><body>Bundle test</body></html>"
 
         # Test with bundler decorator
         bundler_storage = BundleResourcesDecorator(s3_storage)

@@ -33,7 +33,7 @@ AWS S3 storage integration with metadata management and environment-specific con
 
 ### **Storage Decorators**
 - **UnzipResourceDecorator**: Automatic decompression of compressed resources
-- **ApplyWARCDecorator**: WARC formatting for web archiving standards
+
 - **BundleResourcesDecorator**: Resource bundling into single packages
 
 ## Storage Architecture
@@ -42,7 +42,7 @@ AWS S3 storage integration with metadata management and environment-specific con
 The storage system uses a decorator pattern where each decorator adds specific functionality while maintaining the same storage interface:
 
 ```
-Raw Data → Unzip Decorator → WARC Decorator → Bundle Decorator → Base Storage
+Raw Data → Unzip Decorator → Bundle Decorator → Base Storage
 ```
 
 ### **Streaming Operations**
@@ -62,7 +62,7 @@ All storage operations are streaming-based, allowing efficient processing of lar
 
 ### **Data Transformation**
 - **Automatic Decompression**: Handles gzip, zip, and other compression formats
-- **WARC Formatting**: Web archiving standards compliance
+
 - **Resource Bundling**: Convenient packaging for downstream processing
 
 ### **Metadata Management**
@@ -102,7 +102,7 @@ from data_fetcher.storage import S3Storage, create_storage_stack
 base_storage = S3Storage("my-bucket", "prefix/")
 storage = create_storage_stack(
     base_storage=base_storage,
-    use_warc=True,
+
     bundle_resources=True,
     unzip_resources=True
 )
@@ -110,11 +110,11 @@ storage = create_storage_stack(
 
 ### **Custom Storage Configuration**
 ```python
-from data_fetcher.storage import FileStorage, ApplyWARCDecorator
+from data_fetcher.storage import FileStorage, BundleResourcesDecorator
 
 # Custom storage configuration
 base_storage = FileStorage("output/custom")
-storage = ApplyWARCDecorator(base_storage)
+storage = BundleResourcesDecorator(base_storage)
 ```
 
 ## Configuration Options
@@ -131,7 +131,7 @@ storage:
     path: ./data/
   decorators:
     unzip: true
-    warc: true
+
     bundle: true
 ```
 
@@ -153,7 +153,7 @@ environments:
 - **Scalability**: Handles large datasets efficiently through streaming
 - **Flexibility**: Composable design allows custom storage configurations
 - **Performance**: Streaming operations maintain constant memory usage
-- **Standards Compliance**: WARC formatting for web archiving standards
+
 - **Extensibility**: Easy to add new storage backends and decorators
 - **Reliability**: Robust error handling and data integrity
 - **Monitoring**: Built-in metrics and observability

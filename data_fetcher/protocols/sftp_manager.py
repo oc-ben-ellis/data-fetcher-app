@@ -12,6 +12,12 @@ from typing import Any
 
 import pysftp
 
+from ..utils.retry import (
+    async_retry_with_backoff,
+    create_connection_retry_engine,
+    create_operation_retry_engine,
+)
+
 
 @dataclass
 class ScheduledDailyGate:
@@ -83,13 +89,17 @@ class OncePerIntervalGate:
 
 @dataclass
 class SftpManager:
-    """SFTP connection manager with scheduling and rate limiting."""
+    """SFTP connection manager with scheduling, rate limiting, and retry logic."""
 
     credentials_provider: Any
     connect_timeout: float = 20.0
     daily_gate: ScheduledDailyGate | None = None
     interval_gate: OncePerIntervalGate | None = None
     rate_limit_requests_per_second: float = 5.0
+    max_retries: int = 3
+    base_retry_delay: float = 1.0
+    max_retry_delay: float = 60.0
+    retry_exponential_base: float = 2.0
 
     def __post_init__(self) -> None:
         """Initialize the SFTP manager with internal state and connection management."""
@@ -97,8 +107,19 @@ class SftpManager:
         self._rate_limit_lock = asyncio.Lock()
         self._connection: pysftp.Connection | None = None
 
+        # Create retry engines for different operations
+        self._connection_retry_engine = create_connection_retry_engine()
+        self._operation_retry_engine = create_operation_retry_engine()
+
+    @async_retry_with_backoff(
+        max_retries=3,
+        base_delay=1.0,
+        max_delay=60.0,
+        exponential_base=2.0,
+        jitter=True,
+    )
     async def get_connection(self) -> pysftp.Connection:
-        """Get or create SFTP connection."""
+        """Get or create SFTP connection with retry logic."""
         if self._connection is None:
             credentials = await self.credentials_provider.get_credentials()
 
@@ -123,8 +144,15 @@ class SftpManager:
         if self.interval_gate:
             await self.interval_gate.wait_if_needed()
 
+    @async_retry_with_backoff(
+        max_retries=3,
+        base_delay=1.0,
+        max_delay=60.0,
+        exponential_base=2.0,
+        jitter=True,
+    )
     async def request(self, operation: str, *args: Any, **kwargs: Any) -> Any:
-        """Make an SFTP request with rate limiting."""
+        """Make an SFTP request with rate limiting and retry logic."""
         # Wait for gates
         await self.wait_for_gates()
 
@@ -144,8 +172,47 @@ class SftpManager:
         method = getattr(conn, operation)
         return method(*args, **kwargs)
 
+    @async_retry_with_backoff(
+        max_retries=2,
+        base_delay=0.5,
+        max_delay=10.0,
+        exponential_base=2.0,
+        jitter=True,
+    )
     async def close(self) -> None:
-        """Close the SFTP connection."""
+        """Close the SFTP connection with retry logic."""
         if self._connection:
             self._connection.close()
             self._connection = None
+
+    async def reset_connection(self) -> None:
+        """Reset the SFTP connection, useful after connection errors."""
+        if self._connection:
+            try:
+                self._connection.close()
+            except Exception:
+                # Ignore errors during close
+                pass
+            finally:
+                self._connection = None
+
+    @async_retry_with_backoff(
+        max_retries=3,
+        base_delay=1.0,
+        max_delay=60.0,
+        exponential_base=2.0,
+        jitter=True,
+    )
+    async def test_connection(self) -> bool:
+        """Test the SFTP connection with retry logic.
+
+        Returns:
+            True if connection is working, False otherwise.
+        """
+        try:
+            conn = await self.get_connection()
+            # Try a simple operation to test the connection
+            _ = conn.pwd  # Test connection by accessing pwd attribute
+            return True
+        except Exception:
+            return False

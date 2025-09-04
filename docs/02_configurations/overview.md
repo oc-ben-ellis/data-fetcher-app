@@ -7,7 +7,7 @@ OC Fetcher is a composable, streaming-first fetch framework for Python that pull
 ## Key Features
 
 - **Composable Architecture**: Bundle locators generate URLs for loading
-- **Streaming-First**: Bundle loaders stream large payloads directly to Storage (WARC) to keep RAM small
+- **Streaming-First**: Bundle loaders stream large payloads directly to Storage to keep RAM small
 - **Protocol-Level Policies**: Managers handle cross-cutting concerns like rate limiting and scheduling
 - **Multiple Protocols**: Support for HTTP(S) and SFTP with extensible architecture
 - **SFTP**: Enterprise-grade SFTP with AWS Secrets Manager, S3 upload, and date-based file patterns

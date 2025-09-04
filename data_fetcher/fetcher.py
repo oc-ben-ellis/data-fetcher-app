@@ -128,7 +128,7 @@ class Fetcher:
         while not completion_flag.is_set():
             try:
                 # Get next request with timeout
-                req = await asyncio.wait_for(q.get(), timeout=5.0)
+                req = await asyncio.wait_for(q.get(), timeout=30.0)
 
                 # Process the request
                 worker_logger.debug("Processing request", url=req.url)

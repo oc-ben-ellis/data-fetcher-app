@@ -91,7 +91,7 @@ Shows the main components of the OC Fetcher framework including Bundle Locators,
 Sequence diagram showing the step-by-step process of how a fetch operation works, from initial request through data loading, storage, and completion.
 
 ### Storage Architecture
-Focuses on the composable storage system, showing how data transforms through decorators (Unzip → WARC → Bundle) before reaching base storage implementations.
+Focuses on the composable storage system, showing how data transforms through decorators (Unzip → Bundle) before reaching base storage implementations.
 
 ### Component Relationships
 Detailed view of how all components relate to each other, organized by layers (Core, Frontier, Protocol, Loader, Storage, Supporting Systems).

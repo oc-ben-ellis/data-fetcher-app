@@ -73,7 +73,7 @@ Storage Interface:
 **Storage Decorators** (modify streams being passed to storage):
 
 - `UnzipResourceDecorator`: Unzips any zipped resources
-- `ApplyWARCDecorator`: Turns resources into WARC files based on metadata
+
 - `BundleResourcesDecorator`: Zips resources into a single zip file
 
 ## Component Relationships

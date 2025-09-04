@@ -11,7 +11,7 @@ Environment Variables:
     OC_S3_ENDPOINT_URL: Custom S3 endpoint URL (for LocalStack, etc.). Default: None
     AWS_REGION: Standard AWS region environment variable (takes precedence over OC_S3_REGION)
     OC_STORAGE_USE_UNZIP: Enable unzip decorator ("true"/"false"). Default: "true"
-    OC_STORAGE_USE_WARC: Enable WARC decorator ("true"/"false"). Default: "true"
+
     OC_STORAGE_USE_BUNDLER: Enable bundler decorator ("true"/"false"). Default: "true"
     OC_STORAGE_FILE_PATH: File storage path (when using file storage). Default: "default_capture"
 """
@@ -67,11 +67,10 @@ def configure_global_storage() -> None:
 
     # Configure decorators
     use_unzip = _get_env_bool("OC_STORAGE_USE_UNZIP", True)
-    use_warc = _get_env_bool("OC_STORAGE_USE_WARC", True)
     use_bundler = _get_env_bool("OC_STORAGE_USE_BUNDLER", True)
 
     storage_config = storage_config.storage_decorators(
-        use_unzip=use_unzip, use_warc=use_warc, use_bundler=use_bundler
+        use_unzip=use_unzip, use_bundler=use_bundler
     )
 
     set_global_storage(storage_config)

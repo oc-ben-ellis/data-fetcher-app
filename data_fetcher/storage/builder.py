@@ -18,7 +18,6 @@ class StorageBuilder:
         self._s3_region: str = self._get_default_aws_region()
         self._s3_endpoint_url: str | None = None
         self._file_path: str | None = None
-        self._use_warc: bool = True
         self._use_bundler: bool = True
         self._use_unzip: bool = False
 
@@ -46,11 +45,10 @@ class StorageBuilder:
         return self
 
     def storage_decorators(
-        self, use_unzip: bool = False, use_warc: bool = True, use_bundler: bool = True
+        self, use_unzip: bool = False, use_bundler: bool = True
     ) -> "StorageBuilder":
         """Configure storage decorators."""
         self._use_unzip = use_unzip
-        self._use_warc = use_warc
         self._use_bundler = use_bundler
         return self
 
@@ -58,7 +56,6 @@ class StorageBuilder:
         """Build the storage configuration."""
         # Import here to avoid circular imports
         from . import (
-            ApplyWARCDecorator,
             BundleResourcesDecorator,
             FileStorage,
             S3Storage,
@@ -89,9 +86,6 @@ class StorageBuilder:
 
         if self._use_bundler:
             storage = BundleResourcesDecorator(storage)
-
-        if self._use_warc:
-            storage = ApplyWARCDecorator(storage)
 
         return storage
 

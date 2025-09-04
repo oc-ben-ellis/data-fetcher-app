@@ -1,6 +1,6 @@
 # Storage Architecture
 
-The framework uses a composable storage architecture with two base storage implementations and three decorators:
+The framework uses a composable storage architecture with two base storage implementations and two decorators:
 
 ## Base Storage Implementations
 
@@ -19,20 +19,19 @@ The framework uses a composable storage architecture with two base storage imple
 Storage decorators are located in `data_fetcher/storage/decorators/` and modify streams being passed to storage implementations:
 
 1. **UnzipResourceDecorator** (`unzip_resource.py`): Automatically decompresses gzip and zip resources
-2. **ApplyWARCDecorator** (`apply_warc.py`): Formats resources as WARC records for web archiving
-3. **BundleResourcesDecorator** (`bundle_resources.py`): Collects all resources in a bundle and creates a single zip file
+2. **BundleResourcesDecorator** (`bundle_resources.py`): Collects all resources in a bundle and creates a single zip file
 
 ## Usage Examples
 
 ```python
-from data_fetcher.storage import FileStorage, S3Storage, ApplyWARCDecorator, BundleResourcesDecorator
+from data_fetcher.storage import FileStorage, S3Storage, BundleResourcesDecorator
 
 # Basic file storage
 storage = FileStorage("output/files")
 
-# File storage with WARC formatting
-base_storage = FileStorage("output/warc")
-storage = ApplyWARCDecorator(base_storage)
+# File storage with resource bundling
+base_storage = FileStorage("output/bundles")
+storage = BundleResourcesDecorator(base_storage)
 
 # S3 storage with resource bundling
 base_storage = S3Storage("my-bucket", "prefix/")
@@ -42,7 +41,6 @@ storage = BundleResourcesDecorator(base_storage)
 base_storage = FileStorage("output/complex")
 storage = create_storage_stack(
     base_storage=base_storage,
-    use_warc=True,
     bundle_resources=True,
     unzip_resources=True,
 )

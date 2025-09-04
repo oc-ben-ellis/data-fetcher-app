@@ -73,7 +73,12 @@ define run_in_container
 	fi
 endef
 
-ARGS=-v --tb=line
+# Default pytest arguments for test targets
+PYTEST_ARGS=-v --tb=line
+
+# User-provided arguments (can be overridden from command line)
+ARGS=
+
 # Default number of parallel workers for tests (auto-detect CPU cores)
 # Parallel execution can significantly speed up test runs, especially on multi-core systems
 # Use TEST_WORKERS=1 to run tests sequentially if you encounter issues
@@ -132,22 +137,22 @@ lint/black: ensure-devcontainer
 	$(call run_in_container,black --check .)
 
 lint/ruff: ensure-devcontainer
-	$(call run_in_container,ruff .)
+	$(call run_in_container,ruff check .)
 
 lint/mypy: ensure-devcontainer
 	$(call run_in_container,mypy .)
 
 test: ensure-devcontainer
-	$(call run_in_container,pytest $(ARGS) -n $(TEST_WORKERS))
+	$(call run_in_container,pytest $(PYTEST_ARGS) -n $(TEST_WORKERS))
 
 test/not-in-parallel: ensure-devcontainer
-	$(call run_in_container,pytest $(ARGS))
+	$(call run_in_container,pytest $(PYTEST_ARGS))
 
 test/parallel: ensure-devcontainer
-	$(call run_in_container,pytest $(ARGS) -n $(TEST_WORKERS))
+	$(call run_in_container,pytest $(PYTEST_ARGS) -n $(TEST_WORKERS))
 
 test/with-coverage: ensure-devcontainer
-	$(call run_in_container,coverage run -m pytest $(ARGS) -n $(TEST_WORKERS))
+	$(call run_in_container,coverage run -m pytest $(PYTEST_ARGS) -n $(TEST_WORKERS))
 	$(call run_in_container,coverage html --fail-under=0)
 	@echo "Coverage report at file://$(PWD)/tmp/htmlcov/index.html"
 	$(call run_in_container,coverage report)
@@ -195,9 +200,10 @@ help:
 	@echo ""
 	@echo "Usage examples:"
 	@echo "  make run ARGS=us-il"
-	@echo "  make test ARGS=tests/test_fetcher.py"
-	@echo "  make test/not-in-parallel ARGS=tests/test_fetcher.py"
-	@echo "  make test/parallel TEST_WORKERS=4 ARGS=tests/test_fetcher.py"
+	@echo "  make test"
+	@echo "  make test/not-in-parallel"
+	@echo "  make test/parallel TEST_WORKERS=4"
+	@echo "  make test PYTEST_ARGS='-v -s tests/test_fetcher.py'"
 	@echo "  make MODE=local run ARGS=us-fl"
 	@echo "  make MODE=docker run ARGS=us-fl"
 	@echo ""
@@ -205,6 +211,10 @@ help:
 	@echo "  TEST_WORKERS=auto  - Auto-detect CPU cores (default)"
 	@echo "  TEST_WORKERS=4     - Use 4 parallel workers"
 	@echo "  TEST_WORKERS=1     - Run tests sequentially"
+	@echo ""
+	@echo "Argument variables:"
+	@echo "  ARGS               - User arguments for non-test targets (e.g., fetcher IDs)"
+	@echo "  PYTEST_ARGS        - Pytest arguments (default: -v --tb=line, can be overridden)"
 
 examples: ensure-devcontainer
 	$(call run_in_container,python examples/using_config_system.py)

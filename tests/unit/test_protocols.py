@@ -11,7 +11,7 @@ that occurs in the async execution environment.
 
 import base64
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -137,9 +137,10 @@ class TestHttpManager:
     ) -> None:
         """Test HTTP manager when max retries are exceeded."""
         with patch("httpx.AsyncClient") as mock_client:
-            # All calls raise exceptions
+            # All calls raise exceptions - need 4 total (initial + 3 retries)
             mock_client_instance = AsyncMock()
             mock_client_instance.request.side_effect = [
+                httpx.ConnectError("Connection failed"),
                 httpx.ConnectError("Connection failed"),
                 httpx.ConnectError("Connection failed"),
                 httpx.ConnectError("Connection failed"),
@@ -206,10 +207,21 @@ class TestHttpManager:
             )
             mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
 
+            # Mock the retry engine to call the actual _make_request function
+            async def mock_execute_with_retry(
+                func: Callable[[], Awaitable[httpx.Response]]
+            ) -> httpx.Response:
+                return await func()
+
+            mock_retry_engine = AsyncMock()
+            mock_retry_engine.execute_with_retry_async = mock_execute_with_retry
+            manager._retry_engine = mock_retry_engine
+
             await manager.request("GET", "https://example.com")
 
             # Check that request was made with auth headers
             call_args = mock_client_instance.request.call_args
+            assert call_args is not None
             headers = call_args[1].get("headers", {})
 
             # Should have Authorization header
