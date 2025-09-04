@@ -23,3 +23,8 @@ jobs:
       # mypy inputs
       enable-mypy: true
       mypy-version: "1.17.1"
+
+      # pytest inputs
+      enable-pytest: false # Disable until tests are added
+      # pytest-requirements-file: "requirements-dev.txt"
+      # pytest-test-path: "tests"
