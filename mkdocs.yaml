@@ -1,0 +1,5 @@
+site_name: "docs"
+docs_dir: "."
+edit_uri: ""
+plugins:
+  - same-dir
