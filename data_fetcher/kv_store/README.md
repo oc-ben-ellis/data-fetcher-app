@@ -8,7 +8,7 @@ The key-value store system offers:
 
 - **Generic Interface**: Common interface for different storage backends
 - **Multiple Implementations**: In-memory (testing) and Redis (production)
-- **Global Configuration**: Automatic setup with optional override
+- **Application Configuration**: Automatic setup with optional override
 - **TTL Support**: Automatic expiration of cached data
 - **Range Queries**: Efficient retrieval of key ranges
 - **Serialization Options**: JSON and pickle support
@@ -21,7 +21,7 @@ The key-value store system offers:
 ```python
 from data_fetcher.kv_store import put, get, delete, exists
 
-# The global store is automatically configured when the module is imported
+# The application-wide store is automatically configured when the module is imported
 # Store and retrieve data
 await put("user:123", {"name": "John Doe", "email": "john@example.com"})
 user_data = await get("user:123")
@@ -177,12 +177,12 @@ async with get_store_context("memory", serializer="json") as store:
 
 ### Direct Store Access
 
-Access the global store directly:
+Access the application-wide store directly:
 
 ```python
 from data_fetcher.kv_store import get_global_store
 
-# Get the global store instance
+# Get the application-wide store instance
 store = await get_global_store()
 
 # Use store methods directly
@@ -197,9 +197,9 @@ if hasattr(store, 'get_stats'):
 
 ## Configuration
 
-### Global Configuration
+### Application Configuration
 
-The global store is automatically configured when the module is imported:
+The application store is automatically configured when the module is imported:
 
 ```python
 # Default configuration (in-memory, JSON, 1 hour TTL)
@@ -536,6 +536,6 @@ print(f"Exists after TTL: {await exists('test')}")
 
 ### Configuration Functions
 
-- `configure_global_store(store_type, **kwargs)` - Configure the global store
-- `get_global_store()` - Get the global store instance
+- `configure_global_store(store_type, **kwargs)` - Configure the application-wide store
+- `get_global_store()` - Get the application-wide store instance
 - `get_store_context(store_type, **kwargs)` - Context manager for store instances

@@ -21,7 +21,7 @@ def register_configuration(name: str, setup_func: Callable[[], FetchContext]) ->
 def get_fetcher(config_name: str) -> Fetcher:
     """Get a fetcher with the specified configuration."""
     if config_name not in _CONFIGURATIONS:
-        raise KeyError(f"Unknown configuration: {config_name}")
+        raise KeyError(f"Bad config: {config_name}")  # noqa: TRY003
 
     # Call the setup function
     setup_func = _CONFIGURATIONS[config_name]
@@ -30,7 +30,7 @@ def get_fetcher(config_name: str) -> Fetcher:
     return Fetcher(ctx)
 
 
-def list_configurations() -> list:
+def list_configurations() -> list[str]:
     """List all available configurations."""
     return list(_CONFIGURATIONS.keys())
 
@@ -38,5 +38,5 @@ def list_configurations() -> list:
 def get_configuration_setup_function(config_name: str) -> Callable[[], FetchContext]:
     """Get the setup function for a configuration."""
     if config_name not in _CONFIGURATIONS:
-        raise KeyError(f"Unknown configuration: {config_name}")
+        raise KeyError(f"Bad config: {config_name}")  # noqa: TRY003
     return _CONFIGURATIONS[config_name]

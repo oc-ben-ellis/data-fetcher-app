@@ -5,11 +5,17 @@ storage of key-value pairs in memory, useful for caching and testing.
 """
 
 import asyncio
+import contextlib
 import time
 from datetime import timedelta
 from typing import Any
 
+import structlog
+
 from .base import KeyValueStore
+
+# Get logger for this module
+logger = structlog.get_logger(__name__)
 
 
 class InMemoryKeyValueStore(KeyValueStore):
@@ -20,7 +26,7 @@ class InMemoryKeyValueStore(KeyValueStore):
     and will be lost when the application restarts.
     """
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, **kwargs: object) -> None:
         """Initialize the in-memory store."""
         super().__init__(**kwargs)
         self._store: dict[str, Any] = {}
@@ -34,10 +40,10 @@ class InMemoryKeyValueStore(KeyValueStore):
     async def put(
         self,
         key: str,
-        value: Any,
+        value: object,
         ttl: int | timedelta | None = None,
         prefix: str | None = None,
-        **kwargs: Any,
+        **kwargs: object,  # noqa: ARG002
     ) -> None:
         """Store a value with the given key."""
         # Start cleanup task if needed
@@ -62,8 +68,12 @@ class InMemoryKeyValueStore(KeyValueStore):
                 del self._expiry_times[prefixed_key]
 
     async def get(
-        self, key: str, default: Any = None, prefix: str | None = None, **kwargs: Any
-    ) -> Any | None:
+        self,
+        key: str,
+        default: object = None,
+        prefix: str | None = None,
+        **kwargs: object,  # noqa: ARG002
+    ) -> object | None:
         """Retrieve a value by key."""
         # Apply key prefix
         prefixed_key = self._get_prefixed_key(key, prefix)
@@ -77,7 +87,12 @@ class InMemoryKeyValueStore(KeyValueStore):
             serialized_value = self._store[prefixed_key]
             return self._deserialize(serialized_value)
 
-    async def delete(self, key: str, prefix: str | None = None, **kwargs: Any) -> bool:
+    async def delete(
+        self,
+        key: str,
+        prefix: str | None = None,
+        **kwargs: object,  # noqa: ARG002
+    ) -> bool:
         """Delete a key-value pair."""
         # Apply key prefix
         prefixed_key = self._get_prefixed_key(key, prefix)
@@ -90,7 +105,12 @@ class InMemoryKeyValueStore(KeyValueStore):
                 return True
             return False
 
-    async def exists(self, key: str, prefix: str | None = None, **kwargs: Any) -> bool:
+    async def exists(
+        self,
+        key: str,
+        prefix: str | None = None,
+        **kwargs: object,  # noqa: ARG002
+    ) -> bool:
         """Check if a key exists."""
         # Apply key prefix
         prefixed_key = self._get_prefixed_key(key, prefix)
@@ -104,7 +124,7 @@ class InMemoryKeyValueStore(KeyValueStore):
         end_key: str | None = None,
         limit: int | None = None,
         prefix: str | None = None,
-        **kwargs: Any,
+        **kwargs: object,  # noqa: ARG002
     ) -> list[tuple[str, Any]]:
         """Get a range of key-value pairs."""
         # Apply key prefix to start and end keys
@@ -151,10 +171,8 @@ class InMemoryKeyValueStore(KeyValueStore):
         """Close the store and release resources."""
         if self._cleanup_task:
             self._cleanup_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
 
         async with self._lock:
             self._store.clear()
@@ -172,12 +190,11 @@ class InMemoryKeyValueStore(KeyValueStore):
             return False
 
         # Check if key has expired
-        if key in self._expiry_times:
-            if time.time() > self._expiry_times[key]:
-                # Remove expired key
-                del self._store[key]
-                del self._expiry_times[key]
-                return False
+        if key in self._expiry_times and time.time() > self._expiry_times[key]:
+            # Remove expired key
+            del self._store[key]
+            del self._expiry_times[key]
+            return False
 
         return True
 
@@ -202,8 +219,12 @@ class InMemoryKeyValueStore(KeyValueStore):
 
             except asyncio.CancelledError:
                 break
-            except Exception:
+            except Exception as e:
                 # Log error but continue cleanup
+                logger.exception(
+                    "Error during cleanup task",
+                    error=str(e),
+                )
                 continue
 
     def get_stats(self) -> dict[str, Any]:

@@ -5,7 +5,6 @@ storage instances, including S3 and local file storage with various options.
 """
 
 import os
-from typing import Any
 
 
 class StorageBuilder:
@@ -45,17 +44,17 @@ class StorageBuilder:
         return self
 
     def storage_decorators(
-        self, use_unzip: bool = False, use_bundler: bool = True
+        self, *, use_unzip: bool = False, use_bundler: bool = True
     ) -> "StorageBuilder":
         """Configure storage decorators."""
         self._use_unzip = use_unzip
         self._use_bundler = use_bundler
         return self
 
-    def build(self) -> Any:
+    def build(self) -> object:
         """Build the storage configuration."""
         # Import here to avoid circular imports
-        from . import (
+        from . import (  # noqa: PLC0415
             BundleResourcesDecorator,
             FileStorage,
             S3Storage,
@@ -65,7 +64,7 @@ class StorageBuilder:
         # Create base storage
         if self._s3_bucket:
             # Use S3 storage
-            base_storage: Any = S3Storage(
+            base_storage: object = S3Storage(
                 bucket_name=self._s3_bucket,
                 prefix=self._s3_prefix,
                 region=self._s3_region,
@@ -79,7 +78,7 @@ class StorageBuilder:
             base_storage = FileStorage("default_capture")
 
         # Apply decorators in order
-        storage: Any = base_storage
+        storage: object = base_storage
 
         if self._use_unzip:
             storage = UnzipResourceDecorator(storage)
@@ -95,20 +94,34 @@ def create_storage_config() -> StorageBuilder:
     return StorageBuilder()
 
 
-# Global storage instance
-_global_storage: Any | None = None
+class GlobalStorageManager:
+    """Manager for the global storage instance."""
+
+    def __init__(self) -> None:
+        """Initialize the global storage manager."""
+        self._storage: object | None = None
+
+    def set(self, storage_builder: StorageBuilder) -> None:
+        """Set the global storage configuration."""
+        self._storage = storage_builder.build()
+
+    def get(self) -> object:
+        """Get the global storage instance."""
+        if self._storage is None:
+            # Create default storage if none is set
+            self._storage = create_storage_config().build()
+        return self._storage
+
+
+# Global storage manager instance
+_global_storage_manager = GlobalStorageManager()
 
 
 def set_global_storage(storage_builder: StorageBuilder) -> None:
     """Set the global storage configuration."""
-    global _global_storage
-    _global_storage = storage_builder.build()
+    _global_storage_manager.set(storage_builder)
 
 
-def get_global_storage() -> Any:
+def get_global_storage() -> object:
     """Get the global storage instance."""
-    global _global_storage
-    if _global_storage is None:
-        # Create default storage if none is set
-        _global_storage = create_storage_config().build()
-    return _global_storage
+    return _global_storage_manager.get()

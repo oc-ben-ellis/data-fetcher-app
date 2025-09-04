@@ -27,25 +27,27 @@ _default_credential_provider: CredentialProvider | None = None
 
 def set_default_credential_provider(provider: CredentialProvider) -> None:
     """Set the default credential provider."""
-    global _default_credential_provider
+    global _default_credential_provider  # noqa: PLW0603
     _default_credential_provider = provider
 
 
 def clear_default_credential_provider() -> None:
     """Clear the default credential provider, forcing reconfiguration on next access."""
-    global _default_credential_provider
+    global _default_credential_provider  # noqa: PLW0603
     _default_credential_provider = None
 
 
 def get_default_credential_provider() -> CredentialProvider:
     """Get the default application credential provider."""
-    global _default_credential_provider
+    global _default_credential_provider  # noqa: PLW0602
     if _default_credential_provider is None:
         # Create default provider based on environment configuration
-        configure_global_credential_provider()
+        configure_application_credential_provider()
         # After configuration, it should not be None
         if _default_credential_provider is None:
-            raise RuntimeError("Failed to configure default credential provider")
+            raise RuntimeError(  # noqa: TRY003
+                "Failed to configure credential provider"
+            )
     return _default_credential_provider
 
 
@@ -58,7 +60,7 @@ def _get_aws_region() -> str:
     )
 
 
-def configure_global_credential_provider() -> None:
+def configure_application_credential_provider() -> None:
     """Configure the application credential provider with environment variables and sensible defaults."""
     # Get provider type
     provider_type = os.getenv("OC_CREDENTIAL_PROVIDER_TYPE", "aws").lower()
@@ -76,19 +78,18 @@ def configure_global_credential_provider() -> None:
         prefix = os.getenv("OC_CREDENTIAL_PROVIDER_ENV_PREFIX", "OC_CREDENTIAL_")
         provider = EnvironmentCredentialProvider(prefix=prefix)
     else:
-        raise ValueError(f"Unknown credential provider type: {provider_type}")
+        raise ValueError(f"Unknown provider type: {provider_type}")  # noqa: TRY003
 
     set_default_credential_provider(provider)
 
 
-# Configure global credential provider when this module is imported
-configure_global_credential_provider()
+# Configure application credential provider when this module is imported
+configure_application_credential_provider()
 
 
-def configure_application_credential_provider() -> None:
-    """Alias: Configure application credential provider.
+def configure_global_credential_provider() -> None:
+    """Alias: Configure global credential provider.
 
-    This is an alias for ``configure_global_credential_provider`` to emphasize
-    that this configuration is application-wide rather than per-fetcher.
+    This is an alias for ``configure_application_credential_provider`` to maintain backward compatibility.
     """
-    configure_global_credential_provider()
+    configure_application_credential_provider()

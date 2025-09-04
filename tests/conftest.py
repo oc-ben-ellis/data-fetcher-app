@@ -92,7 +92,6 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
         if shutdown_coro is not None:
             shutdown_coro.close()
         # Best-effort shutdown; ignore errors here to avoid masking test results
-        pass
 
     # Detach the loop and close it to avoid unclosed loop warnings
     asyncio.set_event_loop(None)
@@ -329,13 +328,11 @@ def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
 def pytest_runtest_setup(item: Any) -> None:
     """Ensure setup failures cause test failures instead of skips."""
     # This hook runs before each test and can catch setup issues
-    pass
 
 
 def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
     """Ensure teardown failures are properly reported."""
     # This hook runs after each test and can catch teardown issues
-    pass
 
 
 # Fail localstack tests if Docker is not available

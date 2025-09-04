@@ -7,11 +7,8 @@ if [ "$INSTALLPOETRY" = "true" ]; then
     pip install poetry
 fi
 
-# Install project dependencies
-if [ -f "pyproject.toml" ]; then
-    echo "Installing project dependencies..."
-    poetry install
-fi
+# Project dependencies will be installed by postCreateCommand
+# Skip poetry install during feature installation to avoid issues
 
 # Install Mermaid CLI if requested
 if [ "$INSTALLMERMAID" = "true" ]; then

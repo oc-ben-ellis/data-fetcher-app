@@ -88,9 +88,10 @@ storage = S3Storage("my-bucket", "prefix/")
 
 ### **Caching Configuration**
 ```python
-from data_fetcher.config import GlobalConfig
+from data_fetcher.global_kv_store import configure_application_kv_store
 
-config = GlobalConfig()
+# Configure application key-value store
+configure_application_kv_store()
 config.cache.enabled = True
 config.cache.backend = "redis"
 config.cache.ttl = 3600  # 1 hour

@@ -6,20 +6,26 @@ during storage operations, creating logical groupings of related data.
 
 import gzip
 import io
-import os
 import tempfile
 import zipfile
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-from typing import Any
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import asynccontextmanager, suppress
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from ...core import BundleRef
+import structlog
+
+if TYPE_CHECKING:
+    from data_fetcher.core import BundleRef
+
+# Get logger for this module
+logger = structlog.get_logger(__name__)
 
 
 class BundleResourcesDecorator:
     """Decorator that bundles resources into a single zip file."""
 
-    def __init__(self, base_storage: Any) -> None:
+    def __init__(self, base_storage: object) -> None:
         """Initialize the bundle resources decorator with base storage.
 
         Args:
@@ -28,9 +34,11 @@ class BundleResourcesDecorator:
         self.base_storage = base_storage
 
     @asynccontextmanager
-    async def open_bundle(self, bundle_ref: BundleRef) -> Any:
+    async def open_bundle(
+        self, bundle_ref: "BundleRef"
+    ) -> AsyncIterator["BundleResourcesBundle"]:
         """Open a bundle with resource bundling."""
-        async with self.base_storage.open_bundle(bundle_ref) as base_bundle:
+        async with self.base_storage.open_bundle(bundle_ref) as base_bundle:  # type: ignore[attr-defined]
             bundle = BundleResourcesBundle(base_bundle)
             try:
                 yield bundle
@@ -41,7 +49,7 @@ class BundleResourcesDecorator:
 class BundleResourcesBundle:
     """Bundle that collects resources into a zip file."""
 
-    def __init__(self, base_bundle: Any) -> None:
+    def __init__(self, base_bundle: Any) -> None:  # noqa: ANN401
         """Initialize the bundle resources bundle with base bundle.
 
         Args:
@@ -60,35 +68,26 @@ class BundleResourcesBundle:
     ) -> None:
         """Stream a resource to a temporary file."""
         # Create temporary file
-        temp_file = tempfile.NamedTemporaryFile(delete=False)
-        try:
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             # Stream content to temp file
             async for chunk in stream:
                 temp_file.write(chunk)
             temp_file.flush()
-            temp_file.close()
 
-            # If the resource appears to be gzipped (by magic bytes) or URL ends with .gz,
-            # transparently decompress before adding to the bundle so that downstream
-            # consumers see the actual payload (e.g., HTML) rather than the compressed blob.
-            decompressed_path = self._maybe_decompress_gzip(url, temp_file.name)
+        # If the resource appears to be gzipped (by magic bytes) or URL ends with .gz,
+        # transparently decompress before adding to the bundle so that downstream
+        # consumers see the actual payload (e.g., HTML) rather than the compressed blob.
+        decompressed_path = self._maybe_decompress_gzip(url, temp_file.name)
 
-            # Store temp file info (not content)
-            self.temp_files.append(
-                {
-                    "url": url,
-                    "content_type": content_type,
-                    "status_code": status_code,
-                    "temp_file": decompressed_path,
-                }
-            )
-        except Exception:
-            # Clean up on error
-            try:
-                os.unlink(temp_file.name)
-            except OSError:
-                pass
-            raise
+        # Store temp file info (not content)
+        self.temp_files.append(
+            {
+                "url": url,
+                "content_type": content_type,
+                "status_code": status_code,
+                "temp_file": decompressed_path,
+            }
+        )
 
     async def close(self) -> None:
         """Close the bundle and create zip file from temp files."""
@@ -119,7 +118,7 @@ class BundleResourcesBundle:
                     # In some environments, intermediary temp files may be
                     # cleaned up by underlying layers; skip gracefully.
                     temp_path = resource["temp_file"]
-                    if os.path.exists(temp_path):
+                    if Path(temp_path).exists():
                         zip_file.write(temp_path, filename)
                     else:
                         # TODO: Consider logging this occurrence for debugging
@@ -138,10 +137,8 @@ class BundleResourcesBundle:
         finally:
             # Clean up all temp files
             for resource in self.temp_files:
-                try:
-                    os.unlink(resource["temp_file"])
-                except OSError:
-                    pass
+                with suppress(OSError):
+                    Path(resource["temp_file"]).unlink()
 
         await self.base_bundle.close()
 
@@ -166,7 +163,7 @@ class BundleResourcesBundle:
             if url.endswith(".gz"):
                 is_gz = True
             else:
-                with open(temp_path, "rb") as f:
+                with Path(temp_path).open("rb") as f:
                     header = f.read(2)
                     is_gz = header.startswith(b"\x1f\x8b")
 
@@ -174,17 +171,22 @@ class BundleResourcesBundle:
                 return temp_path
 
             # Decompress into a new temp file
-            with open(temp_path, "rb") as src:
-                with gzip.GzipFile(fileobj=src, mode="rb") as gz:
-                    decompressed = gz.read()
+            with (
+                Path(temp_path).open("rb") as src,
+                gzip.GzipFile(fileobj=src, mode="rb") as gz,
+            ):
+                decompressed = gz.read()
 
-            out = tempfile.NamedTemporaryFile(delete=False)
-            out.write(decompressed)
-            out.flush()
-            out.close()
-
-            # Keep original around for later cleanup; caller manages lifecycle
-            return out.name
-        except Exception:
+            with tempfile.NamedTemporaryFile(delete=False) as out:
+                out.write(decompressed)
+                out.flush()
+                # Keep original around for later cleanup; caller manages lifecycle
+                return out.name
+        except Exception as e:
             # On any failure, fall back to original content
+            logger.exception(
+                "Error decompressing gzip content, falling back to original",
+                error=str(e),
+                temp_path=temp_path,
+            )
             return temp_path

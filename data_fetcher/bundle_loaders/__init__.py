@@ -5,8 +5,8 @@ from .http_loader import HttpxStreamingLoader
 from .sftp_loader import SFTPLoader
 
 __all__ = [
+    "ApiLoader",
     "HttpxStreamingLoader",
     "SFTPLoader",
-    "ApiLoader",
     "TrackingApiLoader",
 ]

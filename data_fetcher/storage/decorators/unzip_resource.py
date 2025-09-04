@@ -6,16 +6,17 @@ files during storage operations, including ZIP, GZIP, and other formats.
 
 import gzip
 import io
-import os
 import tempfile
 import zipfile
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-from typing import Any
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import asynccontextmanager, suppress
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import structlog
 
-from ...core import BundleRef
+if TYPE_CHECKING:
+    from data_fetcher.core import BundleRef
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -24,7 +25,7 @@ logger = structlog.get_logger(__name__)
 class UnzipResourceDecorator:
     """Decorator that decompresses zipped resources."""
 
-    def __init__(self, base_storage: Any) -> None:
+    def __init__(self, base_storage: object) -> None:
         """Initialize the unzip resource decorator with base storage.
 
         Args:
@@ -33,9 +34,11 @@ class UnzipResourceDecorator:
         self.base_storage = base_storage
 
     @asynccontextmanager
-    async def open_bundle(self, bundle_ref: BundleRef) -> Any:
+    async def open_bundle(
+        self, bundle_ref: "BundleRef"
+    ) -> AsyncIterator["UnzipResourceBundle"]:
         """Open a bundle with decompression."""
-        async with self.base_storage.open_bundle(bundle_ref) as base_bundle:
+        async with self.base_storage.open_bundle(bundle_ref) as base_bundle:  # type: ignore[attr-defined]
             unzip_bundle = UnzipResourceBundle(base_bundle)
             try:
                 yield unzip_bundle
@@ -46,7 +49,7 @@ class UnzipResourceDecorator:
 class UnzipResourceBundle:
     """Bundle that decompresses resources."""
 
-    def __init__(self, base_bundle: Any) -> None:
+    def __init__(self, base_bundle: object) -> None:
         """Initialize the unzip resource bundle with base bundle.
 
         Args:
@@ -91,7 +94,7 @@ class UnzipResourceBundle:
                 logger.debug(
                     "Content written to temp file",
                     temp_file=temp_file.name,
-                    size=os.path.getsize(temp_file.name),
+                    size=Path(temp_file.name).stat().st_size,
                 )
 
                 # Check if content is compressed
@@ -117,20 +120,18 @@ class UnzipResourceBundle:
 
             finally:
                 # Clean up temp file
-                try:
-                    os.unlink(temp_file.name)
-                except OSError:
-                    pass
+                with suppress(OSError):
+                    Path(temp_file.name).unlink()
 
     def _is_gzipped_file(self, filepath: str) -> bool:
         """Check if file is gzipped by reading first 2 bytes."""
-        with open(filepath, "rb") as f:
+        with Path(filepath).open("rb") as f:
             header = f.read(2)
         return header.startswith(b"\x1f\x8b")
 
     def _is_zipped_file(self, filepath: str) -> bool:
         """Check if file is a zip file by reading first 2 bytes."""
-        with open(filepath, "rb") as f:
+        with Path(filepath).open("rb") as f:
             header = f.read(2)
         return header.startswith(b"PK")
 
@@ -140,14 +141,14 @@ class UnzipResourceBundle:
         """Stream a temp file to storage without loading into memory."""
 
         async def file_stream() -> AsyncGenerator[bytes, None]:
-            with open(filepath, "rb") as f:
+            with Path(filepath).open("rb") as f:
                 while True:
                     chunk = f.read(8192)  # 8KB chunks
                     if not chunk:
                         break
                     yield chunk
 
-        await self.base_bundle.write_resource(
+        await self.base_bundle.write_resource(  # type: ignore[attr-defined]
             url=url,
             content_type=content_type,
             status_code=status_code,
@@ -168,16 +169,14 @@ class UnzipResourceBundle:
                             break
                         yield chunk
 
-            await self.base_bundle.write_resource(
+            await self.base_bundle.write_resource(  # type: ignore[attr-defined]  # type: ignore[attr-defined]
                 url=self._strip_compression_suffix(url),
                 content_type=content_type,
                 status_code=status_code,
                 stream=gzip_stream(),
             )
         except Exception as e:
-            logger.error(
-                "Error decompressing gzip", url=url, error=str(e), exc_info=True
-            )
+            logger.exception("Error decompressing gzip", url=url, error=str(e))
             # Stream original content as fallback
             await self._stream_temp_file_to_storage(
                 self._strip_compression_suffix(url),
@@ -211,16 +210,14 @@ class UnzipResourceBundle:
 
                     # Write extracted file
                     extracted_url = f"{self._strip_compression_suffix(url)}/{filename}"
-                    await self.base_bundle.write_resource(
+                    await self.base_bundle.write_resource(  # type: ignore[attr-defined]  # type: ignore[attr-defined]  # type: ignore[attr-defined]
                         url=extracted_url,
                         content_type="application/octet-stream",
                         status_code=status_code,
                         stream=create_zip_stream(zip_file, filename),
                     )
         except Exception as e:
-            logger.error(
-                "Error decompressing zip", url=url, error=str(e), exc_info=True
-            )
+            logger.exception("Error decompressing zip", url=url, error=str(e))
             # Stream original content as fallback
             await self._stream_temp_file_to_storage(
                 self._strip_compression_suffix(url),
@@ -235,18 +232,16 @@ class UnzipResourceBundle:
         """Write decompressed gzip content."""
         try:
             decompressed = gzip.decompress(content)
-            await self.base_bundle.write_resource(
+            await self.base_bundle.write_resource(  # type: ignore[attr-defined]  # type: ignore[attr-defined]
                 url=self._strip_compression_suffix(url),
                 content_type=content_type,
                 status_code=status_code,
                 stream=self._stream_from_bytes(decompressed),
             )
         except Exception as e:
-            logger.error(
-                "Error decompressing gzip", url=url, error=str(e), exc_info=True
-            )
+            logger.exception("Error decompressing gzip", url=url, error=str(e))
             # Write original content as fallback
-            await self.base_bundle.write_resource(
+            await self.base_bundle.write_resource(  # type: ignore[attr-defined]  # type: ignore[attr-defined]
                 url=self._strip_compression_suffix(url),
                 content_type=content_type,
                 status_code=status_code,
@@ -269,18 +264,16 @@ class UnzipResourceBundle:
 
                     # Write extracted file
                     extracted_url = f"{url}/{filename}"
-                    await self.base_bundle.write_resource(
+                    await self.base_bundle.write_resource(  # type: ignore[attr-defined]  # type: ignore[attr-defined]  # type: ignore[attr-defined]
                         url=extracted_url,
                         content_type="application/octet-stream",
                         status_code=status_code,
                         stream=self._stream_from_bytes(extracted_content),
                     )
         except Exception as e:
-            logger.error(
-                "Error decompressing zip", url=url, error=str(e), exc_info=True
-            )
+            logger.exception("Error decompressing zip", url=url, error=str(e))
             # Write original content as fallback
-            await self.base_bundle.write_resource(
+            await self.base_bundle.write_resource(  # type: ignore[attr-defined]  # type: ignore[attr-defined]
                 url=url,
                 content_type=content_type,
                 status_code=status_code,
@@ -293,7 +286,7 @@ class UnzipResourceBundle:
 
     async def close(self) -> None:
         """Close the unzip bundle."""
-        await self.base_bundle.close()
+        await self.base_bundle.close()  # type: ignore[attr-defined]
 
     def _strip_compression_suffix(self, url: str) -> str:
         """Strip common compression suffixes from the URL path.
@@ -309,7 +302,7 @@ class UnzipResourceBundle:
             URL string with trailing `.gz`/`.gzip` removed from the path.
         """
         try:
-            from urllib.parse import urlparse, urlunparse
+            from urllib.parse import urlparse, urlunparse  # noqa: PLC0415
 
             parsed = urlparse(url)
             path = parsed.path
@@ -319,8 +312,13 @@ class UnzipResourceBundle:
                     break
             parsed = parsed._replace(path=path)
             return urlunparse(parsed)
-        except Exception:
+        except Exception as e:
             # Safe fallback: best-effort suffix strip
+            logger.exception(
+                "Error parsing URL for compression detection, using fallback",
+                error=str(e),
+                url=url,
+            )
             if url.endswith(".gz"):
                 return url[:-3]
             if url.endswith(".gzip"):
@@ -342,7 +340,7 @@ class UnzipResourceBundle:
             True if decompression should be bypassed.
         """
         try:
-            from urllib.parse import urlparse
+            from urllib.parse import urlparse  # noqa: PLC0415
 
             path = urlparse(url).path or ""
             if path.endswith(".zip"):
@@ -350,8 +348,13 @@ class UnzipResourceBundle:
             # Respect explicit zip content-type as an additional signal
             if content_type and "application/zip" in content_type:
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            logger.exception(
+                "Error checking if decompression should be bypassed",
+                error=str(e),
+                url=url,
+                content_type=content_type,
+            )
         return False
 
     async def _persist_stream_to_tempfile(

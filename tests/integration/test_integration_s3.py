@@ -24,11 +24,25 @@ class TestS3Integration:
     """Integration tests for S3 storage functionality."""
 
     @pytest.fixture
-    def s3_storage(self, test_bucket: str, localstack_container: Any) -> S3Storage:
+    def s3_storage(
+        self, test_bucket: str, localstack_container: Any, request: Any
+    ) -> S3Storage:
         """Create S3Storage instance for testing."""
+        import os
+        import uuid
+
+        # Set AWS credentials environment variables for S3Storage
+        os.environ["AWS_ACCESS_KEY_ID"] = "test"
+        os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
+        os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
+
+        # Create unique prefix for each test to avoid conflicts
+        test_name = request.node.name
+        unique_prefix = f"test-prefix-{test_name}-{uuid.uuid4().hex[:8]}/"
+
         storage = S3Storage(
             bucket_name=test_bucket,
-            prefix="test-prefix/",
+            prefix=unique_prefix,
             region="us-east-1",
         )
 
@@ -44,13 +58,20 @@ class TestS3Integration:
         return storage
 
     @pytest.fixture
-    def bundle_ref(self) -> BundleRef:
+    def bundle_ref(self, request: Any) -> BundleRef:
         """Create a test bundle reference."""
+        import uuid
+
+        # Create unique storage key for each test to avoid conflicts
+        test_name = request.node.name
+        unique_storage_key = f"test_bundle_{test_name}_{uuid.uuid4().hex[:8]}"
+        unique_url = f"https://example.com/{test_name}"
+
         return BundleRef(
-            primary_url="https://example.com",
+            primary_url=unique_url,
             resources_count=1,
-            storage_key="test_bundle",
-            meta={"test": "data"},
+            storage_key=unique_storage_key,
+            meta={"test": "data", "test_name": test_name},
         )
 
     def create_test_stream(self, content: bytes) -> AsyncGenerator[bytes, None]:
@@ -82,7 +103,9 @@ class TestS3Integration:
             )
 
         # Verify file was uploaded to S3
-        response = s3_client.list_objects_v2(Bucket=test_bucket, Prefix="test-prefix/")
+        response = s3_client.list_objects_v2(
+            Bucket=test_bucket, Prefix=s3_storage.prefix
+        )
         objects = response.get("Contents", [])
         assert len(objects) >= 1
 
@@ -128,7 +151,9 @@ class TestS3Integration:
                 )
 
         # Verify all resources were uploaded
-        response = s3_client.list_objects_v2(Bucket=test_bucket, Prefix="test-prefix/")
+        response = s3_client.list_objects_v2(
+            Bucket=test_bucket, Prefix=s3_storage.prefix
+        )
         objects = response.get("Contents", [])
 
         # Should have bundle metadata + resources
@@ -184,7 +209,9 @@ class TestS3Integration:
             )
 
         # Verify large file was uploaded
-        response = s3_client.list_objects_v2(Bucket=test_bucket, Prefix="test-prefix/")
+        response = s3_client.list_objects_v2(
+            Bucket=test_bucket, Prefix=s3_storage.prefix
+        )
         objects = response.get("Contents", [])
 
         # Should have the large file
@@ -221,7 +248,9 @@ class TestS3Integration:
             )
 
         # Find the uploaded object
-        response = s3_client.list_objects_v2(Bucket=test_bucket, Prefix="test-prefix/")
+        response = s3_client.list_objects_v2(
+            Bucket=test_bucket, Prefix=s3_storage.prefix
+        )
         objects = response.get("Contents", [])
         resource_objects = [obj for obj in objects if "resources" in obj["Key"]]
         assert len(resource_objects) >= 1
@@ -287,12 +316,14 @@ class TestS3Integration:
         bundle_ref: BundleRef,
     ) -> None:
         """Test S3 storage with concurrent uploads."""
-        # Create multiple bundle references
+        # Create multiple bundle references with unique keys
+        import uuid
+
         bundle_refs = [
             BundleRef(
-                primary_url=f"https://example.com/bundle_{i}",
+                primary_url=f"https://example.com/bundle_{i}_{uuid.uuid4().hex[:8]}",
                 resources_count=1,
-                storage_key=f"test_bundle_{i}",
+                storage_key=f"test_bundle_{i}_{uuid.uuid4().hex[:8]}",
                 meta={"index": i},
             )
             for i in range(5)
@@ -314,7 +345,9 @@ class TestS3Integration:
         await asyncio.gather(*[upload_bundle(ref) for ref in bundle_refs])
 
         # Verify all uploads succeeded
-        response = s3_client.list_objects_v2(Bucket=test_bucket, Prefix="test-prefix/")
+        response = s3_client.list_objects_v2(
+            Bucket=test_bucket, Prefix=s3_storage.prefix
+        )
         objects = response.get("Contents", [])
 
         # Should have multiple bundle metadata files (one for each bundle)
@@ -358,7 +391,9 @@ class TestS3Integration:
             )
 
         # Verify bundle was created
-        response = s3_client.list_objects_v2(Bucket=test_bucket, Prefix="test-prefix/")
+        response = s3_client.list_objects_v2(
+            Bucket=test_bucket, Prefix=s3_storage.prefix
+        )
         objects = response.get("Contents", [])
 
         # Should have bundle file
@@ -387,7 +422,9 @@ class TestS3Integration:
             )
 
         # Verify compressed content was uploaded
-        response = s3_client.list_objects_v2(Bucket=test_bucket, Prefix="test-prefix/")
+        response = s3_client.list_objects_v2(
+            Bucket=test_bucket, Prefix=s3_storage.prefix
+        )
         objects = response.get("Contents", [])
 
         # Should have the compressed file
@@ -427,7 +464,9 @@ class TestS3Integration:
             )
 
         # Verify content was uploaded
-        response = s3_client.list_objects_v2(Bucket=test_bucket, Prefix="test-prefix/")
+        response = s3_client.list_objects_v2(
+            Bucket=test_bucket, Prefix=s3_storage.prefix
+        )
         objects = response.get("Contents", [])
         assert len(objects) >= 1
 
@@ -439,7 +478,9 @@ class TestS3Integration:
             )
 
         # Verify cleanup
-        response = s3_client.list_objects_v2(Bucket=test_bucket, Prefix="test-prefix/")
+        response = s3_client.list_objects_v2(
+            Bucket=test_bucket, Prefix=s3_storage.prefix
+        )
         objects = response.get("Contents", [])
         assert len(objects) == 0
 
@@ -471,7 +512,9 @@ class TestS3Integration:
         assert upload_time < 10.0  # Should upload 100KB in under 10 seconds
 
         # Test download performance
-        response = s3_client.list_objects_v2(Bucket=test_bucket, Prefix="test-prefix/")
+        response = s3_client.list_objects_v2(
+            Bucket=test_bucket, Prefix=s3_storage.prefix
+        )
         objects = response.get("Contents", [])
         resource_objects = [obj for obj in objects if "resources" in obj["Key"]]
 
@@ -508,7 +551,9 @@ class TestS3Integration:
                 )
 
         # Verify final content is consistent
-        response = s3_client.list_objects_v2(Bucket=test_bucket, Prefix="test-prefix/")
+        response = s3_client.list_objects_v2(
+            Bucket=test_bucket, Prefix=s3_storage.prefix
+        )
         objects = response.get("Contents", [])
 
         # Should have consistent state
@@ -567,7 +612,7 @@ class TestS3Integration:
         # Verify empty content was handled (only if upload succeeded)
         try:
             response = s3_client.list_objects_v2(
-                Bucket=test_bucket, Prefix="test-prefix/"
+                Bucket=test_bucket, Prefix=s3_storage.prefix
             )
             objects = response.get("Contents", [])
 
@@ -581,4 +626,3 @@ class TestS3Integration:
         except Exception as e:
             print(f"Error verifying empty content: {type(e).__name__}: {e}")
             # Test passes if we can't verify due to LocalStack issues
-            pass

@@ -18,10 +18,10 @@ __all__ = [
     "AuthenticationMechanism",
     "BasicAuthenticationMechanism",
     "BearerTokenAuthenticationMechanism",
+    "HttpManager",
     "NoAuthenticationMechanism",
     "OAuthAuthenticationMechanism",
-    "HttpManager",
-    "SftpManager",
-    "ScheduledDailyGate",
     "OncePerIntervalGate",
+    "ScheduledDailyGate",
+    "SftpManager",
 ]

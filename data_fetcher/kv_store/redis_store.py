@@ -5,9 +5,23 @@ using Redis, including connection management and Redis-specific operations.
 """
 
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
+
+import redis.asyncio as redis
+import structlog
 
 from .base import KeyValueStore
+
+# Get logger for this module
+logger = structlog.get_logger(__name__)
+
+
+class RedisConnectionError(RuntimeError):
+    """Raised when Redis connection fails."""
+
+    def __init__(self) -> None:
+        """Initialize the Redis connection error."""
+        super().__init__("Redis connection failed")
 
 
 class RedisKeyValueStore(KeyValueStore):
@@ -18,31 +32,29 @@ class RedisKeyValueStore(KeyValueStore):
     using Redis SCAN and ZRANGE operations.
     """
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, **kwargs: object) -> None:
         """Initialize the Redis store."""
         super().__init__(**kwargs)
 
         # Redis connection parameters
-        self._host = kwargs.get("host", "localhost")
-        self._port = kwargs.get("port", 6379)
-        self._db = kwargs.get("db", 0)
-        self._password = kwargs.get("password", None)
-        self._ssl = kwargs.get("ssl", False)
-        self._timeout = kwargs.get("timeout", 10.0)
-        self._max_connections = kwargs.get("max_connections", 10)
+        self._host: str = cast("str", kwargs.get("host", "localhost"))
+        self._port: int = cast("int", kwargs.get("port", 6379))
+        self._db: int = cast("int", kwargs.get("db", 0))
+        self._password: str | None = cast("str | None", kwargs.get("password"))
+        self._ssl: bool = cast("bool", kwargs.get("ssl", False))
+        self._timeout: float = cast("float", kwargs.get("timeout", 10.0))
+        self._max_connections: int = cast("int", kwargs.get("max_connections", 10))
 
         # Redis client
-        self._redis: Any = None
-        self._pool: Any = None
+        self._redis: redis.Redis | None = None
+        self._pool: redis.ConnectionPool | None = None
 
     async def _ensure_connection(self) -> None:
         """Ensure Redis connection is established."""
         if self._redis is None:
             try:
-                import redis.asyncio as redis
-
                 # Create connection pool
-                connection_kwargs = {
+                connection_kwargs: dict[str, Any] = {
                     "host": self._host,
                     "port": self._port,
                     "db": self._db,
@@ -65,20 +77,16 @@ class RedisKeyValueStore(KeyValueStore):
                 # Test connection
                 await self._redis.ping()
 
-            except ImportError as err:
-                raise ImportError(
-                    "Redis client not available. Install with: pip install redis"
-                ) from err
             except Exception as e:
-                raise ConnectionError(f"Failed to connect to Redis: {e}") from e
+                raise ConnectionError(f"Redis failed: {e}") from e  # noqa: TRY003
 
     async def put(
         self,
         key: str,
-        value: Any,
+        value: object,
         ttl: int | timedelta | None = None,
         prefix: str | None = None,
-        **kwargs: Any,
+        **_kwargs: object,
     ) -> None:
         """Store a value with the given key."""
         await self._ensure_connection()
@@ -90,15 +98,27 @@ class RedisKeyValueStore(KeyValueStore):
         prefixed_key = self._get_prefixed_key(key, prefix)
 
         # Store the value
+        if self._redis is None:
+            await self._ensure_connection()
+        if self._redis is None:
+            raise RuntimeError("Failed to establish Redis connection")  # noqa: TRY003
+
         if ttl is not None:
             ttl_seconds = self._normalize_ttl(ttl)
-            await self._redis.setex(prefixed_key, ttl_seconds, serialized_value)
+            if ttl_seconds is not None:
+                await self._redis.setex(prefixed_key, ttl_seconds, serialized_value)
+            else:
+                await self._redis.set(prefixed_key, serialized_value)
         else:
             await self._redis.set(prefixed_key, serialized_value)
 
     async def get(
-        self, key: str, default: Any = None, prefix: str | None = None, **kwargs: Any
-    ) -> Any | None:
+        self,
+        key: str,
+        default: object = None,
+        prefix: str | None = None,
+        **_kwargs: object,
+    ) -> object | None:
         """Retrieve a value by key."""
         await self._ensure_connection()
 
@@ -106,6 +126,10 @@ class RedisKeyValueStore(KeyValueStore):
         prefixed_key = self._get_prefixed_key(key, prefix)
 
         # Get the value
+        if self._redis is None:
+            await self._ensure_connection()
+        if self._redis is None:
+            raise RuntimeError("Failed to establish Redis connection")  # noqa: TRY003
         serialized_value = await self._redis.get(prefixed_key)
 
         if serialized_value is None:
@@ -114,7 +138,9 @@ class RedisKeyValueStore(KeyValueStore):
         # Deserialize and return
         return self._deserialize(serialized_value)
 
-    async def delete(self, key: str, prefix: str | None = None, **kwargs: Any) -> bool:
+    async def delete(
+        self, key: str, prefix: str | None = None, **_kwargs: object
+    ) -> bool:
         """Delete a key-value pair."""
         await self._ensure_connection()
 
@@ -122,10 +148,16 @@ class RedisKeyValueStore(KeyValueStore):
         prefixed_key = self._get_prefixed_key(key, prefix)
 
         # Delete the key
+        if self._redis is None:
+            await self._ensure_connection()
+        if self._redis is None:
+            raise RuntimeError("Failed to establish Redis connection")  # noqa: TRY003
         result = await self._redis.delete(prefixed_key)
         return bool(result > 0)
 
-    async def exists(self, key: str, prefix: str | None = None, **kwargs: Any) -> bool:
+    async def exists(
+        self, key: str, prefix: str | None = None, **_kwargs: object
+    ) -> bool:
         """Check if a key exists."""
         await self._ensure_connection()
 
@@ -133,6 +165,10 @@ class RedisKeyValueStore(KeyValueStore):
         prefixed_key = self._get_prefixed_key(key, prefix)
 
         # Check if key exists
+        if self._redis is None:
+            await self._ensure_connection()
+        if self._redis is None:
+            raise RuntimeError("Failed to establish Redis connection")  # noqa: TRY003
         result = await self._redis.exists(prefixed_key)
         return bool(result > 0)
 
@@ -142,7 +178,7 @@ class RedisKeyValueStore(KeyValueStore):
         end_key: str | None = None,
         limit: int | None = None,
         prefix: str | None = None,
-        **kwargs: Any,
+        **_kwargs: object,
     ) -> list[tuple[str, Any]]:
         """Get a range of key-value pairs."""
         await self._ensure_connection()
@@ -157,6 +193,13 @@ class RedisKeyValueStore(KeyValueStore):
 
         while True:
             # Scan for keys with current prefix
+            if self._redis is None:
+                await self._ensure_connection()
+            if self._redis is None:
+                raise RuntimeError(  # noqa: TRY003
+                    "Failed to establish Redis connection"
+                )
+
             effective_prefix = prefix if prefix is not None else self._key_prefix
             scan_pattern = f"{effective_prefix}*" if effective_prefix else "*"
             cursor, keys = await self._redis.scan(
@@ -211,6 +254,11 @@ class RedisKeyValueStore(KeyValueStore):
         """Get statistics about the store."""
         await self._ensure_connection()
 
+        # Check connection before entering try block to avoid TRY301
+        if self._redis is None:
+            await self._ensure_connection()
+        if self._redis is None:
+            raise RedisConnectionError
         try:
             info = await self._redis.info()
             return {
@@ -222,7 +270,11 @@ class RedisKeyValueStore(KeyValueStore):
                 "serializer": self._serializer,
                 "default_ttl": self._default_ttl,
             }
-        except Exception:
+        except Exception as e:
+            logger.exception(
+                "Could not retrieve Redis stats",
+                error=str(e),
+            )
             return {
                 "key_prefix": self._key_prefix,
                 "serializer": self._serializer,
@@ -233,6 +285,10 @@ class RedisKeyValueStore(KeyValueStore):
     async def flush_db(self) -> None:
         """Flush all data from the current database."""
         await self._ensure_connection()
+        if self._redis is None:
+            await self._ensure_connection()
+        if self._redis is None:
+            raise RuntimeError("Failed to establish Redis connection")  # noqa: TRY003
         await self._redis.flushdb()
 
     async def get_keys_by_pattern(self, pattern: str) -> list[str]:
@@ -244,6 +300,12 @@ class RedisKeyValueStore(KeyValueStore):
         cursor = 0
 
         while True:
+            if self._redis is None:
+                await self._ensure_connection()
+            if self._redis is None:
+                raise RuntimeError(  # noqa: TRY003
+                    "Failed to establish Redis connection"
+                )
             cursor, batch_keys = await self._redis.scan(
                 cursor=cursor, match=prefixed_pattern, count=100
             )

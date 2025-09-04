@@ -24,7 +24,7 @@ class SftpCredentialsWrapper:
 
     def __init__(
         self, config_name: str, credential_provider: CredentialProvider | None = None
-    ):
+    ) -> None:
         """Initialize the SFTP credentials wrapper.
 
         Args:
@@ -40,7 +40,7 @@ class SftpCredentialsWrapper:
         if self._cached_credentials is None:
             # Check if credential provider is available
             if self.credential_provider is None:
-                raise RuntimeError("No credential provider configured")
+                raise RuntimeError("No credential provider")  # noqa: TRY003
 
             # Get credentials from provider
             host = await self.credential_provider.get_credential(
@@ -59,8 +59,12 @@ class SftpCredentialsWrapper:
                     self.config_name, "port"
                 )
                 port = int(port_str)
-            except (ValueError, TypeError, Exception):
-                port = 22
+            except (ValueError, TypeError) as err:
+                raise ValueError(  # noqa: TRY003
+                    "Port not found in credentials"
+                ) from err
+            except Exception as err:
+                raise ValueError(f"Error getting port: {err}") from err  # noqa: TRY003
 
             self._cached_credentials = SftpCredentials(
                 host=host, username=username, password=password, port=port

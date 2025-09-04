@@ -11,10 +11,10 @@ import os
 import structlog
 
 from .core import FetchPlan
-from .global_credential_provider import configure_global_credential_provider
+from .global_credential_provider import configure_application_credential_provider
 from .registry import get_fetcher, list_configurations
 
-# Global configuration name
+# Application configuration name
 config_name = os.getenv("OC_CONFIG_ID")
 
 # Get logger for this module
@@ -59,7 +59,7 @@ async def main() -> None:
     # Parse command line arguments
     args = parse_arguments()
 
-    # Get config_name from command line argument or use global default
+    # Get config_name from command line argument or use application default
     final_config_name = args.config_name or config_name
 
     # Bind config_id to context for all subsequent logs
@@ -68,7 +68,7 @@ async def main() -> None:
 
     # Check if we have a valid config_name
     if not final_config_name:
-        logger.error("No configuration specified")
+        logger.exception("No configuration specified")
         logger.info(
             "Please provide a configuration name as a command line argument or set the OC_CONFIG_ID environment variable"
         )
@@ -91,15 +91,15 @@ async def main() -> None:
         os.environ["OC_CREDENTIAL_PROVIDER_TYPE"] = "aws"
         logger.info("Using AWS Secrets Manager credential provider")
 
-    # Reconfigure global credential provider with new settings
-    configure_global_credential_provider()
+    # Reconfigure application credential provider with new settings
+    configure_application_credential_provider()
 
     try:
         logger.info("Initializing fetcher", config_id=final_config_name)
         fetcher = get_fetcher(final_config_name)
 
         # Create a basic fetch plan with fetcher_id in context
-        from .core import FetchRunContext
+        from .core import FetchRunContext  # noqa: PLC0415
 
         run_context = FetchRunContext(run_id=final_config_name)
 
@@ -118,17 +118,16 @@ async def main() -> None:
         )
 
     except KeyError:
-        logger.error(
+        logger.exception(
             "Unknown configuration",
             config_id=final_config_name,
             available_configurations=list_configurations(),
         )
     except Exception as e:
-        logger.error(
+        logger.exception(
             "Error running fetcher",
             config_id=final_config_name,
             error=str(e),
-            exc_info=True,
         )
 
 

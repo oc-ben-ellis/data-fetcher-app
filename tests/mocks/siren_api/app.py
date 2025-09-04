@@ -195,7 +195,7 @@ def get_token() -> tuple[Response, int]:
     if not auth_header or not auth_header.startswith("Basic "):
         return (
             cast(
-                Response,
+                "Response",
                 jsonify(
                     {
                         "error": "invalid_request",
@@ -209,7 +209,7 @@ def get_token() -> tuple[Response, int]:
     # Return a mock token response
     return (
         cast(
-            Response,
+            "Response",
             jsonify(
                 {
                     "access_token": "mock_access_token_12345",
@@ -235,7 +235,7 @@ def get_siren_data() -> Response | tuple[Response, int]:
     if not auth_header or not auth_header.startswith("Bearer "):
         return (
             cast(
-                Response,
+                "Response",
                 jsonify(
                     {
                         "error": "invalid_token",
@@ -248,37 +248,34 @@ def get_siren_data() -> Response | tuple[Response, int]:
 
     # Determine which response to return based on query
     if "siren:00" in q:
-        return cast(Response, jsonify(mock_responses["siren_00"]))
-    elif "siren:01" in q:
-        return cast(Response, jsonify(mock_responses["siren_01"]))
-    elif "siren:99" in q:
+        return cast("Response", jsonify(mock_responses["siren_00"]))
+    if "siren:01" in q:
+        return cast("Response", jsonify(mock_responses["siren_01"]))
+    if "siren:99" in q:
         # Return empty response for siren:99 (end of pagination)
         return cast(
-            Response,
+            "Response",
             jsonify(
                 {"total": 0, "nombre": 0, "curseurSuivant": None, "unitesLegales": []}
             ),
         )
-    else:
-        # Return empty response for unknown queries
-        return cast(
-            Response,
-            jsonify(
-                {"total": 0, "nombre": 0, "curseurSuivant": None, "unitesLegales": []}
-            ),
-        )
+    # Return empty response for unknown queries
+    return cast(
+        "Response",
+        jsonify({"total": 0, "nombre": 0, "curseurSuivant": None, "unitesLegales": []}),
+    )
 
 
 @app.route("/health", methods=["GET"])
 def health() -> Response:
     """Health check endpoint."""
     return cast(
-        Response,
+        "Response",
         jsonify(
             {
                 "status": "healthy",
                 "timestamp": datetime.now().isoformat(),
-                "service": "siren-api-mock",
+                "service": "siren_api_mock",
                 "version": "1.0.0",
             }
         ),
@@ -289,7 +286,7 @@ def health() -> Response:
 def root() -> Response:
     """Root endpoint with API information."""
     return cast(
-        Response,
+        "Response",
         jsonify(
             {
                 "service": "SIREN API Mock",
@@ -311,7 +308,7 @@ def not_found(error: Any) -> tuple[Response, int]:
     """Handle 404 errors."""
     return (
         cast(
-            Response,
+            "Response",
             jsonify({"error": "not_found", "error_description": "Endpoint not found"}),
         ),
         404,
@@ -323,7 +320,7 @@ def internal_error(error: Any) -> tuple[Response, int]:
     """Handle 500 errors."""
     return (
         cast(
-            Response,
+            "Response",
             jsonify(
                 {
                     "error": "internal_server_error",

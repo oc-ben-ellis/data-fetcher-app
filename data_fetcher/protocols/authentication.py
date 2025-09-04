@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import httpx
 import structlog
 
-from ..credentials import CredentialProvider
+from data_fetcher.credentials import CredentialProvider
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -33,7 +33,6 @@ class AuthenticationMechanism(ABC):
         Returns:
             Updated headers with authentication information
         """
-        pass
 
 
 @dataclass
@@ -64,9 +63,12 @@ class OAuthAuthenticationMechanism(AuthenticationMechanism):
     async def _ensure_valid_token(self) -> None:
         """Ensure we have a valid OAuth access token."""
         # Check if we need to refresh the token
-        if self._access_token and self._token_expires_at:
-            if asyncio.get_event_loop().time() < self._token_expires_at:
-                return  # Token is still valid
+        if (
+            self._access_token
+            and self._token_expires_at
+            and asyncio.get_event_loop().time() < self._token_expires_at
+        ):
+            return  # Token is still valid
 
         await self._fetch_new_token()
 
@@ -82,7 +84,9 @@ class OAuthAuthenticationMechanism(AuthenticationMechanism):
             )
 
             if not consumer_key or not consumer_secret:
-                logger.error("Missing OAuth credentials", config_name=self.config_name)
+                logger.exception(
+                    "Missing OAuth credentials", config_name=self.config_name
+                )
                 return
 
             # Create authorization header
@@ -100,7 +104,8 @@ class OAuthAuthenticationMechanism(AuthenticationMechanism):
                     data={"grant_type": self.grant_type},
                 )
 
-                if response.status_code == 200:
+                HTTP_OK = 200  # noqa: N806
+                if response.status_code == HTTP_OK:
                     token_data = response.json()
                     self._access_token = token_data.get("access_token")
 
@@ -115,18 +120,17 @@ class OAuthAuthenticationMechanism(AuthenticationMechanism):
                         config_name=self.config_name,
                     )
                 else:
-                    logger.error(
+                    logger.exception(
                         "Failed to obtain OAuth token",
                         config_name=self.config_name,
                         status_code=response.status_code,
                     )
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Error fetching OAuth token",
                 config_name=self.config_name,
                 error=str(e),
-                exc_info=True,
             )
 
 
@@ -137,7 +141,7 @@ class BasicAuthenticationMechanism(AuthenticationMechanism):
     credential_provider: CredentialProvider
     config_name: str
     username_key: str = "username"
-    password_key: str = "password"
+    password_key: str = "password"  # noqa: S105
 
     def __post_init__(self) -> None:
         """Initialize the basic authentication mechanism state."""
@@ -170,7 +174,7 @@ class BearerTokenAuthenticationMechanism(AuthenticationMechanism):
 
     credential_provider: CredentialProvider
     config_name: str
-    token_key: str = "token"
+    token_key: str = "token"  # noqa: S105
 
     def __post_init__(self) -> None:
         """Initialize the bearer token authentication mechanism state."""

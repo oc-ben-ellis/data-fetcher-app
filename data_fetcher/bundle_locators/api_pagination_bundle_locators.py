@@ -7,14 +7,14 @@ including support for various pagination strategies and cursor-based navigation.
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import structlog
 
-from ..core import BundleRef, FetchRunContext, RequestMeta
-from ..kv_store import KeyValueStore, get_global_store
-from ..protocols import HttpManager
+from data_fetcher.core import BundleRef, FetchRunContext, RequestMeta
+from data_fetcher.kv_store import KeyValueStore, get_global_store
+from data_fetcher.protocols import HttpManager
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -126,8 +126,8 @@ class ComplexPaginationBundleLocator:
         state_key = f"{self.persistence_prefix}:state:{self.base_url}"
         state_data = await store.get(state_key, {})
 
-        if state_data:
-            self._current_date = datetime.strptime(
+        if state_data and isinstance(state_data, dict):
+            self._current_date = datetime.strptime(  # noqa: DTZ007
                 state_data.get("current_date", self.date_start), "%Y-%m-%d"
             ).date()
             self._current_cursor = state_data.get("current_cursor", "*")
@@ -148,19 +148,25 @@ class ComplexPaginationBundleLocator:
         # Save current state
         state_key = f"{self.persistence_prefix}:state:{self.base_url}"
         state_data = {
-            "current_date": self._current_date.strftime("%Y-%m-%d")
-            if self._current_date
-            else self.date_start,
+            "current_date": (
+                self._current_date.strftime("%Y-%m-%d")
+                if self._current_date
+                else self.date_start
+            ),
             "current_cursor": self._current_cursor,
             "current_narrowing": self._current_narrowing,
             "initialized": self._initialized,
             "last_request_time": self._last_request_time,
-            "last_updated": datetime.now().isoformat(),
+            "last_updated": datetime.now(timezone.utc).isoformat(),
         }
         await store.put(state_key, state_data, ttl=timedelta(days=7))
 
     async def _save_processing_result(
-        self, request: RequestMeta, bundle_refs: list[BundleRef], success: bool = True
+        self,
+        request: RequestMeta,
+        bundle_refs: list[BundleRef],
+        *,
+        success: bool = True,
     ) -> None:
         """Save processing result to kvstore."""
         store = await self._get_store()
@@ -170,7 +176,7 @@ class ComplexPaginationBundleLocator:
         )
         result_data = {
             "url": request.url,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "success": success,
             "bundle_count": len(bundle_refs),
             "bundle_refs": [str(ref) for ref in bundle_refs],
@@ -187,19 +193,20 @@ class ComplexPaginationBundleLocator:
         error_data = {
             "url": request.url,
             "error": error,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "retry_count": 0,
         }
         await store.put(error_key, error_data, ttl=timedelta(hours=24))
 
-    async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
+    async def get_next_urls(self, _ctx: FetchRunContext) -> list[RequestMeta]:
         """Get the next batch of API URLs to process."""
         if not self._initialized:
             await self._load_persistence_state()
             await self._initialize()
 
         urls: list[RequestMeta] = []
-        while self._url_queue and len(urls) < 5:  # Batch size
+        BATCH_SIZE = 5  # noqa: N806
+        while self._url_queue and len(urls) < BATCH_SIZE:  # Batch size
             url = self._url_queue.pop(0)
             if url not in self._processed_urls:
                 urls.append(RequestMeta(url=url, headers=self.headers or {}))
@@ -227,7 +234,9 @@ class ComplexPaginationBundleLocator:
 
         # If no more URLs in queue and we haven't finished the date range, generate more
         if not self._url_queue and self._current_date and self.date_end:
-            end_date = datetime.strptime(self.date_end, "%Y-%m-%d").date()
+            end_date = datetime.strptime(  # noqa: DTZ007
+                self.date_end, "%Y-%m-%d"
+            ).date()
             if self._current_date < end_date:
                 self._current_date += timedelta(days=1)
                 self._current_cursor = "*"  # Reset cursor for new date
@@ -244,11 +253,13 @@ class ComplexPaginationBundleLocator:
     async def _initialize(self) -> None:
         """Initialize the provider with the date range."""
         try:
-            start_date = datetime.strptime(self.date_start, "%Y-%m-%d").date()
+            start_date = datetime.strptime(  # noqa: DTZ007
+                self.date_start, "%Y-%m-%d"
+            ).date()
             end_date = (
-                datetime.strptime(self.date_end, "%Y-%m-%d").date()
+                datetime.strptime(self.date_end, "%Y-%m-%d").date()  # noqa: DTZ007
                 if self.date_end
-                else date.today()
+                else datetime.now(tz=timezone.utc).date()
             )
 
             if self._current_date is None:
@@ -266,11 +277,10 @@ class ComplexPaginationBundleLocator:
             )
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Error initializing complex pagination provider",
                 base_url=self.base_url,
                 error=str(e),
-                exc_info=True,
             )
             raise
 
@@ -308,15 +318,21 @@ class ComplexPaginationBundleLocator:
 
         self._url_queue.append(url)
 
-    async def _generate_next_urls(self, ctx: FetchRunContext) -> None:
+    async def _generate_next_urls(self, _ctx: FetchRunContext) -> None:
         """Generate next URLs based on pagination or date progression."""
         # This would be called after processing a response to determine if we need more URLs
         # For now, we'll implement a simple date progression
-        if self._current_date and self.date_end:
-            if self._current_date < datetime.strptime(self.date_end, "%Y-%m-%d").date():
-                self._current_date += timedelta(days=1)
-                self._current_cursor = "*"  # Reset cursor for new date
-                await self._generate_urls_for_current_date()
+        if (
+            self._current_date
+            and self.date_end
+            and (
+                self._current_date
+                < datetime.strptime(self.date_end, "%Y-%m-%d").date()  # noqa: DTZ007
+            )
+        ):
+            self._current_date += timedelta(days=1)
+            self._current_cursor = "*"  # Reset cursor for new date
+            await self._generate_urls_for_current_date()
 
     async def _wait_for_rate_limit(self) -> None:
         """Wait if rate limit would be exceeded."""
@@ -387,10 +403,12 @@ class ReversePaginationBundleLocator:
         state_key = f"{self.persistence_prefix}:state:{self.base_url}"
         state_data = await store.get(state_key, {})
 
-        if state_data:
-            self._current_date = datetime.strptime(
+        if state_data and isinstance(state_data, dict):
+            self._current_date = datetime.strptime(  # noqa: DTZ007
                 state_data.get(
-                    "current_date", self.date_end or date.today().strftime("%Y-%m-%d")
+                    "current_date",
+                    self.date_end
+                    or datetime.now(tz=timezone.utc).date().strftime("%Y-%m-%d"),
                 ),
                 "%Y-%m-%d",
             ).date()
@@ -412,19 +430,28 @@ class ReversePaginationBundleLocator:
         # Save current state
         state_key = f"{self.persistence_prefix}:state:{self.base_url}"
         state_data = {
-            "current_date": self._current_date.strftime("%Y-%m-%d")
-            if self._current_date
-            else (self.date_end or date.today().strftime("%Y-%m-%d")),
+            "current_date": (
+                self._current_date.strftime("%Y-%m-%d")
+                if self._current_date
+                else (
+                    self.date_end
+                    or datetime.now(tz=timezone.utc).date().strftime("%Y-%m-%d")
+                )
+            ),
             "current_cursor": self._current_cursor,
             "current_narrowing": self._current_narrowing,
             "initialized": self._initialized,
             "last_request_time": self._last_request_time,
-            "last_updated": datetime.now().isoformat(),
+            "last_updated": datetime.now(timezone.utc).isoformat(),
         }
         await store.put(state_key, state_data, ttl=timedelta(days=7))
 
     async def _save_processing_result(
-        self, request: RequestMeta, bundle_refs: list[BundleRef], success: bool = True
+        self,
+        request: RequestMeta,
+        bundle_refs: list[BundleRef],
+        *,
+        success: bool = True,
     ) -> None:
         """Save processing result to kvstore."""
         store = await self._get_store()
@@ -434,21 +461,22 @@ class ReversePaginationBundleLocator:
         )
         result_data = {
             "url": request.url,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "success": success,
             "bundle_count": len(bundle_refs),
             "bundle_refs": [str(ref) for ref in bundle_refs],
         }
         await store.put(result_key, result_data, ttl=timedelta(days=30))
 
-    async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
+    async def get_next_urls(self, _ctx: FetchRunContext) -> list[RequestMeta]:
         """Get the next batch of API URLs to process."""
         if not self._initialized:
             await self._load_persistence_state()
             await self._initialize()
 
         urls: list[RequestMeta] = []
-        while self._url_queue and len(urls) < 5:  # Batch size
+        BATCH_SIZE = 5  # noqa: N806
+        while self._url_queue and len(urls) < BATCH_SIZE:  # Batch size
             url = self._url_queue.pop(0)
             if url not in self._processed_urls:
                 urls.append(RequestMeta(url=url, headers=self.headers or {}))
@@ -476,7 +504,9 @@ class ReversePaginationBundleLocator:
 
         # If no more URLs in queue and we haven't finished the date range, generate more
         if not self._url_queue and self._current_date and self.date_start:
-            start_date = datetime.strptime(self.date_start, "%Y-%m-%d").date()
+            start_date = datetime.strptime(  # noqa: DTZ007
+                self.date_start, "%Y-%m-%d"
+            ).date()
             if self._current_date > start_date:
                 self._current_date -= timedelta(days=1)
                 self._current_cursor = "*"  # Reset cursor for new date
@@ -495,7 +525,7 @@ class ReversePaginationBundleLocator:
         error_data = {
             "url": request.url,
             "error": error,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "retry_count": 0,
         }
         await store.put(error_key, error_data, ttl=timedelta(hours=24))
@@ -505,11 +535,13 @@ class ReversePaginationBundleLocator:
         """Initialize the provider with the date range."""
         try:
             end_date = (
-                datetime.strptime(self.date_end, "%Y-%m-%d").date()
+                datetime.strptime(self.date_end, "%Y-%m-%d").date()  # noqa: DTZ007
                 if self.date_end
-                else date.today()
+                else datetime.now(tz=timezone.utc).date()
             )
-            start_date = datetime.strptime(self.date_start, "%Y-%m-%d").date()
+            start_date = datetime.strptime(  # noqa: DTZ007
+                self.date_start, "%Y-%m-%d"
+            ).date()
 
             if self._current_date is None:
                 self._current_date = end_date
@@ -526,11 +558,10 @@ class ReversePaginationBundleLocator:
             )
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Error initializing reverse pagination provider",
                 base_url=self.base_url,
                 error=str(e),
-                exc_info=True,
             )
             raise
 
@@ -568,18 +599,21 @@ class ReversePaginationBundleLocator:
 
         self._url_queue.append(url)
 
-    async def _generate_next_urls(self, ctx: FetchRunContext) -> None:
+    async def _generate_next_urls(self, _ctx: FetchRunContext) -> None:
         """Generate next URLs based on pagination or date progression."""
         # This would be called after processing a response to determine if we need more URLs
         # For now, we'll implement a simple date progression
-        if self._current_date and self.date_start:
-            if (
+        if (
+            self._current_date
+            and self.date_start
+            and (
                 self._current_date
-                > datetime.strptime(self.date_start, "%Y-%m-%d").date()
-            ):
-                self._current_date -= timedelta(days=1)
-                self._current_cursor = "*"  # Reset cursor for new date
-                await self._generate_urls_for_current_date()
+                > datetime.strptime(self.date_start, "%Y-%m-%d").date()  # noqa: DTZ007
+            )
+        ):
+            self._current_date -= timedelta(days=1)
+            self._current_cursor = "*"  # Reset cursor for new date
+            await self._generate_urls_for_current_date()
 
     async def _wait_for_rate_limit(self) -> None:
         """Wait if rate limit would be exceeded."""

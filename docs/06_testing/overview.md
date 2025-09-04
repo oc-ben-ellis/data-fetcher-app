@@ -131,13 +131,13 @@ For API testing, a mock Sirene API server is provided:
 
 ```bash
 # Start mock API server
-docker-compose -f tests/mocks/siren-api/docker-compose.yml up -d
+docker-compose -f tests/mocks/siren_api/docker-compose.yml up -d
 
 # Run API tests
 poetry run pytest tests/test_configurations/test_fr.py
 
 # Stop mock server
-docker-compose -f tests/mocks/siren-api/docker-compose.yml down
+docker-compose -f tests/mocks/siren_api/docker-compose.yml down
 ```
 
 ## Writing Tests

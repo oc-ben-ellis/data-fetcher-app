@@ -6,6 +6,7 @@ import os
 import tempfile
 import zipfile
 from collections.abc import AsyncGenerator, Generator
+from pathlib import Path
 
 import pytest
 
@@ -48,7 +49,7 @@ class TestFileStorage:
         """Test FileStorage creation."""
         assert storage.output_dir == temp_dir
         assert storage.create_dirs is True
-        assert os.path.exists(temp_dir)
+        assert Path(temp_dir).exists()
 
     @pytest.mark.asyncio
     async def test_open_bundle(
@@ -59,7 +60,7 @@ class TestFileStorage:
             assert bundle is not None
             assert bundle.bundle_ref == bundle_ref
             assert bundle.output_dir == storage.output_dir
-            assert os.path.exists(bundle.bundle_dir)
+            assert Path(bundle.bundle_dir).exists()
 
     @pytest.mark.asyncio
     async def test_write_resource(
@@ -77,11 +78,11 @@ class TestFileStorage:
             )
 
             # Check that files were created
-            files = os.listdir(bundle.bundle_dir)
+            files = [f.name for f in Path(bundle.bundle_dir).iterdir()]
             assert "page.html" in files
 
             # Check content
-            with open(os.path.join(bundle.bundle_dir, "page.html"), "rb") as f:
+            with Path(os.path.join(bundle.bundle_dir, "page.html")).open("rb") as f:
                 content = f.read()
                 assert b"<html><body>Test content</body></html>" in content
 
@@ -112,16 +113,16 @@ class TestFileStorage:
             )
 
             # Check that both files were created
-            files = os.listdir(bundle.bundle_dir)
+            files = [f.name for f in Path(bundle.bundle_dir).iterdir()]
             assert "page1.html" in files
             assert "page2.html" in files
 
             # Check content
-            with open(os.path.join(bundle.bundle_dir, "page1.html"), "rb") as f:
+            with Path(os.path.join(bundle.bundle_dir, "page1.html")).open("rb") as f:
                 content = f.read()
                 assert b"<html><body>Test content</body></html>" in content
 
-            with open(os.path.join(bundle.bundle_dir, "page2.html"), "rb") as f:
+            with Path(os.path.join(bundle.bundle_dir, "page2.html")).open("rb") as f:
                 content = f.read()
                 assert b"<html><body>Test content</body></html>" in content
 
@@ -139,13 +140,13 @@ class TestFileStorage:
             )
 
             # Check that metadata file was created
-            files = os.listdir(bundle.bundle_dir)
+            files = [f.name for f in Path(bundle.bundle_dir).iterdir()]
             assert "data.json" in files
             assert "data.json.meta" in files
 
             # Check metadata content
             meta_file_path = os.path.join(bundle.bundle_dir, "data.json.meta")
-            with open(meta_file_path) as f:
+            with Path(meta_file_path).open() as f:
                 meta_content = f.read()
                 assert "https://example.com/data.json" in meta_content
                 assert "application/json" in meta_content
@@ -206,11 +207,13 @@ class TestStorageDecorators:
 
         # Check that unzipped file was created
         bundle_dirs = [
-            d for d in os.listdir(base_storage.output_dir) if d.startswith("bundle_")
+            d.name
+            for d in Path(base_storage.output_dir).iterdir()
+            if d.name.startswith("bundle_")
         ]
         assert len(bundle_dirs) == 1
         bundle_dir = os.path.join(base_storage.output_dir, bundle_dirs[0])
-        bundle_files = os.listdir(bundle_dir)
+        bundle_files = [f.name for f in Path(bundle_dir).iterdir()]
 
         # Should have unzipped file
         html_files = [
@@ -220,7 +223,7 @@ class TestStorageDecorators:
 
         # Check content
         html_file_path = os.path.join(bundle_dir, html_files[0])
-        with open(html_file_path, "rb") as f:
+        with Path(html_file_path).open("rb") as f:
             content = f.read()
             assert content == original_content
 
@@ -254,11 +257,13 @@ class TestStorageDecorators:
 
         # Check that zip file was created
         bundle_dirs = [
-            d for d in os.listdir(base_storage.output_dir) if d.startswith("bundle_")
+            d.name
+            for d in Path(base_storage.output_dir).iterdir()
+            if d.name.startswith("bundle_")
         ]
         assert len(bundle_dirs) == 1
         bundle_dir = os.path.join(base_storage.output_dir, bundle_dirs[0])
-        bundle_files = os.listdir(bundle_dir)
+        bundle_files = [f.name for f in Path(bundle_dir).iterdir()]
 
         # Should have zip file
         zip_files = [
@@ -302,11 +307,13 @@ class TestStorageDecorators:
 
         # Check that zip file was created
         bundle_dirs = [
-            d for d in os.listdir(base_storage.output_dir) if d.startswith("bundle_")
+            d.name
+            for d in Path(base_storage.output_dir).iterdir()
+            if d.name.startswith("bundle_")
         ]
         assert len(bundle_dirs) == 1
         bundle_dir = os.path.join(base_storage.output_dir, bundle_dirs[0])
-        bundle_files = os.listdir(bundle_dir)
+        bundle_files = [f.name for f in Path(bundle_dir).iterdir()]
 
         # Should have zip file
         zip_files = [
@@ -345,11 +352,13 @@ class TestStorageDecorators:
 
         # Check that the corrupted content was stored as-is
         bundle_dirs = [
-            d for d in os.listdir(base_storage.output_dir) if d.startswith("bundle_")
+            d.name
+            for d in Path(base_storage.output_dir).iterdir()
+            if d.name.startswith("bundle_")
         ]
         assert len(bundle_dirs) == 1
         bundle_dir = os.path.join(base_storage.output_dir, bundle_dirs[0])
-        bundle_files = os.listdir(bundle_dir)
+        bundle_files = [f.name for f in Path(bundle_dir).iterdir()]
 
         # Should have the file (stored as-is due to corruption)
         html_files = [
@@ -359,7 +368,7 @@ class TestStorageDecorators:
 
         # Check content (should be the corrupted content as-is)
         html_file_path = os.path.join(bundle_dir, html_files[0])
-        with open(html_file_path, "rb") as f:
+        with Path(html_file_path).open("rb") as f:
             content = f.read()
             assert content == corrupted_content
 
@@ -428,14 +437,16 @@ class TestStorageIntegration:
             )
 
         # Check that files were created
-        files = os.listdir(temp_dir)
+        files = [f.name for f in Path(temp_dir).iterdir()]
         assert len(files) > 0
 
         # Find the bundle directory
-        bundle_dirs = [d for d in os.listdir(temp_dir) if d.startswith("bundle_")]
+        bundle_dirs = [
+            d.name for d in Path(temp_dir).iterdir() if d.name.startswith("bundle_")
+        ]
         assert len(bundle_dirs) == 1
         bundle_dir = os.path.join(temp_dir, bundle_dirs[0])
-        bundle_files = os.listdir(bundle_dir)
+        bundle_files = [f.name for f in Path(bundle_dir).iterdir()]
 
         # Should have one zip file
         zip_files = [
@@ -490,10 +501,12 @@ class TestStorageIntegration:
             )
 
         # Check that zip file was created
-        bundle_dirs = [d for d in os.listdir(temp_dir) if d.startswith("bundle_")]
+        bundle_dirs = [
+            d.name for d in Path(temp_dir).iterdir() if d.name.startswith("bundle_")
+        ]
         assert len(bundle_dirs) == 1
         bundle_dir = os.path.join(temp_dir, bundle_dirs[0])
-        bundle_files = os.listdir(bundle_dir)
+        bundle_files = [f.name for f in Path(bundle_dir).iterdir()]
 
         # Should have zip file
         zip_files = [

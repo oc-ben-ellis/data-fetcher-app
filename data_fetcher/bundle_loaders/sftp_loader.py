@@ -1,15 +1,28 @@
 """SFTP data loader implementation."""
 
+import fnmatch
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Protocol, Union
 
+import pysftp
 import structlog
 
-from ..core import BundleRef, FetchRunContext, RequestMeta
-from ..protocols import SftpManager
+from data_fetcher.core import BundleRef, FetchRunContext, RequestMeta
+from data_fetcher.protocols import SftpManager
 
-__author__ = "Ben Ellis <ben.ellis@opencorporates.com>"
-__copyright__ = "Copyright (c) 2024 OpenCorporates Ltd"
+if TYPE_CHECKING:
+    from data_fetcher.storage import FileStorage, LineageStorage, S3Storage
+
+# Type alias for storage classes
+Storage = Union["FileStorage", "S3Storage", "LineageStorage"]
+
+
+class ReadableFile(Protocol):
+    """Protocol for file objects that can be read."""
+
+    def read(self, size: int = -1) -> bytes:
+        """Read data from the file."""
 
 
 """
@@ -32,7 +45,7 @@ class SFTPLoader:
     meta_load_name: str = "sftp_loader"
 
     async def load(
-        self, request: RequestMeta, storage: Any, ctx: FetchRunContext
+        self, request: RequestMeta, storage: Storage | None, ctx: FetchRunContext
     ) -> list[BundleRef]:
         """Load data from SFTP endpoint.
 
@@ -58,28 +71,30 @@ class SFTPLoader:
                 stat = conn.stat(remote_path)
                 if stat.st_mode is not None and stat.st_mode & 0o40000:  # Directory
                     return await self._load_directory(conn, remote_path, storage, ctx)
-                else:  # File
-                    return await self._load_file(conn, remote_path, storage, ctx)
+                # File
+                return await self._load_file(conn, remote_path, storage, ctx)
             except Exception as e:
-                logger.error(
+                logger.exception(
                     "Error accessing remote path",
                     remote_path=remote_path,
                     error=str(e),
-                    exc_info=True,
                 )
                 return []
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Error loading SFTP request",
                 url=request.url,
                 error=str(e),
-                exc_info=True,
             )
             return []
 
     async def _load_file(
-        self, conn: Any, remote_path: str, storage: Any, ctx: FetchRunContext
+        self,
+        conn: pysftp.Connection,
+        remote_path: str,
+        storage: Storage | None,
+        _ctx: FetchRunContext,
     ) -> list[BundleRef]:
         """Load a single file from SFTP."""
         try:
@@ -93,7 +108,9 @@ class SFTPLoader:
                 meta={
                     "size": stat.st_size,
                     "modified": stat.st_mtime,
-                    "permissions": oct(stat.st_mode),
+                    "permissions": (
+                        oct(stat.st_mode) if stat.st_mode is not None else None
+                    ),
                 },
             )
 
@@ -109,19 +126,22 @@ class SFTPLoader:
                             stream=self._stream_from_file(remote_file),
                         )
 
-            return [bundle_ref]
-
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Error loading file",
                 remote_path=remote_path,
                 error=str(e),
-                exc_info=True,
             )
             return []
+        else:
+            return [bundle_ref]
 
     async def _load_directory(
-        self, conn: Any, remote_path: str, storage: Any, ctx: FetchRunContext
+        self,
+        conn: pysftp.Connection,
+        remote_path: str,
+        storage: Storage | None,
+        ctx: FetchRunContext,
     ) -> list[BundleRef]:
         """Load all files in a directory from SFTP."""
         bundle_refs = []
@@ -145,22 +165,21 @@ class SFTPLoader:
                 bundle_refs.extend(file_bundles)
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Error loading directory",
                 remote_path=remote_path,
                 error=str(e),
-                exc_info=True,
             )
 
         return bundle_refs
 
     def _matches_pattern(self, filename: str) -> bool:
         """Check if filename matches the pattern."""
-        import fnmatch
-
         return fnmatch.fnmatch(filename, self.filename_pattern)
 
-    async def _stream_from_file(self, file_obj: Any) -> Any:
+    async def _stream_from_file(
+        self, file_obj: ReadableFile
+    ) -> AsyncGenerator[bytes, None]:
         """Create an async stream from a file object."""
         while True:
             chunk = file_obj.read(8192)  # 8KB chunks

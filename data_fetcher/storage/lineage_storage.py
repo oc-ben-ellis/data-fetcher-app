@@ -8,95 +8,92 @@ resource streams for data lineage purposes.
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
-from ..core import BundleRef
-
 # Mock oc_lineage library - replace with actual import when available
-try:
-    from oc_lineage.core.emitter import (  # type: ignore[import-not-found]
-        DatasetInfo,
-        EventType,
-        LineageEmitter,
-    )
-    from returns.result import Failure  # type: ignore[import-not-found]
+if TYPE_CHECKING:
+    from data_fetcher.core import BundleRef
 
-    OC_LINEAGE_AVAILABLE = True
-except ImportError:
-    # Mock classes for development/testing
-    OC_LINEAGE_AVAILABLE = False
 
-    class MockLineageEmitter:
-        """Mock lineage emitter for development/testing."""
+class MockLineageEmitter:
+    """Mock lineage emitter for development/testing."""
 
-        @staticmethod
-        def create(
-            transport_type: str,
-            job_name: str,
-            job_namespace: str,
-            run_id: str | None = None,
-            transport_config: dict[str, Any] | None = None,
-        ) -> "MockEmitter":
-            """Mock create method that returns a mock emitter."""
-            return MockEmitter()
+    @staticmethod
+    def create(
+        transport_type: str,  # noqa: ARG004
+        job_name: str,  # noqa: ARG004
+        job_namespace: str,  # noqa: ARG004
+        run_id: str | None = None,  # noqa: ARG004
+        transport_config: dict[str, Any] | None = None,  # noqa: ARG004
+    ) -> "MockEmitter":
+        """Mock create method that returns a mock emitter."""
+        return MockEmitter()
 
-    class MockEmitter:
-        """Mock emitter that logs events instead of sending them."""
 
-        def emit_event(
-            self,
-            event_type: str,
-            inputs: list[Any] | None = None,
-            outputs: list[Any] | None = None,
-        ) -> None:
-            """Mock emit_event that logs the event."""
-            print(f"[MOCK] Emitting {event_type} event:")
-            if inputs:
-                print(f"  Inputs: {inputs}")
-            if outputs:
-                print(f"  Outputs: {outputs}")
+class MockEmitter:
+    """Mock emitter that logs events instead of sending them."""
 
-    class MockDatasetInfo:
-        """Mock dataset info for development/testing."""
+    def unwrap(self) -> "MockEmitter":
+        """Mock unwrap method that returns self."""
+        return self
 
-        def __init__(self, namespace: str, name: str) -> None:
-            """Initialize the mock dataset info.
+    def emit_event(
+        self,
+        event_type: str,  # noqa: ARG002
+        inputs: list[Any] | None = None,
+        outputs: list[Any] | None = None,
+    ) -> None:
+        """Mock emit_event that logs the event."""
+        if inputs:
+            pass
+        if outputs:
+            pass
 
-            Args:
-                namespace: The namespace for the dataset.
-                name: The name of the dataset.
-            """
-            self.namespace = namespace
-            self.name = name
 
-        def __repr__(self) -> str:
-            """Return string representation of the dataset info.
+class MockDatasetInfo:
+    """Mock dataset info for development/testing."""
 
-            Returns:
-                String representation in the format 'DatasetInfo(namespace='...', name='...')'.
-            """
-            return f"DatasetInfo(namespace='{self.namespace}', name='{self.name}')"
+    def __init__(self, namespace: str, name: str) -> None:
+        """Initialize the mock dataset info.
 
-    class MockEventType:
-        """Mock event types for development/testing."""
+        Args:
+            namespace: The namespace for the dataset.
+            name: The name of the dataset.
+        """
+        self.namespace = namespace
+        self.name = name
 
-        START = "START"
-        COMPLETE = "COMPLETE"
-        FAIL = "FAIL"
+    def __repr__(self) -> str:
+        """Return string representation of the dataset info.
 
-    # Use mock classes
-    LineageEmitter = MockLineageEmitter
-    DatasetInfo = MockDatasetInfo
-    EventType = MockEventType
-    Failure = type("MockFailure", (), {"failure": lambda self: "Mock failure"})
+        Returns:
+            String representation in the format 'DatasetInfo(namespace='...', name='...')'.
+        """
+        return f"DatasetInfo(namespace='{self.namespace}', name='{self.name}')"
+
+
+class MockEventType:
+    """Mock event types for development/testing."""
+
+    START = "START"
+    COMPLETE = "COMPLETE"
+    FAIL = "FAIL"
+
+
+# Use mock classes
+LineageEmitter = MockLineageEmitter
+DatasetInfo = MockDatasetInfo
+EventType = MockEventType
+Failure = type("MockFailure", (), {"failure": lambda _self: "Mock failure"})
 
 
 @dataclass
 class LineageStorage:
     """Lineage-aware storage implementation that records metadata and events."""
 
-    base_storage: Any
+    base_storage: object
+    emitter: "MockEmitter"
     job_name: str = "data-fetcher"
     job_namespace: str = "data.fetcher"
     run_id: str | None = None
@@ -107,7 +104,7 @@ class LineageStorage:
         """Initialize the lineage storage and create lineage emitter."""
         # Generate run_id if not provided
         if self.run_id is None:
-            import uuid
+            import uuid  # noqa: PLC0415
 
             self.run_id = str(uuid.uuid4())
 
@@ -124,15 +121,11 @@ class LineageStorage:
 
         res = LineageEmitter.create(**emitter_config)
 
-        if OC_LINEAGE_AVAILABLE and isinstance(res, Failure):
-            print(f"Failed to create lineage emitter: {res.failure()}")
-            self.emitter = None
-        else:
-            self.emitter = res.unwrap() if OC_LINEAGE_AVAILABLE else res
+        self.emitter = res.unwrap()
 
     @asynccontextmanager
     async def open_bundle(
-        self, bundle_ref: BundleRef
+        self, bundle_ref: "BundleRef"
     ) -> AsyncGenerator["LineageBundle", None]:
         """Open a bundle for writing with lineage tracking."""
         bundle = LineageBundle(
@@ -154,9 +147,9 @@ class LineageBundle:
 
     def __init__(
         self,
-        base_storage: Any,
-        bundle_ref: BundleRef,
-        emitter: Any,
+        base_storage: object,
+        bundle_ref: "BundleRef",
+        emitter: object,
         job_name: str,
         job_namespace: str,
         run_id: str,
@@ -187,17 +180,16 @@ class LineageBundle:
                     name=self._extract_name(bundle_ref.primary_url),
                 )
             ]
-            self.emitter.emit_event(EventType.START, inputs=inputs)
+            self.emitter.emit_event(EventType.START, inputs=inputs)  # type: ignore[attr-defined]
 
     def _extract_namespace(self, url: str) -> str:
         """Extract namespace from URL for lineage tracking."""
         parsed = urlparse(url)
         if parsed.scheme in ("http", "https"):
             return f"{parsed.scheme}://{parsed.netloc}"
-        elif parsed.scheme == "sftp":
+        if parsed.scheme == "sftp":
             return f"sftp://{parsed.netloc}"
-        else:
-            return f"{parsed.scheme}://{parsed.netloc}"
+        return f"{parsed.scheme}://{parsed.netloc}"
 
     def _extract_name(self, url: str) -> str:
         """Extract name from URL for lineage tracking."""
@@ -228,7 +220,7 @@ class LineageBundle:
                 await base_bundle.write_resource(url, content_type, status_code, stream)
         else:
             # If base_storage is a bundle, use it directly
-            await self.base_storage.write_resource(
+            await self.base_storage.write_resource(  # type: ignore[attr-defined]
                 url, content_type, status_code, stream
             )
 
@@ -256,4 +248,4 @@ class LineageBundle:
                     DatasetInfo(namespace=resource["namespace"], name=resource["name"])
                 )
 
-            self.emitter.emit_event(EventType.COMPLETE, outputs=outputs)
+            self.emitter.emit_event(EventType.COMPLETE, outputs=outputs)  # type: ignore[attr-defined]

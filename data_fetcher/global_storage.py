@@ -21,12 +21,12 @@ import os
 from .storage.builder import create_storage_config, set_global_storage
 
 
-def _get_env_bool(key: str, default: bool = False) -> bool:
+def _get_env_bool(key: str, *, default: bool = False) -> bool:
     """Get boolean value from environment variable."""
     value = os.getenv(key, "").lower()
     if value in ("true", "1", "yes", "on"):
         return True
-    elif value in ("false", "0", "no", "off"):
+    if value in ("false", "0", "no", "off"):
         return False
     return default
 
@@ -38,7 +38,7 @@ def _get_aws_region() -> str:
     )
 
 
-def configure_global_storage() -> None:
+def configure_application_storage() -> None:
     """Configure the application storage with environment variables and sensible defaults."""
     # Get storage type
     storage_type = os.getenv("OC_STORAGE_TYPE", "s3").lower()
@@ -63,11 +63,11 @@ def configure_global_storage() -> None:
         file_path = os.getenv("OC_STORAGE_FILE_PATH", "default_capture")
         storage_config = storage_config.file_storage(file_path)
     else:
-        raise ValueError(f"Unknown storage type: {storage_type}")
+        raise ValueError(f"Unknown storage: {storage_type}")  # noqa: TRY003
 
     # Configure decorators
-    use_unzip = _get_env_bool("OC_STORAGE_USE_UNZIP", True)
-    use_bundler = _get_env_bool("OC_STORAGE_USE_BUNDLER", True)
+    use_unzip = _get_env_bool("OC_STORAGE_USE_UNZIP", default=True)
+    use_bundler = _get_env_bool("OC_STORAGE_USE_BUNDLER", default=True)
 
     storage_config = storage_config.storage_decorators(
         use_unzip=use_unzip, use_bundler=use_bundler
@@ -76,14 +76,13 @@ def configure_global_storage() -> None:
     set_global_storage(storage_config)
 
 
-def configure_application_storage() -> None:
-    """Alias: Configure application storage.
+def configure_global_storage() -> None:
+    """Alias: Configure global storage.
 
-    This is an alias for ``configure_global_storage`` to emphasize that this
-    configuration is application-wide rather than per-fetcher.
+    This is an alias for ``configure_application_storage`` to maintain backward compatibility.
     """
-    configure_global_storage()
+    configure_application_storage()
 
 
-# Configure global storage when this module is imported
-configure_global_storage()
+# Configure application storage when this module is imported
+configure_application_storage()

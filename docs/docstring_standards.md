@@ -53,8 +53,6 @@ Module description.
 This module provides functionality for...
 """
 
-__author__ = "Ben Ellis <ben.ellis@opencorporates.com>"
-__copyright__ = "Copyright (c) 2024 OpenCorporates Ltd"
 ```
 
 ### 4. Exceptions to Requirements

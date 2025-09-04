@@ -54,7 +54,7 @@ def setup_early_s3() -> TypingGenerator[None, None, None]:
     print("EARLY S3 CLEANUP")
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def sftp_server_container() -> TypingGenerator[DockerContainer, None, None]:
     """Start an SFTP server container with mock data for testing."""
     try:
@@ -121,6 +121,7 @@ def sftp_server_container() -> TypingGenerator[DockerContainer, None, None]:
                 "-p",
                 "/home/testuser/doc/cor",
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -137,6 +138,7 @@ def sftp_server_container() -> TypingGenerator[DockerContainer, None, None]:
                 "-p",
                 "/home/testuser/doc/Quarterly/Cor",
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -156,6 +158,7 @@ def sftp_server_container() -> TypingGenerator[DockerContainer, None, None]:
                     str(file_path),
                     f"{container.get_wrapped_container().id}:/home/testuser/doc/cor/{filename}",
                 ],
+                check=False,
                 capture_output=True,
                 text=True,
             )
@@ -171,6 +174,7 @@ def sftp_server_container() -> TypingGenerator[DockerContainer, None, None]:
                 str(quarterly_file),
                 f"{container.get_wrapped_container().id}:/home/testuser/doc/Quarterly/Cor/cordata.zip",
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -191,6 +195,7 @@ def sftp_server_container() -> TypingGenerator[DockerContainer, None, None]:
                 "testuser",
                 "/home/testuser/doc",
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -209,6 +214,7 @@ def sftp_server_container() -> TypingGenerator[DockerContainer, None, None]:
                 "-la",
                 "/home/testuser/doc/cor",
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -225,6 +231,7 @@ def sftp_server_container() -> TypingGenerator[DockerContainer, None, None]:
                 "-la",
                 "/home/testuser/doc/Quarterly/Cor",
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -258,6 +265,7 @@ def sftp_server_container() -> TypingGenerator[DockerContainer, None, None]:
                 "-la",
                 "/home/testuser/",
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -280,7 +288,7 @@ def sftp_server_container() -> TypingGenerator[DockerContainer, None, None]:
         pytest.fail(f"Failed to start SFTP server container: {e}")
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def localstack_container() -> TypingGenerator[DockerContainer, None, None]:
     """Start localstack container for S3 testing."""
     try:
@@ -399,7 +407,7 @@ def setup_storage_and_kvstore(
     global_storage = get_global_storage()
     print(f"Fixture: Global storage type: {type(global_storage).__name__}")
     if global_storage is not None:
-        gs = cast(Any, global_storage)
+        gs = cast("Any", global_storage)
         if hasattr(gs, "bucket_name"):
             print(f"Fixture: Global storage bucket: {gs.bucket_name}")
         if hasattr(gs, "prefix"):
@@ -629,7 +637,7 @@ class TestUsfloridaFunctional:
         global_storage = get_global_storage()
         print(f"Manual: Global storage type: {type(global_storage).__name__}")
         if global_storage is not None:
-            gs = cast(Any, global_storage)
+            gs = cast("Any", global_storage)
             if hasattr(gs, "bucket_name"):
                 print(f"Manual: Global storage bucket: {gs.bucket_name}")
             if hasattr(gs, "prefix"):
@@ -660,7 +668,7 @@ class TestUsfloridaFunctional:
         print(f"Fetch context storage type: {type(fetch_context.storage).__name__}")
         storage = fetch_context.storage
         if storage is not None:
-            st = cast(Any, storage)
+            st = cast("Any", storage)
             if hasattr(st, "bucket_name"):
                 print(f"Storage bucket: {st.bucket_name}")
             if hasattr(st, "prefix"):
@@ -767,7 +775,7 @@ class TestUsfloridaFunctional:
         test_request = RequestMeta(url=test_url)
 
         try:
-            bundle_refs = await fetch_context.bundle_loader.load(
+            bundle_refs = await fetch_context.bundle_loader.load(  # type: ignore[attr-defined]
                 test_request,
                 get_global_storage(),
                 FetchRunContext(run_id="test-direct"),
@@ -1107,12 +1115,11 @@ class TestUsfloridaFunctional:
         async def mock_get_credential(config_name: str, field: str) -> str:
             if field == "host":
                 return "localhost"
-            elif field == "username":
+            if field == "username":
                 return "testuser"
-            elif field == "password":
+            if field == "password":
                 return "testpass"
-            else:
-                raise ValueError(f"Unknown field: {field}")
+            raise ValueError(f"Unknown field: {field}")
 
         mock_credential_provider.get_credential = mock_get_credential
 
@@ -1143,7 +1150,7 @@ class TestUsfloridaFunctional:
             # Check loader configuration
             loader = fetch_context.bundle_loader
             assert loader is not None
-            assert loader.meta_load_name == "us_fl_sftp_loader"
+            assert loader.meta_load_name == "us_fl_sftp_loader"  # type: ignore[attr-defined]
 
             # Run a quick test to verify the configuration works
             from data_fetcher.core import FetchPlan

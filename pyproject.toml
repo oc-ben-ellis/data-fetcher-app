@@ -77,6 +77,7 @@ exclude = [
     "build",
     "dist",
     "tmp",
+    "docs",
 ]
 
 # see https://opencorporates.atlassian.net/wiki/spaces/ENGINEERIN/pages/382337032/Platform+ADR+002+004+Baseline+Linting+Type-Checking
@@ -118,7 +119,7 @@ select = [
   "SIM", # SIM: flake8-simplify
   "SLF", # SLF: flake8-self
   "T20", # T20: flake8-print
-  "TC", # TCH: flake8-type-checking
+  "TCH", # TCH: flake8-type-checking
   "TID", # TID: flake8-tidy-imports
   "TRY", # TRY: tryceratops
   "UP", # UP: PyUpgrade
@@ -141,6 +142,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+"tests/**/*.py" = ["S101", "S105", "S106", "S110", "S104", "S201", "S603", "S607", "PTH110", "PTH118", "PTH123", "PLR2004", "PLR0912", "PLR0915", "PLR1704", "ANN", "SLF", "BLE", "PLC0415", "TRY003", "TRY300", "TRY301", "T201", "ARG001", "ARG002", "PLW0602", "PLW0603", "PLW1508", "SIM102", "SIM105", "SIM117", "DTZ005", "DTZ011", "PT017"]  # Allow assert, hardcoded passwords, URLs, SQL, subprocess, pathlib, magic values, complexity, annotations, self, blind except, import, exception, print, unused args, global vars, nested ifs, datetime, and pytest rules in test files
+"scripts/**/*.py" = ["PTH123", "TRY300", "BLE001", "SIM102", "PLR0912", "PLR0915", "RUF001", "S110", "PLC0415", "B007"]  # Allow pathlib, exception handling, simplification, complexity, unicode, security, import, and loop control rules in scripts
+"examples/**/*.py" = ["PLC0415", "S110", "BLE001", "S105", "DTZ005", "SIM105", "INP001"]  # Allow import, exception handling, hardcoded passwords, datetime, simplification, and namespace package rules in examples
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -209,6 +213,26 @@ markers = [
     "integration: mark test as integration test",
     "slow: mark test as slow running",
 ]
+
+[tool.coverage.run]
+data_file = "tmp/.coverage"
+relative_files = true
+source = ["."]
+omit = [
+    # any whole-file exceptions
+]
+
+[tool.coverage.report]
+exclude_also = [
+    # pick up pragma: no cover even when it's part of the same comment as a noqa directive
+    "#.* pragma: no cover",
+    # no need to test that unimplemented methods are unimplemented
+    "raise NotImplementedError",
+    # don't try and cover lines which are just an ellipsis
+    "^\\s+\\.\\.\\.$"
+]
+include_namespace_packages = "true"
+fail_under = 100
 
 [tool.poetry.scripts]
 build-docs = "scripts.build_docs:main"

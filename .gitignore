@@ -212,3 +212,6 @@ cython_debug/
 .ruff_cache/
 
 # No special devcontainer files needed - using npx
+
+# GPG key configuration (user-specific)
+.gpg_key

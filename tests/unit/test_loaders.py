@@ -18,8 +18,7 @@ from data_fetcher.storage import FileStorage
 
 def create_mock_storage() -> Mock:
     """Create a properly configured mock storage."""
-    storage = Mock(spec=FileStorage)
-    return storage
+    return Mock(spec=FileStorage)
 
 
 def setup_storage_bundle_mock(mock_storage: Mock) -> AsyncMock:
@@ -399,16 +398,13 @@ class TestLoaderIntegration:
         """Test loader with storage decorators."""
         # This test would verify that loaders work correctly with storage decorators
         # like unzip decorators, bundle decorators, etc.
-        pass
 
     @pytest.mark.asyncio
     async def test_loader_with_different_content_types(self) -> None:
         """Test loader with different content types."""
         # This test would verify that loaders handle different content types correctly
-        pass
 
     @pytest.mark.asyncio
     async def test_loader_with_large_files(self) -> None:
         """Test loader with large files."""
         # This test would verify that loaders handle large files correctly
-        pass

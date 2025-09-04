@@ -6,16 +6,18 @@ SFTP server, including business registration and licensing data.
 
 from collections.abc import Callable
 
-from ..bundle_locators.api_generic_bundle_locators import (
+import structlog
+
+from data_fetcher.bundle_locators.api_generic_bundle_locators import (
     GenericDirectoryBundleLocator,
     GenericFileBundleLocator,
 )
-from ..core import FetchContext, create_fetcher_config
-from ..factory import (
-    create_sftp_loader,
-    create_sftp_manager,
-)
-from ..registry import register_configuration
+from data_fetcher.core import FetchContext, create_fetcher_config
+from data_fetcher.factory import create_sftp_loader, create_sftp_manager
+from data_fetcher.registry import register_configuration
+
+# Get logger for this module
+logger = structlog.get_logger(__name__)
 
 """
 US Florida SFTP configuration setup.
@@ -24,22 +26,35 @@ US Florida SFTP configuration setup.
 
 def _create_us_fl_daily_file_filter(start_date: str) -> Callable[[str], bool]:
     """Create a file filter for US FL daily files based on start date."""
+    DATE_LENGTH = 8  # noqa: N806
 
     def filter_function(filename: str) -> bool:
         """Check if daily file should be processed based on start date."""
         # Extract date from filename (assuming format like YYYYMMDD_*.txt)
         try:
             # Look for date pattern in filename
-            for i in range(len(filename) - 7):
-                date_str = filename[i : i + 8]
-                if date_str.isdigit() and len(date_str) == 8:
-                    # Check if this date is >= start date
-                    if date_str >= start_date:
-                        return True
-            return False
-        except Exception:
+            for i in range(len(filename) - (DATE_LENGTH - 1)):
+                date_str = filename[i : i + DATE_LENGTH]
+                if (
+                    date_str.isdigit()
+                    and len(date_str) == DATE_LENGTH
+                    and date_str >= start_date
+                ):
+                    return True
+        except Exception as e:
             # If we can't parse the date, process the file
-            return True
+            logger.exception(
+                "Error parsing date in filename, skipping file",
+                error=str(e),
+                filename=filename,
+                start_date=start_date,
+            )
+        else:
+            # No date found or date is before start_date
+            return False
+
+        # If we get here, an exception occurred, so skip the file
+        return False
 
     return filter_function
 
@@ -70,7 +85,7 @@ def _setup_us_fl_sftp_fetcher() -> FetchContext:
         max_files=None,
         file_filter=daily_file_filter,
         # Sort by modification time (newest first)
-        sort_key=lambda file_path, mtime: mtime,
+        sort_key=lambda _file_path, mtime: mtime,
         sort_reverse=True,
         persistence_prefix="us_fl_daily_provider",
     )

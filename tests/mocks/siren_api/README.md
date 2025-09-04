@@ -31,9 +31,9 @@ The mock server provides realistic SIREN API responses with:
 If you want to run the mock API manually for testing:
 
 ```bash
-cd tmp/siren-api-mock
-docker build -t siren-api-mock .
-docker run -p 5000:5000 siren-api-mock
+cd tmp/siren_api_mock
+docker build -t siren_api_mock .
+docker run -p 5000:5000 siren_api_mock
 ```
 
 Then test the endpoints:

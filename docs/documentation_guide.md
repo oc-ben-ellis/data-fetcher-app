@@ -32,7 +32,7 @@ docs/
 │   └── png/
 ├── architecture/                 # Legacy architecture files
 ├── configurations/              # Configuration documentation
-├── global_configuration/        # System configuration
+├── application_configuration/        # System configuration
 ├── persistence/                 # Data persistence
 └── storage/                     # Storage systems
 ```

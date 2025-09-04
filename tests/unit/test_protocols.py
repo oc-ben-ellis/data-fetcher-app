@@ -209,7 +209,7 @@ class TestHttpManager:
 
             # Mock the retry engine to call the actual _make_request function
             async def mock_execute_with_retry(
-                func: Callable[[], Awaitable[httpx.Response]]
+                func: Callable[[], Awaitable[httpx.Response]],
             ) -> httpx.Response:
                 return await func()
 

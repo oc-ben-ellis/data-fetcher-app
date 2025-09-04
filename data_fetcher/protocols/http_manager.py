@@ -7,11 +7,12 @@ including rate limiting, retry logic, and connection pooling.
 import asyncio
 import time
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import cast
 
 import httpx
 
-from ..utils.retry import create_retry_engine
+from data_fetcher.utils.retry import create_retry_engine
+
 from .authentication import AuthenticationMechanism, NoAuthenticationMechanism
 
 
@@ -39,7 +40,7 @@ class HttpManager:
         # Create retry engine for HTTP operations with configured max_retries
         self._retry_engine = create_retry_engine(max_retries=self.max_retries)
 
-    async def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+    async def request(self, method: str, url: str, **kwargs: object) -> httpx.Response:
         """Make an HTTP request with rate limiting and authentication."""
         async with self._rate_limit_lock:
             # Rate limiting
@@ -58,7 +59,7 @@ class HttpManager:
                 # Ensure we have valid headers to unpack
                 request_headers = kwargs.get("headers", {}) or {}
                 default_headers = self.default_headers or {}
-                headers = {**default_headers, **request_headers}
+                headers = {**default_headers, **request_headers}  # type: ignore[dict-item]
 
                 # Apply authentication
                 if self.authentication_mechanism:
@@ -67,9 +68,9 @@ class HttpManager:
                     )
                 kwargs["headers"] = headers
 
-                return await client.request(method, url, **kwargs)
+                return await client.request(method, url, **kwargs)  # type: ignore[arg-type]
 
         # Execute with retry logic using the unified retry engine
         result = await self._retry_engine.execute_with_retry_async(_make_request)
         # Return the result with explicit typing for mypy
-        return cast(httpx.Response, result)
+        return cast("httpx.Response", result)

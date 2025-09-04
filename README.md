@@ -135,7 +135,7 @@ This documentation is organized into the following main sections:
 - SFTP configurations
 - Scheduling options
 
-### [🌐 Global Configuration](docs/03_global_configuration/) - System-wide settings and logging
+### [🌐 Application Configuration](docs/03_application_configuration/) - System-wide settings and logging
 - Detailed configuration options
 - Logging setup and configuration
 - Environment-specific settings

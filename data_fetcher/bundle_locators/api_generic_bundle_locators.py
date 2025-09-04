@@ -4,16 +4,17 @@ This module provides generic bundle locators that can work with various data
 sources, including file systems, databases, and custom data providers.
 """
 
+import fnmatch
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import structlog
 
-from ..core import BundleRef, FetchRunContext, RequestMeta
-from ..kv_store import KeyValueStore, get_global_store
-from ..protocols import SftpManager
+from data_fetcher.core import BundleRef, FetchRunContext, RequestMeta
+from data_fetcher.kv_store import KeyValueStore, get_global_store
+from data_fetcher.protocols import SftpManager
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -87,7 +88,11 @@ class GenericDirectoryBundleLocator:
         await store.put(init_key, self._initialized, ttl=timedelta(days=7))
 
     async def _save_processing_result(
-        self, request: RequestMeta, bundle_refs: list[BundleRef], success: bool = True
+        self,
+        request: RequestMeta,
+        bundle_refs: list[BundleRef],
+        *,
+        success: bool = True,
     ) -> None:
         """Save processing result to kvstore."""
         store = await self._get_store()
@@ -98,7 +103,7 @@ class GenericDirectoryBundleLocator:
         )
         result_data = {
             "remote_path": remote_path,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "success": success,
             "bundle_count": len(bundle_refs),
             "bundle_refs": [str(ref) for ref in bundle_refs],
@@ -116,12 +121,12 @@ class GenericDirectoryBundleLocator:
         error_data = {
             "remote_path": remote_path,
             "error": error,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "retry_count": 0,
         }
         await store.put(error_key, error_data, ttl=timedelta(hours=24))
 
-    async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
+    async def get_next_urls(self, _ctx: FetchRunContext) -> list[RequestMeta]:
         """Get the next batch of SFTP URLs to process."""
         if not self._initialized:
             await self._load_persistence_state()
@@ -129,7 +134,8 @@ class GenericDirectoryBundleLocator:
                 await self._initialize()
 
         urls: list[RequestMeta] = []
-        while self._file_queue and len(urls) < 10:  # Batch size
+        BATCH_SIZE = 10  # noqa: N806
+        while self._file_queue and len(urls) < BATCH_SIZE:  # Batch size
             if self.max_files and len(self._processed_files) >= self.max_files:
                 break
 
@@ -143,7 +149,7 @@ class GenericDirectoryBundleLocator:
         return urls
 
     async def handle_url_processed(
-        self, request: RequestMeta, bundle_refs: list[BundleRef], ctx: FetchRunContext
+        self, request: RequestMeta, bundle_refs: list[BundleRef], _ctx: FetchRunContext
     ) -> None:
         """Handle when a URL has been processed."""
         # Mark as processed
@@ -186,16 +192,8 @@ class GenericDirectoryBundleLocator:
                     continue
 
                 # Get file stats for sorting
-                try:
-                    stat = conn.stat(file_path)
-                    file_info.append((file_path, stat.st_mtime))
-                except Exception as e:
-                    logger.warning(
-                        "Error getting stats for file",
-                        file_path=file_path,
-                        error=str(e),
-                    )
-                    continue
+                stat = conn.stat(file_path)
+                file_info.append((file_path, stat.st_mtime))
 
             # Sort files if sort_key is provided
             sort_key_func = self.sort_key
@@ -216,17 +214,14 @@ class GenericDirectoryBundleLocator:
             )
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Error initializing directory provider",
                 directory=self.remote_dir,
                 error=str(e),
-                exc_info=True,
             )
 
     def _matches_pattern(self, filename: str) -> bool:
         """Check if filename matches the pattern."""
-        import fnmatch
-
         return fnmatch.fnmatch(filename, self.filename_pattern)
 
 
@@ -280,7 +275,11 @@ class GenericFileBundleLocator:
         )
 
     async def _save_processing_result(
-        self, request: RequestMeta, bundle_refs: list[BundleRef], success: bool = True
+        self,
+        request: RequestMeta,
+        bundle_refs: list[BundleRef],
+        *,
+        success: bool = True,
     ) -> None:
         """Save processing result to kvstore."""
         store = await self._get_store()
@@ -289,21 +288,22 @@ class GenericFileBundleLocator:
         result_key = f"{self.persistence_prefix}:results:{hash(remote_path)}"
         result_data = {
             "remote_path": remote_path,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "success": success,
             "bundle_count": len(bundle_refs),
             "bundle_refs": [str(ref) for ref in bundle_refs],
         }
         await store.put(result_key, result_data, ttl=timedelta(days=30))
 
-    async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
+    async def get_next_urls(self, _ctx: FetchRunContext) -> list[RequestMeta]:
         """Get the next batch of SFTP URLs to process."""
         # Load persistence state on first call
         if not self._processed_files:
             await self._load_persistence_state()
 
         urls: list[RequestMeta] = []
-        while self._file_queue and len(urls) < 10:  # Batch size
+        BATCH_SIZE = 10  # noqa: N806
+        while self._file_queue and len(urls) < BATCH_SIZE:  # Batch size
             file_path = self._file_queue.pop(0)
             if file_path not in self._processed_files:
                 urls.append(RequestMeta(url=f"sftp://{file_path}"))
@@ -314,7 +314,7 @@ class GenericFileBundleLocator:
         return urls
 
     async def handle_url_processed(
-        self, request: RequestMeta, bundle_refs: list[BundleRef], ctx: FetchRunContext
+        self, request: RequestMeta, bundle_refs: list[BundleRef], _ctx: FetchRunContext
     ) -> None:
         """Handle when a URL has been processed."""
         # Mark as processed
@@ -336,7 +336,7 @@ class GenericFileBundleLocator:
         error_data = {
             "remote_path": remote_path,
             "error": error,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "retry_count": 0,
         }
         await store.put(error_key, error_data, ttl=timedelta(hours=24))

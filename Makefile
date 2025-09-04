@@ -85,7 +85,7 @@ ARGS=
 TEST_WORKERS ?= auto
 
 .PHONY: all-checks build/for-deployment format lint test test/not-in-parallel test/parallel test/with-coverage test/snapshot-update run run/with-observability
-.PHONY: lint/black lint/ruff lint/mypy help examples debug docs docs/open headers pre-commit
+.PHONY: lint/black lint/ruff lint/mypy help examples debug docs docs/open headers pre-commit pre-commit/init
 
 all-checks: format lint test/with-coverage
 
@@ -130,6 +130,11 @@ pre-commit: ensure-devcontainer
 	@echo "Installing pre-commit hooks..."
 	$(call run_in_container,pre-commit install)
 	@echo "Pre-commit hooks installed. They will run automatically on commit."
+
+pre-commit/init: ensure-devcontainer
+	@echo "Initializing pre-commit environments..."
+	$(call run_in_container,pre-commit install-hooks)
+	@echo "Pre-commit environments initialized. First run will be much faster."
 
 lint: lint/black lint/ruff lint/mypy
 
@@ -181,6 +186,7 @@ help:
 	@echo "  format              - Format code with black and ruff"
 	@echo "  headers             - Add standard headers to Python files"
 	@echo "  pre-commit          - Install pre-commit hooks for automatic checks"
+	@echo "  pre-commit/init     - Initialize pre-commit environments (faster first run)"
 	@echo "  lint                - Run all linters"
 	@echo "  test                - Run tests in parallel (default, faster)"
 	@echo "  test/not-in-parallel - Run tests sequentially (fallback)"

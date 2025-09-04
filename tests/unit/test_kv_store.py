@@ -121,9 +121,9 @@ class TestInMemoryKeyValueStore:
             result = await store.get("complex_key")
 
             assert result == complex_data
-            assert isinstance(result["number"], int)
-            assert isinstance(result["list"], list)
-            assert isinstance(result["dict"], dict)
+            assert isinstance(result["number"], int)  # type: ignore[index]
+            assert isinstance(result["list"], list)  # type: ignore[index]
+            assert isinstance(result["dict"], dict)  # type: ignore[index]
         finally:
             await store.close()
 

@@ -4,7 +4,6 @@ This module configures structlog for the framework, providing structured logging
 with context variables, JSON output, and consistent formatting across all components.
 """
 
-
 import logging.config
 import os
 import sys
@@ -212,9 +211,11 @@ def configure_logging(
             timestamper,
             structlog.processors.StackInfoRenderer(),
             set_exc_info,
-            structlog.processors.dict_tracebacks
-            if logging_handler != LoggingHandler.TEXT
-            else _no_op_structlog_processor,
+            (
+                structlog.processors.dict_tracebacks
+                if logging_handler != LoggingHandler.TEXT
+                else _no_op_structlog_processor
+            ),
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         logger_factory=structlog.stdlib.LoggerFactory(),  # Required for stdlib/gunicorn
@@ -231,12 +232,12 @@ def _parse_package_log_levels(
             k: v if isinstance(v, LoggingLevel) else LoggingLevel(v.upper())
             for k, v in package_log_levels.items()
         }
-    elif isinstance(package_log_levels, str) and ":" in package_log_levels:
+    if isinstance(package_log_levels, str) and ":" in package_log_levels:
         return {
             k: LoggingLevel(v.upper())
             for k, v in (s.split(":") for s in package_log_levels.split(","))
         }
-    elif package_log_levels in ("", None):
+    if package_log_levels in ("", None):
         return {}
 
     raise ValueError(  # noqa: TRY003

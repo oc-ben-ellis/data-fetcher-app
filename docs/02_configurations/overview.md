@@ -316,7 +316,7 @@ poetry run python examples/basic_usage_example.py
 This documentation is organized into the following main sections:
 
 ### [Architecture](../architecture/) - Comprehensive architecture overview
-### [Application Configuration](../global_configuration/) - System-wide settings and logging
+### [Application Configuration](../application_configuration/) - System-wide settings and logging
 ### [Persistence](../persistence/) - Data management and caching
 ### [Storage](../storage/) - Data storage and S3 integration
 ### [Troubleshooting](../troubleshooting.md) - Common issues and solutions

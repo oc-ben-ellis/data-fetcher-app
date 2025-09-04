@@ -32,21 +32,23 @@ class RetryConfig:
     def __post_init__(self) -> None:
         """Validate retry configuration."""
         if self.max_retries < 0:
-            raise ValueError("max_retries must be non-negative")
+            raise ValueError("max_retries must be non-negative")  # noqa: TRY003
         if self.base_delay <= 0:
-            raise ValueError("base_delay must be positive")
+            raise ValueError("base_delay must be positive")  # noqa: TRY003
         if self.max_delay <= 0:
-            raise ValueError("max_delay must be positive")
+            raise ValueError("max_delay must be positive")  # noqa: TRY003
         if self.exponential_base <= 1:
-            raise ValueError("exponential_base must be greater than 1")
+            raise ValueError("exponential_base must be greater than 1")  # noqa: TRY003
         if self.jitter_range[0] >= self.jitter_range[1]:
-            raise ValueError("jitter_range must be (min, max) where min < max")
+            raise ValueError(  # noqa: TRY003
+                "jitter_range must be (min, max) where min < max"
+            )
 
 
 class RetryEngine:
     """Core retry engine that handles retry logic and backoff calculations."""
 
-    def __init__(self, config: RetryConfig):
+    def __init__(self, config: RetryConfig) -> None:
         """Initialize the retry engine with configuration.
 
         Args:
@@ -71,14 +73,14 @@ class RetryEngine:
 
         # Add jitter if enabled
         if self.config.jitter:
-            jitter_factor = random.uniform(*self.config.jitter_range)
+            jitter_factor = random.uniform(*self.config.jitter_range)  # noqa: S311
             delay *= jitter_factor
 
         return delay
 
     async def execute_with_retry_async(
-        self, func: AsyncFunc, *args: Any, **kwargs: Any
-    ) -> Any:
+        self, func: AsyncFunc, *args: object, **kwargs: object
+    ) -> object:
         """Execute an async function with retry logic.
 
         Args:
@@ -111,9 +113,11 @@ class RetryEngine:
         # This should never be reached, but just in case
         if last_exception:
             raise last_exception from last_exception
-        raise RuntimeError("Retry execution failed unexpectedly")
+        raise RuntimeError("Retry execution failed unexpectedly")  # noqa: TRY003
 
-    def execute_with_retry_sync(self, func: SyncFunc, *args: Any, **kwargs: Any) -> Any:
+    def execute_with_retry_sync(
+        self, func: SyncFunc, *args: object, **kwargs: object
+    ) -> object:
         """Execute a sync function with retry logic.
 
         Args:
@@ -146,7 +150,7 @@ class RetryEngine:
         # This should never be reached, but just in case
         if last_exception:
             raise last_exception from last_exception
-        raise RuntimeError("Retry execution failed unexpectedly")
+        raise RuntimeError("Retry execution failed unexpectedly")  # noqa: TRY003
 
 
 def create_retry_engine(
@@ -154,6 +158,7 @@ def create_retry_engine(
     base_delay: float = 1.0,
     max_delay: float = 60.0,
     exponential_base: float = 2.0,
+    *,
     jitter: bool = True,
     jitter_range: tuple[float, float] = (0.5, 1.5),
 ) -> RetryEngine:
@@ -186,9 +191,10 @@ def async_retry_with_backoff(
     base_delay: float = 1.0,
     max_delay: float = 60.0,
     exponential_base: float = 2.0,
+    *,
     jitter: bool = True,
     jitter_range: tuple[float, float] = (0.5, 1.5),
-    retry_exceptions: tuple[type[Exception], ...] = (Exception,),
+    retry_exceptions: tuple[type[Exception], ...] = (Exception,),  # noqa: ARG001
 ) -> Callable[[AsyncFunc], AsyncFunc]:
     """Decorator for async functions with exponential backoff retry logic.
 
@@ -210,7 +216,7 @@ def async_retry_with_backoff(
 
     def decorator(func: AsyncFunc) -> AsyncFunc:
         @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        async def wrapper(*args: object, **kwargs: object) -> object:
             # Create retry engine for this function
             retry_engine = create_retry_engine(
                 max_retries=max_retries,
@@ -234,9 +240,10 @@ def sync_retry_with_backoff(
     base_delay: float = 1.0,
     max_delay: float = 60.0,
     exponential_base: float = 2.0,
+    *,
     jitter: bool = True,
     jitter_range: tuple[float, float] = (0.5, 1.5),
-    retry_exceptions: tuple[type[Exception], ...] = (Exception,),
+    retry_exceptions: tuple[type[Exception], ...] = (Exception,),  # noqa: ARG001
 ) -> Callable[[SyncFunc], SyncFunc]:
     """Decorator for sync functions with exponential backoff retry logic.
 
@@ -258,7 +265,7 @@ def sync_retry_with_backoff(
 
     def decorator(func: SyncFunc) -> SyncFunc:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: object, **kwargs: object) -> object:
             # Create retry engine for this function
             retry_engine = create_retry_engine(
                 max_retries=max_retries,

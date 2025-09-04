@@ -8,15 +8,22 @@ import asyncio
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pysftp
+import structlog
 
-from ..utils.retry import (
+from data_fetcher.utils.retry import (
     async_retry_with_backoff,
     create_connection_retry_engine,
     create_operation_retry_engine,
 )
+
+if TYPE_CHECKING:
+    from data_fetcher.credentials.sftp_credentials import SftpCredentialsWrapper
+
+# Get logger for this module
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -29,7 +36,7 @@ class ScheduledDailyGate:
 
     def __post_init__(self) -> None:
         """Initialize the scheduled daily gate state."""
-        self._last_execution_date: Any = None
+        self._last_execution_date: object = None
 
     async def wait_if_needed(self) -> None:
         """Wait until the next scheduled time if needed."""
@@ -77,9 +84,9 @@ class OncePerIntervalGate:
 
             # Add jitter
             if self.jitter_seconds > 0:
-                import random
+                import random  # noqa: PLC0415
 
-                jitter = random.uniform(0, self.jitter_seconds)
+                jitter = random.uniform(0, self.jitter_seconds)  # noqa: S311
                 wait_time += jitter
 
             await asyncio.sleep(wait_time)
@@ -91,7 +98,7 @@ class OncePerIntervalGate:
 class SftpManager:
     """SFTP connection manager with scheduling, rate limiting, and retry logic."""
 
-    credentials_provider: Any
+    credentials_provider: "SftpCredentialsWrapper"
     connect_timeout: float = 20.0
     daily_gate: ScheduledDailyGate | None = None
     interval_gate: OncePerIntervalGate | None = None
@@ -151,7 +158,7 @@ class SftpManager:
         exponential_base=2.0,
         jitter=True,
     )
-    async def request(self, operation: str, *args: Any, **kwargs: Any) -> Any:
+    async def request(self, operation: str, *args: object, **kwargs: object) -> object:
         """Make an SFTP request with rate limiting and retry logic."""
         # Wait for gates
         await self.wait_for_gates()
@@ -165,7 +172,7 @@ class SftpManager:
             if time_since_last < min_interval:
                 await asyncio.sleep(min_interval - time_since_last)
 
-            self._last_request_time = time.time()
+            self._last_request_time = now
 
         # Execute operation
         conn = await self.get_connection()
@@ -190,9 +197,12 @@ class SftpManager:
         if self._connection:
             try:
                 self._connection.close()
-            except Exception:
+            except Exception as e:
                 # Ignore errors during close
-                pass
+                logger.exception(
+                    "Error closing SFTP connection",
+                    error=str(e),
+                )
             finally:
                 self._connection = None
 
@@ -213,6 +223,11 @@ class SftpManager:
             conn = await self.get_connection()
             # Try a simple operation to test the connection
             _ = conn.pwd  # Test connection by accessing pwd attribute
-            return True
-        except Exception:
+        except Exception as e:
+            logger.exception(
+                "Error testing SFTP connection",
+                error=str(e),
+            )
             return False
+        else:
+            return True

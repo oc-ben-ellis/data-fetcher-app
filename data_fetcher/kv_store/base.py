@@ -8,7 +8,7 @@ import json
 import pickle
 from abc import ABC, abstractmethod
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
 
 class KeyValueStore(ABC):
@@ -18,11 +18,11 @@ class KeyValueStore(ABC):
     must follow. It provides basic CRUD operations plus range queries.
     """
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, **kwargs: object) -> None:
         """Initialize the key-value store."""
-        self._serializer = kwargs.get("serializer", "json")
-        self._default_ttl = kwargs.get("default_ttl", None)
-        self._key_prefix = kwargs.get("key_prefix", "")
+        self._serializer: str = cast("str", kwargs.get("serializer", "json"))
+        self._default_ttl: int | None = cast("int | None", kwargs.get("default_ttl"))
+        self._key_prefix: str = cast("str", kwargs.get("key_prefix", "")) or ""
 
     def _get_prefixed_key(self, key: str, prefix: str | None = None) -> str:
         """Get the key with prefix applied."""
@@ -39,10 +39,10 @@ class KeyValueStore(ABC):
     async def put(
         self,
         key: str,
-        value: Any,
+        value: object,
         ttl: int | timedelta | None = None,
         prefix: str | None = None,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> None:
         """Store a value with the given key.
 
@@ -53,12 +53,15 @@ class KeyValueStore(ABC):
             prefix: Optional prefix to prepend to the key. If None, uses the store's default prefix
             **kwargs: Additional implementation-specific parameters
         """
-        pass
 
     @abstractmethod
     async def get(
-        self, key: str, default: Any = None, prefix: str | None = None, **kwargs: Any
-    ) -> Any | None:
+        self,
+        key: str,
+        default: object = None,
+        prefix: str | None = None,
+        **kwargs: object,
+    ) -> object | None:
         """Retrieve a value by key.
 
         Args:
@@ -70,10 +73,11 @@ class KeyValueStore(ABC):
         Returns:
             The stored value or default if not found
         """
-        pass
 
     @abstractmethod
-    async def delete(self, key: str, prefix: str | None = None, **kwargs: Any) -> bool:
+    async def delete(
+        self, key: str, prefix: str | None = None, **kwargs: object
+    ) -> bool:
         """Delete a key-value pair.
 
         Args:
@@ -84,10 +88,11 @@ class KeyValueStore(ABC):
         Returns:
             True if the key was deleted, False if it didn't exist
         """
-        pass
 
     @abstractmethod
-    async def exists(self, key: str, prefix: str | None = None, **kwargs: Any) -> bool:
+    async def exists(
+        self, key: str, prefix: str | None = None, **kwargs: object
+    ) -> bool:
         """Check if a key exists.
 
         Args:
@@ -98,7 +103,6 @@ class KeyValueStore(ABC):
         Returns:
             True if the key exists, False otherwise
         """
-        pass
 
     @abstractmethod
     async def range_get(
@@ -107,7 +111,7 @@ class KeyValueStore(ABC):
         end_key: str | None = None,
         limit: int | None = None,
         prefix: str | None = None,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> list[tuple[str, Any]]:
         """Get a range of key-value pairs.
 
@@ -121,30 +125,27 @@ class KeyValueStore(ABC):
         Returns:
             List of (key, value) tuples in the specified range
         """
-        pass
 
     @abstractmethod
     async def close(self) -> None:
         """Close the store and release any resources."""
-        pass
 
-    def _serialize(self, value: Any) -> str:
+    def _serialize(self, value: object) -> str:
         """Serialize a value for storage."""
         if self._serializer == "json":
             return json.dumps(value, default=str)
-        elif self._serializer == "pickle":
+        if self._serializer == "pickle":
             return pickle.dumps(value).hex()
-        else:
-            raise ValueError(f"Unknown serializer: {self._serializer}")
+        raise ValueError(f"Bad serializer: {self._serializer}")  # noqa: TRY003
 
-    def _deserialize(self, value: str) -> Any:
+    def _deserialize(self, value: str) -> object:
         """Deserialize a value from storage."""
         if self._serializer == "json":
             return json.loads(value)
-        elif self._serializer == "pickle":
-            return pickle.loads(bytes.fromhex(value))
-        else:
-            raise ValueError(f"Unknown serializer: {self._serializer}")
+        if self._serializer == "pickle":
+            # Note: pickle.loads can be unsafe with untrusted data, but this is for internal use only
+            return pickle.loads(bytes.fromhex(value))  # noqa: S301
+        raise ValueError(f"Bad serializer: {self._serializer}")  # noqa: TRY003
 
     def _normalize_ttl(self, ttl: int | timedelta | None) -> int | None:
         """Normalize TTL to seconds."""
@@ -160,6 +161,8 @@ class KeyValueStore(ABC):
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    async def __aexit__(
+        self, exc_type: object, exc_val: object, exc_tb: object
+    ) -> None:
         """Async context manager exit."""
         await self.close()

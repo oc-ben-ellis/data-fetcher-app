@@ -214,8 +214,8 @@ class TestRedisIntegration:
             await pickle_store.put("complex", complex_pickle_data)
             retrieved = await pickle_store.get("complex")
             assert retrieved is not None
-            assert retrieved["set_data"] == complex_pickle_data["set_data"]
-            assert retrieved["bytes_data"] == complex_pickle_data["bytes_data"]
+            assert retrieved["set_data"] == complex_pickle_data["set_data"]  # type: ignore[index]
+            assert retrieved["bytes_data"] == complex_pickle_data["bytes_data"]  # type: ignore[index]
 
         finally:
             await json_store.close()
@@ -231,7 +231,7 @@ class TestRedisIntegration:
 
         # Simulate connection loss by closing the Redis client
         # redis-py asyncio deprecates close() in favor of aclose() in 5.0.1
-        await redis_store._redis.aclose()
+        await redis_store._redis.aclose()  # type: ignore[union-attr]
 
         # Try to perform operation - should reconnect automatically
         await redis_store.put("recovery_test", "recovered_value")
@@ -355,7 +355,7 @@ class TestRedisIntegration:
 
         # Test concurrent reads
         async def read_key(key: str) -> str | None:
-            return await redis_store.get(key)
+            return await redis_store.get(key)  # type: ignore[return-value]
 
         # Store initial data
         await redis_store.put("concurrent_key", "initial_value")
@@ -396,9 +396,9 @@ class TestRedisIntegration:
         # Verify data integrity
         retrieved = await redis_store.get("large_data")
         assert retrieved is not None
-        assert retrieved["large_string"] == large_data["large_string"]
-        assert retrieved["large_list"] == large_data["large_list"]
-        assert retrieved["large_dict"] == large_data["large_dict"]
+        assert retrieved["large_string"] == large_data["large_string"]  # type: ignore[index]
+        assert retrieved["large_list"] == large_data["large_list"]  # type: ignore[index]
+        assert retrieved["large_dict"] == large_data["large_dict"]  # type: ignore[index]
 
         # Check Redis memory usage
         info = await redis_client.info("memory")

@@ -85,12 +85,18 @@ protocols:
 
 ### **Code Configuration**
 ```python
-from data_fetcher.config import GlobalConfig
+from data_fetcher.global_storage import configure_application_storage
+from data_fetcher.global_kv_store import configure_application_kv_store
+from data_fetcher.global_credential_provider import configure_application_credential_provider
 
-config = GlobalConfig()
-config.logging.level = "DEBUG"
-config.storage.s3_bucket = "my-bucket"
-config.protocols.http.timeout = 30
+# Configure application storage
+configure_application_storage()
+
+# Configure application key-value store
+configure_application_kv_store()
+
+# Configure application credential provider
+configure_application_credential_provider()
 ```
 
 ## Key Features

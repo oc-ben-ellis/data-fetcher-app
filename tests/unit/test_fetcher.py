@@ -71,8 +71,7 @@ class TestFetcher:
     @pytest.fixture
     def mock_storage(self) -> AsyncMock:
         """Create a mock storage."""
-        storage = AsyncMock()
-        return storage
+        return AsyncMock()
 
     @pytest.fixture
     def mock_bundle_locator(self) -> AsyncMock:

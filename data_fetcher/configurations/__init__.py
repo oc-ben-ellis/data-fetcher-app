@@ -7,10 +7,11 @@ configurations.
 
 # Import configuration modules to ensure they are registered
 # Import the main configuration functions from registry
-from ..registry import get_fetcher, list_configurations
+from data_fetcher.registry import get_fetcher, list_configurations
+
 from . import (
-    fr,  # noqa: F401
-    us_fl,  # noqa: F401
+    fr,
+    us_fl,
 )
 
 __all__ = ["get_fetcher", "list_configurations"]

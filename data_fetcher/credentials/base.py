@@ -21,7 +21,6 @@ class CredentialProvider(ABC):
         Returns:
             The credential value
         """
-        pass
 
     def clear(self) -> None:
         """Clear any cached credentials.
@@ -30,4 +29,4 @@ class CredentialProvider(ABC):
         Default implementation is a no-op.
         """
         # Default implementation is a no-op for providers that don't cache
-        return None
+        return

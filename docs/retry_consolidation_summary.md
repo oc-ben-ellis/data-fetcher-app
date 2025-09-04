@@ -192,7 +192,7 @@ class MyProtocolManager:
     def __post_init__(self):
         # Use appropriate retry engine for this protocol
         self._retry_engine = create_connection_retry_engine()
-    
+
     async def operation(self):
         return await self._retry_engine.execute_with_retry_async(
             self._perform_operation
@@ -231,10 +231,10 @@ Comprehensive test coverage for the unified retry engine:
 
 The retry logic consolidation successfully:
 
-✅ **Eliminated code duplication** across protocol managers  
-✅ **Ensured consistent retry behavior** with unified backoff strategies  
-✅ **Improved maintainability** with centralized retry implementation  
-✅ **Preserved protocol-specific flexibility** through thin wrappers  
-✅ **Maintained backward compatibility** with existing decorators  
+✅ **Eliminated code duplication** across protocol managers
+✅ **Ensured consistent retry behavior** with unified backoff strategies
+✅ **Improved maintainability** with centralized retry implementation
+✅ **Preserved protocol-specific flexibility** through thin wrappers
+✅ **Maintained backward compatibility** with existing decorators
 
 This implementation provides a solid foundation for future retry logic enhancements while ensuring all current protocols benefit from consistent, reliable retry behavior.

@@ -1,13 +1,21 @@
 """HTTP API data loader implementation."""
 
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Union, cast
 
 import structlog
 
-from ..core import BundleRef, FetchRunContext, RequestMeta
-from ..protocols import HttpManager
+from data_fetcher.core import BundleRef, FetchRunContext, RequestMeta
+from data_fetcher.protocols import HttpManager
+
+if TYPE_CHECKING:
+    from data_fetcher.storage.file_storage import FileStorage
+    from data_fetcher.storage.lineage_storage import LineageStorage
+    from data_fetcher.storage.s3_storage import S3Storage
+
+# Type alias for storage classes
+Storage = Union["FileStorage", "S3Storage", "LineageStorage"]
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -24,7 +32,10 @@ class ApiLoader:
     error_handler: Callable[[str, int], bool] | None = None
 
     async def load(
-        self, request: RequestMeta, storage: Any, ctx: FetchRunContext
+        self,
+        request: RequestMeta,
+        storage: Storage | None,
+        ctx: FetchRunContext,  # noqa: ARG002
     ) -> list[BundleRef]:
         """Load data from API endpoint.
 
@@ -90,7 +101,9 @@ class ApiLoader:
                         url=request.url,
                         content_type=response.headers.get("content-type"),
                         status_code=response.status_code,
-                        stream=response.aiter_bytes(),
+                        stream=cast(
+                            "AsyncGenerator[bytes, None]", response.aiter_bytes()
+                        ),
                     )
                 logger.debug("Successfully streamed to storage", url=request.url)
             else:
@@ -104,13 +117,12 @@ class ApiLoader:
                 status_code=response.status_code,
                 bundle_ref=bundle_ref,
             )
-            return [bundle_ref]
 
         except Exception as e:
-            logger.error(
-                "Error loading request", url=request.url, error=str(e), exc_info=True
-            )
+            logger.exception("Error loading request", url=request.url, error=str(e))
             return []
+        else:
+            return [bundle_ref]
 
 
 @dataclass

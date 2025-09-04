@@ -22,7 +22,7 @@ from .bundle_locators.api_pagination_bundle_locators import (
     CursorPaginationStrategy,
     ReversePaginationBundleLocator,
 )
-from .credentials import SftpCredentialsWrapper
+from .credentials import CredentialProvider, SftpCredentialsWrapper
 from .global_credential_provider import get_default_credential_provider
 from .protocols import HttpManager, SftpManager
 from .protocols.authentication import (
@@ -38,7 +38,7 @@ def create_sftp_manager(
     config_name: str,
     connect_timeout: float = 20.0,
     rate_limit_requests_per_second: float = 2.0,
-    credential_provider: Any | None = None,
+    credential_provider: CredentialProvider | None = None,
 ) -> SftpManager:
     """Create an SFTP manager with dynamic credentials."""
     if credential_provider is None:
@@ -71,6 +71,7 @@ def create_directory_provider(
     max_files: int | None = None,
     file_filter: Callable[[str], bool] | None = None,
     sort_key: Callable[[str, float | int | None], Any] | None = None,
+    *,
     sort_reverse: bool = True,
 ) -> GenericDirectoryBundleLocator:
     """Create a generic directory bundle locator."""

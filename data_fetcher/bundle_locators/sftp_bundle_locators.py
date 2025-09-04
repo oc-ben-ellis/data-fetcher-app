@@ -4,12 +4,13 @@ This module provides bundle locators that work with SFTP servers, including
 file pattern matching, date-based filtering, and remote directory traversal.
 """
 
+import fnmatch
 from dataclasses import dataclass
 
 import structlog
 
-from ..core import BundleRef, FetchRunContext, RequestMeta
-from ..protocols import SftpManager
+from data_fetcher.core import BundleRef, FetchRunContext, RequestMeta
+from data_fetcher.protocols import SftpManager
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -30,13 +31,14 @@ class SFTPDirectoryBundleLocator:
         self._file_queue: list[str] = []
         self._initialized: bool = False
 
-    async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
+    async def get_next_urls(self, _ctx: FetchRunContext) -> list[RequestMeta]:
         """Get the next batch of SFTP URLs to process."""
         if not self._initialized:
             await self._initialize()
 
+        BATCH_SIZE = 10  # noqa: N806
         urls: list[RequestMeta] = []
-        while self._file_queue and len(urls) < 10:  # Batch size
+        while self._file_queue and len(urls) < BATCH_SIZE:  # Batch size
             if self.max_files and len(self._processed_files) >= self.max_files:
                 break
 
@@ -48,7 +50,7 @@ class SFTPDirectoryBundleLocator:
         return urls
 
     async def handle_url_processed(
-        self, request: RequestMeta, bundle_refs: list[BundleRef], ctx: FetchRunContext
+        self, request: RequestMeta, _bundle_refs: list[BundleRef], _ctx: FetchRunContext
     ) -> None:
         """Handle when a URL has been processed."""
         # Mark as processed
@@ -76,17 +78,14 @@ class SFTPDirectoryBundleLocator:
             self._initialized = True
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Error initializing SFTP directory locator",
                 remote_dir=self.remote_dir,
                 error=str(e),
-                exc_info=True,
             )
 
     def _matches_pattern(self, filename: str) -> bool:
         """Check if filename matches the pattern."""
-        import fnmatch
-
         return fnmatch.fnmatch(filename, self.filename_pattern)
 
 
@@ -102,10 +101,12 @@ class SFTPFileBundleLocator:
         self._processed_files: set[str] = set()
         self._file_queue: list[str] = self.file_paths.copy()
 
-    async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
+    async def get_next_urls(self, _ctx: FetchRunContext) -> list[RequestMeta]:
         """Get the next batch of SFTP URLs to process."""
         urls: list[RequestMeta] = []
-        while self._file_queue and len(urls) < 10:  # Batch size
+
+        BATCH_SIZE = 10  # noqa: N806
+        while self._file_queue and len(urls) < BATCH_SIZE:  # Batch size
             file_path = self._file_queue.pop(0)
             if file_path not in self._processed_files:
                 urls.append(RequestMeta(url=f"sftp://{file_path}"))
@@ -114,7 +115,7 @@ class SFTPFileBundleLocator:
         return urls
 
     async def handle_url_processed(
-        self, request: RequestMeta, bundle_refs: list[BundleRef], ctx: FetchRunContext
+        self, request: RequestMeta, _bundle_refs: list[BundleRef], _ctx: FetchRunContext
     ) -> None:
         """Handle when a URL has been processed."""
         # Mark as processed

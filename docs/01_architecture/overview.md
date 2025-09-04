@@ -97,7 +97,7 @@ The fetcher coordinates components in a two-phase pipeline with concurrent worke
 - **Base Storage**: File system and S3 implementations
 - **Decorators**: Transform data during streaming
   - Unzip: Extract compressed files
-  
+
   - Bundle: Group related resources
 
 ## Storage Architecture
@@ -402,7 +402,7 @@ graph TD
     subgraph "Supporting Systems"
         KVStore[Key-Value Store]
         Logger[Structured Logger]
-        Config[Global Config]
+        Config[Application Config]
     end
 
     %% Core relationships

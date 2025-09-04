@@ -4,16 +4,16 @@ This module provides utility functions for data persistence operations,
 including serialization, deserialization, and data transformation helpers.
 """
 
-from datetime import datetime, timedelta
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 
-from ..kv_store import KeyValueStore, get_global_store
+from data_fetcher.kv_store import KeyValueStore, get_global_store
 
 
 class PersistenceManager:
     """Manager for persistence operations across different providers."""
 
-    def __init__(self, prefix: str = "persistence"):
+    def __init__(self, prefix: str = "persistence") -> None:
         """Initialize the persistence manager with a prefix.
 
         Args:
@@ -51,7 +51,7 @@ class PersistenceManager:
         """Save state information."""
         store = await self._get_store()
         key = f"{self.prefix}:state"
-        state["last_updated"] = datetime.now().isoformat()
+        state["last_updated"] = datetime.now(timezone.utc).isoformat()
         await store.put(key, state, ttl=ttl or timedelta(days=7))
 
     async def load_state(self) -> dict[str, Any]:
@@ -71,7 +71,7 @@ class PersistenceManager:
             "item_id": item_id,
             "error": error,
             "retry_count": retry_count,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         await store.put(key, error_data, ttl=timedelta(hours=24))
 
@@ -89,10 +89,7 @@ class PersistenceManager:
         error_data = await self.get_error(item_id)
         if error_data:
             retry_count_raw = error_data.get("retry_count", 0)
-            if isinstance(retry_count_raw, int):
-                retry_count = retry_count_raw + 1
-            else:
-                retry_count = 1
+            retry_count = retry_count_raw + 1 if isinstance(retry_count_raw, int) else 1
             await self.save_error(item_id, error_data["error"], retry_count)
             return retry_count
         return 0
@@ -130,7 +127,7 @@ class PersistenceManager:
 class RetryManager:
     """Manager for retry logic using persistence."""
 
-    def __init__(self, max_retries: int = 3, backoff_factor: float = 2.0):
+    def __init__(self, max_retries: int = 3, backoff_factor: float = 2.0) -> None:
         """Initialize the retry manager with retry configuration.
 
         Args:
@@ -156,11 +153,9 @@ class RetryManager:
         if not retry_data:
             return True
 
-        retry_count_raw = retry_data.get("retry_count", 0)
-        if isinstance(retry_count_raw, int):
-            retry_count = retry_count_raw
-        else:
-            retry_count = 0
+        retry_data_dict = cast("dict[str, Any]", retry_data)
+        retry_count_raw = retry_data_dict.get("retry_count", 0)
+        retry_count = retry_count_raw if isinstance(retry_count_raw, int) else 0
         return bool(retry_count < self.max_retries)
 
     async def record_retry(self, item_id: str, error: str) -> int:
@@ -171,17 +166,14 @@ class RetryManager:
         retry_data = await store.get(key, {"retry_count": 0, "errors": []})
         if isinstance(retry_data, dict):
             retry_count_raw = retry_data.get("retry_count", 0)
-            if isinstance(retry_count_raw, int):
-                retry_count = retry_count_raw + 1
-            else:
-                retry_count = 1
+            retry_count = retry_count_raw + 1 if isinstance(retry_count_raw, int) else 1
 
             retry_data.update(
                 {
                     "retry_count": retry_count,
                     "last_error": error,
-                    "last_retry": datetime.now().isoformat(),
-                    "errors": retry_data.get("errors", []) + [error],
+                    "last_retry": datetime.now(timezone.utc).isoformat(),
+                    "errors": [*retry_data.get("errors", []), error],
                 }
             )
 
@@ -198,11 +190,9 @@ class RetryManager:
         if not retry_data:
             return 1.0  # Initial delay
 
-        retry_count_raw = retry_data.get("retry_count", 0)
-        if isinstance(retry_count_raw, int):
-            retry_count = retry_count_raw
-        else:
-            retry_count = 0
+        retry_data_dict = cast("dict[str, Any]", retry_data)
+        retry_count_raw = retry_data_dict.get("retry_count", 0)
+        retry_count = retry_count_raw if isinstance(retry_count_raw, int) else 0
         delay = self.backoff_factor**retry_count
         return min(60.0, delay)  # Cap at 60 seconds
 
@@ -216,7 +206,7 @@ class RetryManager:
 class StateTracker:
     """Track processing state and statistics."""
 
-    def __init__(self, prefix: str = "state_tracker"):
+    def __init__(self, prefix: str = "state_tracker") -> None:
         """Initialize the state tracker with a prefix.
 
         Args:
@@ -237,10 +227,7 @@ class StateTracker:
         key = f"{self.prefix}:counter:{counter_name}"
 
         current_value = await store.get(key, 0)
-        if isinstance(current_value, int):
-            new_value = current_value + amount
-        else:
-            new_value = amount
+        new_value = current_value + amount if isinstance(current_value, int) else amount
 
         await store.put(key, new_value, ttl=timedelta(days=30))
         return new_value
@@ -275,7 +262,7 @@ class StateTracker:
             timing_data["total_time"] += duration
             timing_data["min_time"] = min(timing_data["min_time"], duration)
             timing_data["max_time"] = max(timing_data["max_time"], duration)
-            timing_data["last_updated"] = datetime.now().isoformat()
+            timing_data["last_updated"] = datetime.now(timezone.utc).isoformat()
 
             await store.put(key, timing_data, ttl=timedelta(days=7))
 
@@ -285,14 +272,17 @@ class StateTracker:
         key = f"{self.prefix}:timing:{operation}"
         timing_data = await store.get(key, {})
 
-        if timing_data and timing_data.get("count", 0) > 0:
-            return {
-                "count": timing_data["count"],
-                "avg_time": timing_data["total_time"] / timing_data["count"],
-                "min_time": timing_data["min_time"],
-                "max_time": timing_data["max_time"],
-                "last_updated": timing_data["last_updated"],
-            }
+        if timing_data:
+            timing_data_dict = cast("dict[str, Any]", timing_data)
+            if timing_data_dict.get("count", 0) > 0:
+                return {
+                    "count": timing_data_dict["count"],
+                    "avg_time": timing_data_dict["total_time"]
+                    / timing_data_dict["count"],
+                    "min_time": timing_data_dict["min_time"],
+                    "max_time": timing_data_dict["max_time"],
+                    "last_updated": timing_data_dict["last_updated"],
+                }
 
         return {}
 
@@ -300,7 +290,7 @@ class StateTracker:
         """Save session information."""
         store = await self._get_store()
         key = f"{self.prefix}:session:{session_id}"
-        info["created_at"] = datetime.now().isoformat()
+        info["created_at"] = datetime.now(timezone.utc).isoformat()
         await store.put(key, info, ttl=timedelta(days=1))
 
     async def get_session_info(self, session_id: str) -> dict[str, Any] | None:
@@ -329,10 +319,10 @@ class StateTracker:
         current_state = await store.get(key, {})
         if isinstance(current_state, dict):
             current_state.update(state_updates)
-            current_state["last_updated"] = datetime.now().isoformat()
+            current_state["last_updated"] = datetime.now(timezone.utc).isoformat()
         else:
             current_state = state_updates
-            current_state["last_updated"] = datetime.now().isoformat()
+            current_state["last_updated"] = datetime.now(timezone.utc).isoformat()
 
         await store.put(key, current_state, ttl=timedelta(days=7))
 

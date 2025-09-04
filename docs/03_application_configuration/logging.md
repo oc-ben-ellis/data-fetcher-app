@@ -113,7 +113,7 @@ try:
     # Some operation that might fail
     result = risky_operation()
 except Exception as e:
-    logger.error(
+    logger.exception(
         "Operation failed",
         operation="data_fetch",
         error=str(e),
@@ -149,7 +149,7 @@ logger.warning(
 )
 
 # Error: Problems
-logger.error(
+logger.exception(
     "Failed to connect",
     server="sftp.example.com",
     retry_attempt=2
@@ -257,7 +257,7 @@ logger.info("Download completed", files_downloaded=5)
 try:
     result = operation()
 except Exception as e:
-    logger.error(
+    logger.exception(
         "Operation failed",
         operation="data_fetch",
         error=str(e),

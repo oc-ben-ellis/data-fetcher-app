@@ -29,6 +29,12 @@
 - Update Storage / Building to match agreed upon metadata approach
 - Update Storage / Bundling to match agreed upon S3 structure
 
+## Locators
+
+- Make batch sizes configurable
+- Make batch sizes consistent when multiple locators (i.e. 2 locators should give 10 BundleRefences not 10 BundleReferences each (20))
+- Rename api_generic_bundle_locators to sftp_generic_bundle_locators.py and add Sftp to the class names inside
+
 ## Protocols
 
 - Review SFTP and HTTP protocols to ensure they are re-using/pooling connections correctly and the authentication and rate limiting works when using multiple connections.
@@ -44,6 +50,10 @@
 
 - Discuss retry/reload options for parsers / higher level orchestration in the case of corrupted or bad resources. Perhaps introduce a "command" concept that can be used to modify the persistence using the fetcher (i.e. refresh_bundle command given a company_number or URL to reload, command_processor updates persistence so the bundle will be retried/reloaded on next run)
 
+# ADRs
+
+- Change tests subdirectories to have test_ prefixs as per https://opencorporates.atlassian.net/wiki/spaces/ENGINEERIN/pages/382402565/Platform+ADR+002+003+Baseline+Python+Testing
+
 ## Data Fetcher Application TODOs (from PDF comparison)
 
 ## Downstream Notifications (SQS)
@@ -51,7 +61,7 @@
 - [ ] Define the message schema and ensure it includes necessary metadata (fetcher_id, bundle key(s), count, timestamps)
 - [ ] Wire SQS publisher into bundle close/commit points in storage layer
 - [ ] Add configurable SQS queue URL and message attributes via environment variables
-- [ ] Files: `data_fetcher/fetcher.py`, `data_fetcher/storage/*` (new `notifications/sqs_publisher.py`), `data_fetcher/global_configuration`
+- [ ] Files: `data_fetcher/fetcher.py`, `data_fetcher/storage/*` (new `notifications/sqs_publisher.py`), `data_fetcher/application_configuration`
 
 ## CLI Enhancements
 - [ ] Add `--list-configs` or `list` command to print available configuration IDs

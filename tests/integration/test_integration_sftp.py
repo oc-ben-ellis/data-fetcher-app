@@ -139,7 +139,7 @@ class TestSFTPIntegration:
                 )
 
         # Create SFTP manager
-        sftp_manager = SftpManager(credentials_provider=TestCredentialsProvider())
+        sftp_manager = SftpManager(credentials_provider=TestCredentialsProvider())  # type: ignore[arg-type]
 
         # Test connection
         conn = await sftp_manager.get_connection()
@@ -179,6 +179,11 @@ class TestSFTPIntegration:
         container = sftp_container
         localstack = localstack_container
 
+        # Set AWS credentials for LocalStack
+        os.environ["AWS_ACCESS_KEY_ID"] = "test"
+        os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
+        os.environ["AWS_REGION"] = "us-east-1"
+
         # Configure global services
         storage_config = create_storage_config().s3_storage(
             bucket="test-bucket",
@@ -199,7 +204,7 @@ class TestSFTPIntegration:
                 )
 
         # Create SFTP loader
-        sftp_manager = SftpManager(credentials_provider=TestCredentialsProvider())
+        sftp_manager = SftpManager(credentials_provider=TestCredentialsProvider())  # type: ignore[arg-type]
 
         sftp_loader = SFTPLoader(
             sftp_manager=sftp_manager, remote_dir="/", filename_pattern="*.txt"
@@ -210,7 +215,7 @@ class TestSFTPIntegration:
         storage = get_global_storage()
         ctx = FetchRunContext(run_id="test-single-file")
 
-        bundle_refs = await sftp_loader.load(request, storage, ctx)
+        bundle_refs = await sftp_loader.load(request, storage, ctx)  # type: ignore[arg-type]
 
         print(f"Generated {len(bundle_refs)} bundle refs")
         for i, bundle_ref in enumerate(bundle_refs):
@@ -254,7 +259,7 @@ class TestSFTPIntegration:
                 )
 
         # Create SFTP manager
-        sftp_manager = SftpManager(credentials_provider=TestCredentialsProvider())
+        sftp_manager = SftpManager(credentials_provider=TestCredentialsProvider())  # type: ignore[arg-type]
 
         # Create bundle locators
         dir_locator = GenericDirectoryBundleLocator(
@@ -291,6 +296,11 @@ class TestSFTPIntegration:
         container = sftp_container
         localstack = localstack_container
 
+        # Set AWS credentials for LocalStack
+        os.environ["AWS_ACCESS_KEY_ID"] = "test"
+        os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
+        os.environ["AWS_REGION"] = "us-east-1"
+
         # Configure global services
         storage_config = create_storage_config().s3_storage(
             bucket="test-bucket",
@@ -313,7 +323,7 @@ class TestSFTPIntegration:
                 )
 
         # Create SFTP components
-        sftp_manager = SftpManager(credentials_provider=TestCredentialsProvider())
+        sftp_manager = SftpManager(credentials_provider=TestCredentialsProvider())  # type: ignore[arg-type]
 
         sftp_loader = SFTPLoader(
             sftp_manager=sftp_manager, remote_dir="/", filename_pattern="*.txt"
@@ -379,6 +389,11 @@ class TestSFTPIntegration:
         container = sftp_container
         localstack = localstack_container
 
+        # Set AWS credentials for LocalStack (must be set before storage config)
+        os.environ["AWS_ACCESS_KEY_ID"] = "test"
+        os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
+        os.environ["AWS_REGION"] = "us-east-1"
+
         # Configure global services
         storage_config = create_storage_config().s3_storage(
             bucket="test-bucket",
@@ -391,9 +406,6 @@ class TestSFTPIntegration:
         os.environ[
             "OC_CREDENTIAL_PROVIDER_AWS_ENDPOINT_URL"
         ] = f"http://localhost:{localstack.get_exposed_port(4566)}"
-        os.environ["AWS_REGION"] = "us-east-1"
-        os.environ["AWS_ACCESS_KEY_ID"] = "test"
-        os.environ["AWS_SECRET_ACCESS_KEY"] = "test"
 
         # Create a simple credentials provider for testing (like other tests)
         class TestCredentialsProvider:
@@ -416,7 +428,7 @@ class TestSFTPIntegration:
         print(f"Connecting to {credentials.host}:{credentials.port}")
 
         # Create SFTP manager
-        sftp_manager = SftpManager(credentials_provider=sftp_creds)
+        sftp_manager = SftpManager(credentials_provider=sftp_creds)  # type: ignore[arg-type]
 
         # Test connection
         conn = await sftp_manager.get_connection()

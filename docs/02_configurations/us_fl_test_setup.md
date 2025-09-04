@@ -322,6 +322,6 @@ For production use, replace the test components with:
 After successful local testing:
 
 1. **Review the [SFTP Configuration Guide](sftp.md)** for production setup
-2. **Check the [Application Configuration](03_global_configuration/) documentation** for advanced settings
+2. **Check the [Application Configuration](03_application_configuration/) documentation** for advanced settings
 3. **Explore the [Deployment Guide](../07_deployment/)** for production deployment
 4. **Run the functional tests** to verify everything works: `make test ARGS=tests/functional/test_functional_us_fl.py`

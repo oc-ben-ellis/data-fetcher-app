@@ -6,8 +6,8 @@ from .environment import EnvironmentCredentialProvider
 from .sftp_credentials import SftpCredentials, SftpCredentialsWrapper
 
 __all__ = [
-    "CredentialProvider",
     "AWSSecretsCredentialProvider",
+    "CredentialProvider",
     "EnvironmentCredentialProvider",
     "SftpCredentials",
     "SftpCredentialsWrapper",

@@ -4,14 +4,38 @@ This module provides the S3Storage class for storing data to AWS S3,
 including bucket management, object operations, and S3-specific features.
 """
 
+import hashlib
+import json
 import os
 import tempfile
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
+from urllib.parse import urlparse
 
-from ..core import BundleRef
+import boto3
+import structlog
+from boto3.s3.transfer import S3Transfer
+from botocore.config import Config
+
+if TYPE_CHECKING:
+    from data_fetcher.core import BundleRef
+
+# Get logger for this module
+logger = structlog.get_logger(__name__)
+
+
+class MissingAWSCredentialsError(ValueError):
+    """Raised when AWS credentials are required but not provided."""
+
+    def __init__(self) -> None:
+        """Initialize the error with a descriptive message."""
+        super().__init__(
+            "AWS credentials are required when using a custom endpoint. "
+            "Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables."
+        )
 
 
 @dataclass
@@ -29,30 +53,31 @@ class S3Storage:
         if self.region is None:
             self.region = os.getenv("AWS_REGION", "eu-west-2")
 
-        try:
-            import boto3
+        # Declare the attribute once to avoid mypy no-redef complaints
+        self.s3_client: Any = None
 
-            # Declare the attribute once to avoid mypy no-redef complaints
-            self.s3_client: Any
+        # Create S3 client with optional custom endpoint
+        if self.endpoint_url:
+            # For LocalStack, we need to set these credentials
+            aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
+            aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
 
-            # Create S3 client with optional custom endpoint
-            if self.endpoint_url:
-                # For LocalStack, we need to set these credentials
-                self.s3_client = boto3.client(
-                    "s3",
-                    region_name=self.region,
-                    endpoint_url=self.endpoint_url,
-                    aws_access_key_id="test",
-                    aws_secret_access_key="test",
-                )
-            else:
-                self.s3_client = boto3.client("s3", region_name=self.region)
-        except ImportError as err:
-            raise ImportError("boto3 is required for S3 storage") from err
+            if not aws_access_key_id or not aws_secret_access_key:
+                raise MissingAWSCredentialsError
+
+            self.s3_client = boto3.client(
+                "s3",
+                region_name=self.region,
+                endpoint_url=self.endpoint_url,
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+            )
+        else:
+            self.s3_client = boto3.client("s3", region_name=self.region)
 
     @asynccontextmanager
     async def open_bundle(
-        self, bundle_ref: BundleRef
+        self, bundle_ref: "BundleRef"
     ) -> AsyncGenerator["S3Bundle", None]:
         """Open a bundle for writing to S3."""
         bundle = S3Bundle(self.s3_client, self.bucket_name, self.prefix, bundle_ref)
@@ -66,7 +91,7 @@ class S3Bundle:
     """S3 bundle for writing resources to S3."""
 
     def __init__(
-        self, s3_client: Any, bucket_name: str, prefix: str, bundle_ref: BundleRef
+        self, s3_client: object, bucket_name: str, prefix: str, bundle_ref: "BundleRef"
     ) -> None:
         """Initialize the S3 bundle with S3 client, bucket, and bundle reference.
 
@@ -90,9 +115,6 @@ class S3Bundle:
         stream: AsyncGenerator[bytes, None],
     ) -> None:
         """Write a resource to S3 using S3 Transfer Manager for streaming."""
-        import boto3
-        from botocore.config import Config
-
         key = self._create_s3_key(url)
 
         # Create transfer manager with streaming config
@@ -106,11 +128,17 @@ class S3Bundle:
         # but apply transfer-related config via a new session client using the same parameters
         # to ensure connection pooling settings are respected.
         # If the existing client has a custom endpoint, we must carry that forward.
-        transfer_s3_client: Any
         try:
             # botocore exposes _endpoint.host and meta.region_name
-            endpoint_url = self.s3_client._endpoint.host
-        except Exception:
+            # Accessing private member for endpoint URL extraction
+            endpoint_url = cast(  # noqa: SLF001  # SLF001: Accessing private member for endpoint URL extraction
+                "Any", self.s3_client
+            )._endpoint.host  # SLF001: Accessing private member for endpoint URL extraction
+        except Exception as e:
+            logger.exception(
+                "Could not extract endpoint URL from S3 client",
+                error=str(e),
+            )
             endpoint_url = None
 
         region_name = getattr(
@@ -118,21 +146,22 @@ class S3Bundle:
         )
 
         session = boto3.session.Session()
+
+        # Get AWS credentials - require them when using custom endpoint
+        aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
+        aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+
+        if endpoint_url and (not aws_access_key_id or not aws_secret_access_key):
+            raise MissingAWSCredentialsError
+
         transfer_s3_client = session.client(
             "s3",
             region_name=region_name,
             endpoint_url=endpoint_url,
-            aws_access_key_id=os.getenv(
-                "AWS_ACCESS_KEY_ID", "test" if endpoint_url else None
-            ),
-            aws_secret_access_key=os.getenv(
-                "AWS_SECRET_ACCESS_KEY", "test" if endpoint_url else None
-            ),
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
             config=transfer_config,
         )
-        # Use the correct import path for S3Transfer
-        from boto3.s3.transfer import S3Transfer
-
         # Create transfer manager
         transfer = S3Transfer(transfer_s3_client)
 
@@ -163,28 +192,23 @@ class S3Bundle:
 
             finally:
                 # Clean up temporary file
-                try:
-                    os.unlink(temp_file.name)
-                except OSError:
-                    pass
+                with suppress(OSError):
+                    Path(temp_file.name).unlink()
 
     def _create_s3_key(self, url: str) -> str:
         """Create an S3 key from a URL."""
-        import hashlib
-        from urllib.parse import urlparse
-
         # Parse URL
         parsed = urlparse(url)
 
         # Create a hash of the URL for uniqueness
-        url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+        url_hash = hashlib.sha256(url.encode()).hexdigest()[:8]
 
         # Create key with prefix
         key = f"{self.prefix}/resources/{url_hash}"
 
         # Add file extension based on content type
         if parsed.path:
-            _, ext = os.path.splitext(parsed.path)
+            ext = Path(parsed.path).suffix
             if ext:
                 key += ext
 
@@ -202,9 +226,7 @@ class S3Bundle:
             "uploaded_keys": self.uploaded_keys,
         }
 
-        import json
-
-        self.s3_client.put_object(
+        self.s3_client.put_object(  # type: ignore[attr-defined]
             Bucket=self.bucket_name,
             Key=bundle_key,
             Body=json.dumps(metadata, indent=2),

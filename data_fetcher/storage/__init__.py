@@ -13,9 +13,9 @@ from .lineage_storage import LineageStorage
 from .s3_storage import S3Storage
 
 __all__ = [
-    "FileStorage",
-    "S3Storage",
-    "LineageStorage",
     "BundleResourcesDecorator",
+    "FileStorage",
+    "LineageStorage",
+    "S3Storage",
     "UnzipResourceDecorator",
 ]

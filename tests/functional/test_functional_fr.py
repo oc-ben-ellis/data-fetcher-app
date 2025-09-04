@@ -6,10 +6,12 @@ as basic unit tests for core functionality and error handling.
 """
 
 import asyncio
+import datetime
 import json
 import os
 import time
 from collections.abc import AsyncGenerator, Generator
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -51,14 +53,14 @@ def setup_early_s3() -> Generator[None, None, None]:
 def siren_api_container() -> Generator[DockerContainer, None, None]:
     """Start a mock SIREN API server container for testing."""
     try:
-        # Use the organized mock from tests/mocks/siren-api/
-        mock_path = Path(__file__).parent.parent / "mocks" / "siren-api"
+        # Use the organized mock from tests/mocks/siren_api/
+        mock_path = Path(__file__).parent.parent / "mocks" / "siren_api"
 
         if not mock_path.exists():
             pytest.fail(f"SIREN API mock not found at {mock_path}")
 
         print("Starting SIREN API mock container...")
-        container = DockerContainer("siren-api-mock")
+        container = DockerContainer("siren_api_mock")
         container.with_exposed_ports(5000)
         container.start()
         print("SIREN API mock container started!")
@@ -359,12 +361,11 @@ class TestFrenchFunctional:
         async def mock_get_credential(config_name: str, field: str) -> str:
             if field == "client_id":
                 return "test_client_id"
-            elif field == "client_secret":
+            if field == "client_secret":
                 return "test_client_secret"
-            elif field == "token_url":
+            if field == "token_url":
                 return "https://api.insee.fr/token"
-            else:
-                raise ValueError(f"Unknown field: {field}")
+            raise ValueError(f"Unknown field: {field}")
 
         mock_credential_provider.get_credential = mock_get_credential
 
@@ -395,7 +396,7 @@ class TestFrenchFunctional:
             )
 
             # Check loader configuration
-            assert fetch_context.bundle_loader.meta_load_name == "fr_sirene_api_loader"
+            assert fetch_context.bundle_loader.meta_load_name == "fr_sirene_api_loader"  # type: ignore[attr-defined]
 
     def test_fr_configuration_imports(self) -> None:
         """Test that the FR configuration can be imported and basic functions work."""
@@ -418,11 +419,11 @@ class TestFrenchFunctional:
 
     def test_fr_date_range_calculation(self) -> None:
         """Test that the date range calculation in FR configuration is reasonable."""
-        from datetime import date, timedelta
+        from datetime import timedelta
 
         # This test verifies that the date range logic is working
         # The actual calculation happens in _setup_fr_api_fetcher
-        end_date = date.today()
+        end_date = datetime.datetime.now(tz=datetime.timezone.utc).date()
         start_date = end_date - timedelta(days=5)
 
         # Verify the date range is reasonable
@@ -606,9 +607,7 @@ class TestFrenchFunctional:
         print("FR configuration imported")
 
         # Get the real FR configuration with mock URLs and short date range for testing
-        from datetime import date, timedelta
-
-        test_end_date = date.today()
+        test_end_date = datetime.datetime.now(tz=datetime.timezone.utc).date()
         test_start_date = test_end_date - timedelta(days=2)  # Just 2 days for testing
 
         fetch_context = _setup_fr_api_fetcher(
@@ -771,7 +770,7 @@ class TestFrenchFunctional:
         test_request = RequestMeta(url=test_url)
 
         try:
-            bundle_refs = await fetch_context.bundle_loader.load(
+            bundle_refs = await fetch_context.bundle_loader.load(  # type: ignore[attr-defined]
                 test_request,
                 get_global_storage(),
                 FetchRunContext(run_id="test-direct"),
@@ -958,12 +957,11 @@ class TestFrenchFunctional:
         async def mock_get_credential(config_name: str, field: str) -> str:
             if field == "client_id":
                 return "test_client_id"
-            elif field == "client_secret":
+            if field == "client_secret":
                 return "test_client_secret"
-            elif field == "token_url":
+            if field == "token_url":
                 return f"http://localhost:{api_port}/token"
-            else:
-                raise ValueError(f"Unknown field: {field}")
+            raise ValueError(f"Unknown field: {field}")
 
         mock_credential_provider.get_credential = mock_get_credential
 
@@ -999,7 +997,7 @@ class TestFrenchFunctional:
             # Check loader configuration
             loader = fetch_context.bundle_loader
             assert loader is not None
-            assert loader.meta_load_name == "fr_sirene_api_loader"
+            assert loader.meta_load_name == "fr_sirene_api_loader"  # type: ignore[attr-defined]
 
             # Run a quick test to verify the configuration works
             from data_fetcher.core import FetchPlan

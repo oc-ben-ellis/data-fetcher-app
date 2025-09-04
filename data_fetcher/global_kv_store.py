@@ -28,7 +28,7 @@ def _get_env_int(key: str, default: int) -> int:
         return default
 
 
-def configure_global_kv_store() -> None:
+def configure_application_kv_store() -> None:
     """Configure the application key-value store with environment variables and sensible defaults."""
     # Get store type
     store_type = os.getenv("OC_KV_STORE_TYPE", "memory").lower()
@@ -72,14 +72,13 @@ def configure_global_kv_store() -> None:
     configure_global_store(store_type, **config)
 
 
-# Configure global key-value store when this module is imported
-configure_global_kv_store()
+# Configure application key-value store when this module is imported
+configure_application_kv_store()
 
 
-def configure_application_kv_store() -> None:
-    """Alias: Configure application key-value store.
+def configure_global_kv_store() -> None:
+    """Alias: Configure global key-value store.
 
-    This is an alias for ``configure_global_kv_store`` to emphasize that this
-    configuration is application-wide rather than per-fetcher.
+    This is an alias for ``configure_application_kv_store`` to maintain backward compatibility.
     """
-    configure_global_kv_store()
+    configure_application_kv_store()

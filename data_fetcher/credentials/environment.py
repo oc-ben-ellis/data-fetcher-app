@@ -12,7 +12,7 @@ from .base import CredentialProvider
 class EnvironmentCredentialProvider(CredentialProvider):
     """Credential provider that fetches credentials from environment variables."""
 
-    def __init__(self, prefix: str = ""):
+    def __init__(self, prefix: str = "") -> None:
         """Initialize the environment credential provider.
 
         Args:

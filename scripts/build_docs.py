@@ -19,12 +19,7 @@ Documentation builder for OC Fetcher.
 Converts README.md and docs/*.md files to HTML with modern styling.
 """
 
-try:
-    from cairosvg import svg2png  # type: ignore[import-untyped]
-
-    CAIRO_AVAILABLE = True
-except ImportError:
-    CAIRO_AVAILABLE = False
+from cairosvg import svg2png  # type: ignore[import-untyped]
 
 
 class DocBuilder:
@@ -100,10 +95,6 @@ class DocBuilder:
         self, svg_path: Path, png_path: Path, dpi: int = 300
     ) -> bool:
         """Convert SVG file to PNG."""
-        if not CAIRO_AVAILABLE:
-            print(f"Warning: CairoSVG not available, skipping conversion of {svg_path}")
-            return False
-
         try:
             with open(svg_path, "rb") as svg_file:
                 svg2png(
@@ -112,10 +103,8 @@ class DocBuilder:
                     dpi=dpi,
                     background_color="transparent",
                 )
-            print(f"✓ Converted {svg_path} to {png_path}")
             return True
-        except Exception as e:
-            print(f"Error converting {svg_path} to PNG: {e}")
+        except Exception:
             return False
 
     def process_svg_assets(self) -> None:
@@ -129,9 +118,9 @@ class DocBuilder:
 
             # Convert SVG to PNG
             if self.convert_svg_to_png(svg_file, png_file):
-                print(f"Generated PNG: {png_file}")
+                pass
             else:
-                print(f"Failed to convert: {svg_file}")
+                pass
 
     def get_markdown_files(self) -> list[Path]:
         """Get all markdown files to process."""
@@ -178,9 +167,7 @@ class DocBuilder:
         html_content = self.md.convert(content)
 
         # Fix internal links
-        html_content = self.fix_internal_links(html_content, file_path)
-
-        return html_content
+        return self.fix_internal_links(html_content, file_path)
 
     def filter_rendered_docs_section(self, content: str) -> str:
         """Filter out the 'View Rendered Documentation' section from README.md."""
@@ -265,9 +252,7 @@ class DocBuilder:
             return f'src="{src}"'
 
         # Fix image paths
-        html_content = re.sub(img_pattern, replace_img, html_content)
-
-        return html_content
+        return re.sub(img_pattern, replace_img, html_content)
 
     def create_navigation(self, files: list[Path]) -> list[dict[str, Any]]:
         """Create navigation structure."""
@@ -953,26 +938,22 @@ img {
     def create_pygments_css(self) -> None:
         """Create Pygments CSS for syntax highlighting."""
         formatter = HtmlFormatter(style="monokai")
-        css_content = formatter.get_style_defs(".highlight")
+        css_content = formatter.get_style_defs(".highlight")  # type: ignore[no-untyped-call]
 
         css_file = self.output_dir / "assets" / "pygments.css"
         css_file.write_text(css_content, encoding="utf-8")
 
     def build(self) -> None:
         """Build the documentation."""
-        print("Building documentation...")
-
         # Setup directories
         self.setup_directories()
 
         # Process SVG assets and convert to PNG
-        print("Processing SVG assets...")
         self.process_svg_assets()
 
         # Get markdown files
         files = self.get_markdown_files()
         if not files:
-            print("No markdown files found!")
             return
 
         # Create navigation
@@ -987,8 +968,6 @@ img {
 
         # Process each file
         for file_path in files:
-            print(f"Processing {file_path}...")
-
             # Read content
             content = file_path.read_text(encoding="utf-8")
 
@@ -1002,18 +981,17 @@ img {
             if file_path.name == "README.md" and file_path.parent == self.source_dir:
                 output_file = self.output_dir / "index.html"
                 current_page = "index.html"
+            # Handle subdirectories
+            elif file_path.parent != self.source_dir / "docs":
+                # Subdirectory file
+                section_dir = self.output_dir / file_path.parent.name
+                section_dir.mkdir(exist_ok=True)
+                output_file = section_dir / f"{file_path.stem}.html"
+                current_page = f"{file_path.parent.name}/{file_path.stem}.html"
             else:
-                # Handle subdirectories
-                if file_path.parent != self.source_dir / "docs":
-                    # Subdirectory file
-                    section_dir = self.output_dir / file_path.parent.name
-                    section_dir.mkdir(exist_ok=True)
-                    output_file = section_dir / f"{file_path.stem}.html"
-                    current_page = f"{file_path.parent.name}/{file_path.stem}.html"
-                else:
-                    # Main docs file
-                    output_file = self.output_dir / f"{file_path.stem}.html"
-                    current_page = f"{file_path.stem}.html"
+                # Main docs file
+                output_file = self.output_dir / f"{file_path.stem}.html"
+                current_page = f"{file_path.stem}.html"
 
             # Determine asset path prefix based on file location
             # Only subdirectory files need the ../ prefix
@@ -1060,12 +1038,6 @@ img {
 
             # Write file
             output_file.write_text(html_output, encoding="utf-8")
-
-        print(f"Documentation built successfully in {self.output_dir}")
-        print(
-            f"Open {self.output_dir}/index.html in your browser to view the documentation."
-        )
-        print("Or open docs/index.html to be redirected to the correct location.")
 
 
 def main() -> None:

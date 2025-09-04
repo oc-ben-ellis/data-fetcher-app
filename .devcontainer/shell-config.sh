@@ -29,6 +29,28 @@ export POETRY_VENV_IN_PROJECT=1
 export EDITOR=code
 export VISUAL=code
 
+# GPG convenience alias - bypass agent detection for manual runs
+alias configure-gpg='CURSOR_AGENT="" source /workspaces/data-fetcher-sftp/.devcontainer/configure-gpg-interactive.sh'
+
+# CRITICAL: Set up Poetry virtual environment PATH first for proper shell prompt
+# This ensures tools like pre-commit are available immediately
+if command -v poetry >/dev/null 2>&1; then
+    POETRY_VENV_PATH=$(poetry env info --path 2>/dev/null || echo "")
+    if [[ -n "$POETRY_VENV_PATH" && -d "$POETRY_VENV_PATH/bin" ]]; then
+        export PATH="$POETRY_VENV_PATH/bin:$PATH"
+    fi
+fi
+
+# CRITICAL: Configure GPG early to avoid prompt issues
+export GPG_TTY=$(tty)
+if [[ -z "${GPG_CONFIGURED:-}" ]] && [[ -z "$CURSOR_AGENT" ]]; then
+  # Run the GPG configuration script (not source to avoid shell closure issues)
+  if [[ -f "/workspaces/data-fetcher-sftp/.devcontainer/configure-gpg-interactive.sh" ]]; then
+    bash /workspaces/data-fetcher-sftp/.devcontainer/configure-gpg-interactive.sh
+    export GPG_CONFIGURED=1
+  fi
+fi
+
 # Set a clean prompt for Agent sessions
 if [[ -n "$CURSOR_AGENT" ]]; then
   # For bash, set a simple prompt

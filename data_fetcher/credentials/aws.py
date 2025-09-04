@@ -7,13 +7,18 @@ credentials from AWS Secrets Manager, including SFTP and API credentials.
 import json
 import os
 
+import boto3
+from botocore.exceptions import ClientError
+
 from .base import CredentialProvider
 
 
 class AWSSecretsCredentialProvider(CredentialProvider):
     """Default credential provider that fetches credentials from AWS Secrets Manager."""
 
-    def __init__(self, region: str | None = None, endpoint_url: str | None = None):
+    def __init__(
+        self, region: str | None = None, endpoint_url: str | None = None
+    ) -> None:
         """Initialize the AWS Secrets credential provider.
 
         Args:
@@ -33,14 +38,6 @@ class AWSSecretsCredentialProvider(CredentialProvider):
         The secret name is expected to be in the format: {config_name}-sftp-credentials
         The secret should contain keys like: username, password, host
         """
-        try:
-            import boto3
-            from botocore.exceptions import ClientError
-        except ImportError as err:
-            raise ImportError(
-                "boto3 is required for AWS Secrets Manager credential provider"
-            ) from err
-
         # Create secret name
         secret_name = f"{config_name}-sftp-credentials"
 
@@ -56,6 +53,18 @@ class AWSSecretsCredentialProvider(CredentialProvider):
             client_kwargs["endpoint_url"] = self.endpoint_url
         client = session.client(**client_kwargs)  # type: ignore[call-overload]
 
+        def _raise_key_not_found() -> None:
+            """Raise error when key is not found in secret."""
+            raise ValueError(  # noqa: TRY003
+                f"Key '{config_key}' not found in secret '{secret_name}'"
+            )
+
+        def _raise_invalid_type() -> None:
+            """Raise error when credential value is not a string."""
+            raise TypeError(  # noqa: TRY003
+                f"Credential value for key '{config_key}' is not a string: {type(credential_value)}"
+            )
+
         try:
             # Get secret value
             response = client.get_secret_value(SecretId=secret_name)
@@ -65,39 +74,36 @@ class AWSSecretsCredentialProvider(CredentialProvider):
 
             # Get the specific key
             if config_key not in secret_data:
-                raise ValueError(
-                    f"Key '{config_key}' not found in secret '{secret_name}'"
-                )
+                _raise_key_not_found()
 
             credential_value = secret_data[config_key]
 
             # Ensure the value is a string
             if not isinstance(credential_value, str):
-                raise ValueError(
-                    f"Credential value for key '{config_key}' is not a string: {type(credential_value)}"
-                )
+                _raise_invalid_type()
 
             # Cache the result
             self._secrets_cache[cache_key] = credential_value
 
-            return credential_value
+            return credential_value  # type: ignore[no-any-return]  # noqa: TRY300
 
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             if error_code == "ResourceNotFoundException":
-                raise ValueError(
-                    f"Secret '{secret_name}' not found in AWS Secrets Manager"
+                raise ValueError(  # noqa: TRY003
+                    f"Secret '{secret_name}' not found"
                 ) from e
-            elif error_code == "AccessDeniedException":
-                raise ValueError(
-                    f"Access denied to secret '{secret_name}' in AWS Secrets Manager"
+            if error_code == "AccessDeniedException":
+                raise ValueError(  # noqa: TRY003
+                    f"Access denied to secret '{secret_name}'"
                 ) from e
-            else:
-                raise ValueError(f"Error accessing AWS Secrets Manager: {e}") from e
+            raise ValueError(f"AWS Secrets Manager error: {e}") from e  # noqa: TRY003
         except json.JSONDecodeError as e:
-            raise ValueError(f"Secret '{secret_name}' is not valid JSON") from e
+            raise ValueError(  # noqa: TRY003
+                f"Secret '{secret_name}' not valid JSON"
+            ) from e
         except Exception as e:
-            raise ValueError(
+            raise ValueError(  # noqa: TRY003
                 f"Unexpected error accessing secret '{secret_name}': {e}"
             ) from e
 

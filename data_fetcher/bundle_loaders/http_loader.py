@@ -1,15 +1,22 @@
 """HTTP data loader implementation."""
 
-__author__ = "Ben Ellis <ben.ellis@opencorporates.com>"
-__copyright__ = "Copyright (c) 2024 OpenCorporates Ltd"
-
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Union, cast
 
 import structlog
 
-from ..core import BundleRef, FetchRunContext, RequestMeta
-from ..protocols import HttpManager
+from data_fetcher.core import BundleRef, FetchRunContext, RequestMeta
+from data_fetcher.protocols import HttpManager
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from data_fetcher.storage.file_storage import FileStorage
+    from data_fetcher.storage.lineage_storage import LineageStorage
+    from data_fetcher.storage.s3_storage import S3Storage
+
+# Type alias for storage classes
+Storage = Union["FileStorage", "S3Storage", "LineageStorage"]
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -25,7 +32,10 @@ class HttpxStreamingLoader:
     max_redirects: int = 5
 
     async def load(
-        self, request: RequestMeta, storage: Any, ctx: FetchRunContext
+        self,
+        request: RequestMeta,
+        storage: Storage | None,
+        ctx: FetchRunContext,  # noqa: ARG002
     ) -> list[BundleRef]:
         """Load data from HTTP endpoint with streaming support.
 
@@ -65,7 +75,9 @@ class HttpxStreamingLoader:
                         url=request.url,
                         content_type=response.headers.get("content-type"),
                         status_code=response.status_code,
-                        stream=response.aiter_bytes(),
+                        stream=cast(
+                            "AsyncGenerator[bytes, None]", response.aiter_bytes()
+                        ),
                     )
 
                     # Handle related resources (e.g., CSS, JS, images)
@@ -84,28 +96,28 @@ class HttpxStreamingLoader:
                                         "content-type"
                                     ),
                                     status_code=related_response.status_code,
-                                    stream=related_response.aiter_bytes(),
+                                    stream=cast(
+                                        "AsyncGenerator[bytes, None]",
+                                        related_response.aiter_bytes(),
+                                    ),
                                 )
                                 bundle_ref.resources_count += 1
-                            except Exception as e:
+                            except Exception as e:  # noqa: BLE001
                                 logger.warning(
                                     "Error fetching related resource",
                                     related_url=related_url,
                                     error=str(e),
                                 )
 
-            return [bundle_ref]
-
         except Exception as e:
-            logger.error(
-                "Error loading HTTP request",
-                url=request.url,
-                error=str(e),
-                exc_info=True,
+            logger.exception(
+                "Error loading HTTP request", url=request.url, error=str(e)
             )
             return []
+        else:
+            return [bundle_ref]
 
-    def _extract_related_urls(self, response: Any) -> list[str]:
+    def _extract_related_urls(self, response: object) -> list[str]:  # noqa: ARG002
         """Extract related URLs from HTML content."""
         # This is a simplified implementation
         # In a real implementation, you would parse HTML and extract links

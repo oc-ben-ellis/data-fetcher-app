@@ -7,8 +7,7 @@ including the base FetcherContextBuilder and configuration creation utilities.
 from dataclasses import dataclass, field
 from typing import Any
 
-__author__ = "Ben Ellis <ben.ellis@opencorporates.com>"
-__copyright__ = "Copyright (c) 2024 OpenCorporates Ltd"
+from .storage.builder import get_global_storage
 
 Url = str
 
@@ -67,8 +66,8 @@ class FetchContext:
     """Context for the entire fetch operation."""
 
     bundle_locators: list[Any] = field(default_factory=list)
-    bundle_loader: Any | None = None
-    storage: Any | None = None
+    bundle_loader: object | None = None
+    storage: object | None = None
 
 
 class FetcherContextBuilder:
@@ -76,16 +75,18 @@ class FetcherContextBuilder:
 
     def __init__(self) -> None:
         """Initialize the fetcher context builder."""
-        self._bundle_loader: Any = None
+        self._bundle_loader: object = None
         self._bundle_locators: list[Any] = []
 
-    def use_bundle_loader(self, bundle_loader_instance: Any) -> "FetcherContextBuilder":
+    def use_bundle_loader(
+        self, bundle_loader_instance: object
+    ) -> "FetcherContextBuilder":
         """Set the loader instance."""
         self._bundle_loader = bundle_loader_instance
         return self
 
     def add_bundle_locator(
-        self, bundle_locator_instance: Any
+        self, bundle_locator_instance: object
     ) -> "FetcherContextBuilder":
         """Add a bundle locator instance."""
         self._bundle_locators.append(bundle_locator_instance)
@@ -93,10 +94,8 @@ class FetcherContextBuilder:
 
     def build(self) -> FetchContext:
         """Build the fetcher configuration."""
-        from .storage.builder import get_global_storage
-
         if not self._bundle_loader:
-            raise ValueError("Bundle loader is required")
+            raise ValueError("Bundle loader required")  # noqa: TRY003
 
         # Get global storage
         storage = get_global_storage()

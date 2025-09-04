@@ -17,7 +17,7 @@ The framework supports multiple credential providers that can be configured via 
 - **AWS Secrets Manager** (default) - For production environments
 - **Environment Variables** - For development, testing, and containerized deployments
 
-See the [overview.md](overview.md) for quick start examples and [../03_global_configuration/detailed_configuration.md](../03_global_configuration/detailed_configuration.md) for complete configuration details.
+See the [overview.md](overview.md) for quick start examples and [../03_application_configuration/detailed_configuration.md](../03_application_configuration/detailed_configuration.md) for complete configuration details.
 
 ## Files
 

@@ -21,6 +21,9 @@
             "installPuppeteer": true
         }
     },
+    "mounts": [
+        "source=${localEnv:HOME}/.gnupg,target=/home/vscode/.gnupg,type=bind,consistency=cached"
+    ],
     "customizations": {
         "vscode": {
             "extensions": [
@@ -73,14 +76,15 @@
         }
     },
     "remoteUser": "vscode",
-    "postCreateCommand": "poetry install",
     "remoteEnv": {
         "PAGER": "cat",
         "AWS_PAGER": "",
         "GIT_PAGER": "cat",
         "LESS": "",
         "MORE": "",
-        "MANPAGER": "cat"
+        "MANPAGER": "cat",
+        "GPG_TTY": "/dev/pty0"
     },
-    "postStartCommand": "mkdir -p ~/.aws && cp .devcontainer/shell-config.sh ~/ && cp .devcontainer/zsh-config.sh ~/ && cp .devcontainer/aws-config ~/.aws/config && cp .devcontainer/git-config ~/.gitconfig && echo 'source ~/shell-config.sh' >> ~/.bashrc && echo 'source ~/zsh-config.sh' >> ~/.zshrc"
+    // "postCreateCommand": "mkdir -p ~/.aws && cp .devcontainer/shell-config.sh ~/ && cp .devcontainer/zsh-config.sh ~/ && cp .devcontainer/aws-config ~/.aws/config && cp .devcontainer/git-config ~/.gitconfig && echo 'source ~/shell-config.sh' >> ~/.bashrc && echo 'source ~/zsh-config.sh' >> ~/.zshrc || true && poetry install && poetry run pre-commit install && poetry run pre-commit install-hooks",
+    "postStartCommand": "mkdir -p ~/.aws && cp .devcontainer/shell-config.sh ~/ && cp .devcontainer/zsh-config.sh ~/ && cp .devcontainer/aws-config ~/.aws/config && cp .devcontainer/git-config ~/.gitconfig && echo 'source ~/shell-config.sh' >> ~/.bashrc && echo 'source ~/zsh-config.sh' >> ~/.zshrc || true && poetry install && poetry run pre-commit install && poetry run pre-commit install-hooks"
 }
