@@ -1,34 +1,58 @@
 {
     "name": "OC Fetcher",
-    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
     "features": {
-        "ghcr.io/devcontainers/features/git:1": {},
-        "ghcr.io/devcontainers/features/github-cli:1": {},
-        "ghcr.io/devcontainers/features/docker-in-docker:2": {
+        "ghcr.io/devcontainers/features/python:1": {
+            "version": "3.13"
+        },
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "22.18.0"
+        },
+        "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
             "version": "latest",
             "dockerDashComposeVersion": "v2"
         },
         "ghcr.io/devcontainers/features/aws-cli:1": {},
-        "ghcr.io/devcontainers/features/node:1": {
-            "version": "22.18.0"
-        },
-        "ghcr.io/devcontainers/features/python:1": {
-            "version": "3.10"
-        },
-        "./features/oc-fetcher-setup": {
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "./features/poetry": {
             "installPoetry": true,
-            "installMermaid": true,
-            "installPuppeteer": true
+            "installPreCommit": true
+        },
+        "./features/git-ssh": {
+            "enableGpgSigning": true,
+            "enableSshAgent": true,
+            "configureShell": true
+        },
+        "./features/cursor-safe": {
+            "enableAliases": true,
+            "setEditor": true
         }
     },
+    "overrideFeatureInstallOrder": [
+        "ghcr.io/devcontainers/features/python",
+        "ghcr.io/devcontainers/features/node",
+        "ghcr.io/devcontainers/features/docker-outside-of-docker",
+        "ghcr.io/devcontainers/features/aws-cli",
+        "ghcr.io/devcontainers/features/git",
+        "ghcr.io/devcontainers/features/github-cli",
+        "./features/poetry",
+        "./features/git-ssh",
+        "./features/cursor-safe"
+    ],
     "mounts": [
-        "source=${localEnv:HOME}/.gnupg,target=/home/vscode/.gnupg,type=bind,consistency=cached"
+        "source=${localEnv:HOME}/.gnupg,target=/home/vscode/.gnupg,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+        "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached",
+        "source=data-fetcher-poetry-cache,target=/home/vscode/.cache/pypoetry,type=volume",
+        "source=data-fetcher-pip-cache,target=/home/vscode/.cache/pip,type=volume",
+        "source=data-fetcher-precommit-cache,target=/home/vscode/.cache/pre-commit,type=volume"
     ],
     "customizations": {
         "vscode": {
             "extensions": [
                 "ms-python.python",
-                "ms-python.black-formatter",
                 "charliermarsh.ruff",
                 "ms-python.mypy-type-checker",
                 "ms-python.pylint",
@@ -75,16 +99,13 @@
             }
         }
     },
-    "remoteUser": "vscode",
-    "remoteEnv": {
-        "PAGER": "cat",
-        "AWS_PAGER": "",
-        "GIT_PAGER": "cat",
-        "LESS": "",
-        "MORE": "",
-        "MANPAGER": "cat",
-        "GPG_TTY": "/dev/pty0"
-    },
-    // "postCreateCommand": "mkdir -p ~/.aws && cp .devcontainer/shell-config.sh ~/ && cp .devcontainer/zsh-config.sh ~/ && cp .devcontainer/aws-config ~/.aws/config && cp .devcontainer/git-config ~/.gitconfig && echo 'source ~/shell-config.sh' >> ~/.bashrc && echo 'source ~/zsh-config.sh' >> ~/.zshrc || true && poetry install && poetry run pre-commit install && poetry run pre-commit install-hooks",
-    "postStartCommand": "mkdir -p ~/.aws && cp .devcontainer/shell-config.sh ~/ && cp .devcontainer/zsh-config.sh ~/ && cp .devcontainer/aws-config ~/.aws/config && cp .devcontainer/git-config ~/.gitconfig && echo 'source ~/shell-config.sh' >> ~/.bashrc && echo 'source ~/zsh-config.sh' >> ~/.zshrc || true && poetry install && poetry run pre-commit install && poetry run pre-commit install-hooks"
+    "postCreateCommand": "\
+                          sudo chown -R vscode:vscode /home/vscode/.cache/ && \
+                          poetry env use python3.13 && \
+                          echo \"export PATH=\\\"$PATH:$(poetry env info --path)/bin\\\"\" >> ~/.bashrc && \
+                          echo \"export PATH=\\\"$PATH:$(poetry env info --path)/bin\\\"\" >> ~/.zshrc && \
+                          export PATH=\"$PATH:$(poetry env info --path)/bin\" && \
+                          poetry install && \
+                          pre-commit install --install-hooks",
+    "remoteUser": "vscode"
 }

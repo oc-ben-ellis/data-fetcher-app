@@ -23,7 +23,7 @@ graph TD
 
     subgraph "Storage Layer"
         FileStorage[File Storage]
-        S3Storage[S3 Storage]
+        PipelineStorage[Pipeline Storage]
         Decorators[Storage Decorators]
     end
 
@@ -42,7 +42,7 @@ graph TD
     Context --> HttpLoader
     Context --> SftpLoader
     Context --> FileStorage
-    Context --> S3Storage
+    Context --> PipelineStorage
 
     %% Protocol relationships
     HttpLoader --> HttpManager
@@ -50,7 +50,7 @@ graph TD
 
     %% Storage relationships
     FileStorage --> Decorators
-    S3Storage --> Decorators
+    PipelineStorage --> Decorators
 
     %% Supporting relationships
     Fetcher --> KVStore

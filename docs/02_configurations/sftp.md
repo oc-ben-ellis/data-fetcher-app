@@ -8,7 +8,7 @@ The framework includes an SFTP loader that provides enterprise-grade capabilitie
 2. **🔑 Credential Providers**: AWS Secrets Manager, environment variables, static credentials
 3. **📁 SftpManager**: Handles SFTP connection management, rate limiting, and scheduling
 4. **📄 SFTPLoader**: Handles SFTP file operations
-5. **☁️ S3Storage**: Handles S3 uploads with metadata
+5. **☁️ PipelineStorage**: Handles S3 uploads with metadata
 
 ## Quick Start
 

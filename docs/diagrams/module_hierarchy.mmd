@@ -1,0 +1,65 @@
+graph TD
+    subgraph "Application Layer"
+        App[data_fetcher_app<br/>📱 Main Application<br/>• Entry point (main.py)<br/>• CLI interface<br/>• Configuration loading]
+    end
+
+    subgraph "Core Framework"
+        Core[data_fetcher_core<br/>🏗️ Core Framework<br/>• Fetcher orchestration<br/>• Registry system<br/>• Global providers<br/>• Utilities & logging]
+    end
+
+    subgraph "Configuration Layer"
+        Configs[data_fetcher_configs<br/>⚙️ Predefined Configurations<br/>• Country-specific configs<br/>• us-fl (SFTP)<br/>• fr (API)]
+    end
+
+    subgraph "Protocol Implementations"
+        SFTP[data_fetcher_sftp<br/>🔐 SFTP Protocol<br/>• SFTP authentication<br/>• Bundle locators<br/>• SFTP loader<br/>• SFTP manager]
+
+        HTTP[data_fetcher_http<br/>🌐 HTTP Protocol<br/>• HTTP loader<br/>• HTTP manager<br/>• Basic HTTP support]
+
+        HTTPAPI[data_fetcher_http_api<br/>🔌 HTTP API Protocol<br/>• API bundle locators<br/>• Pagination support<br/>• Generic API patterns<br/>• API-specific loaders]
+    end
+
+    subgraph "Core Components Detail"
+        Registry[Registry System]
+        Fetcher[Fetcher Core]
+        Storage[Storage System]
+        Credentials[Credential Providers]
+        KVStore[Key-Value Store]
+        Logging[Structured Logging]
+    end
+
+    %% Main application flow
+    App --> Core
+    App --> Configs
+    Configs --> Core
+
+    %% Core framework dependencies
+    Core --> Registry
+    Core --> Fetcher
+    Core --> Storage
+    Core --> Credentials
+    Core --> KVStore
+    Core --> Logging
+
+    %% Protocol implementations depend on core
+    SFTP --> Core
+    HTTP --> Core
+    HTTPAPI --> Core
+
+    %% Configuration uses protocols
+    Configs --> SFTP
+    Configs --> HTTPAPI
+
+    %% Styling
+    style App fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style Core fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px
+    style Configs fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    style SFTP fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style HTTP fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style HTTPAPI fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style Registry fill:#fce4ec,stroke:#c2185b,stroke-width:1px
+    style Fetcher fill:#fce4ec,stroke:#c2185b,stroke-width:1px
+    style Storage fill:#fce4ec,stroke:#c2185b,stroke-width:1px
+    style Credentials fill:#fce4ec,stroke:#c2185b,stroke-width:1px
+    style KVStore fill:#fce4ec,stroke:#c2185b,stroke-width:1px
+    style Logging fill:#fce4ec,stroke:#c2185b,stroke-width:1px

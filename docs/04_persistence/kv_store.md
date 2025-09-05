@@ -18,7 +18,7 @@ The key-value store system provides:
 ### Basic Usage
 
 ```python
-from data_fetcher.kv_store import put, get, delete, exists
+from data_fetcher_core.kv_store import put, get, delete, exists
 
 # The global key-value store is automatically configured when the module is imported
 # Store and retrieve data
@@ -37,7 +37,7 @@ await delete("user:123")
 ### Production Setup with Redis
 
 ```python
-from data_fetcher.kv_store import configure_global_store
+from data_fetcher_core.kv_store import configure_global_store
 
 # Override the default configuration for production
 configure_global_store(
@@ -59,7 +59,7 @@ configure_global_store(
 The in-memory store is perfect for testing and development:
 
 ```python
-from data_fetcher.kv_store import InMemoryKeyValueStore
+from data_fetcher_core.kv_store import InMemoryKeyValueStore
 
 # Create an in-memory store
 store = InMemoryKeyValueStore(
@@ -84,7 +84,7 @@ value = await store.get("key")
 The Redis store is designed for production use:
 
 ```python
-from data_fetcher.kv_store import RedisKeyValueStore
+from data_fetcher_core.kv_store import RedisKeyValueStore
 
 # Create a Redis store
 store = RedisKeyValueStore(
@@ -175,7 +175,7 @@ await put("complex_data", {
 Use stores as context managers for automatic cleanup:
 
 ```python
-from data_fetcher.kv_store import get_store_context
+from data_fetcher_core.kv_store import get_store_context
 
 async with get_store_context("memory", serializer="json") as store:
     await store.put("key", "value")
@@ -190,7 +190,7 @@ async with get_store_context("memory", serializer="json") as store:
 Use the key-value store for caching and state management:
 
 ```python
-from data_fetcher.kv_store import get_global_store
+from data_fetcher_core.kv_store import get_global_store
 
 class CachingBundleLocator:
     async def get_next_urls(self, ctx):
@@ -281,7 +281,7 @@ await put("user:123:profile", profile_data)  # No expiration
 Handle store errors gracefully:
 
 ```python
-from data_fetcher.kv_store import get_global_store
+from data_fetcher_core.kv_store import get_global_store
 
 async def safe_get(key: str, default=None):
     try:
@@ -402,7 +402,7 @@ For more information, see the test files and example configurations in the proje
 ```python
 class CachingBundleLocator:
     async def get_next_urls(self, ctx):
-        from data_fetcher.kv_store import get_global_store
+        from data_fetcher_core.kv_store import get_global_store
 
         store = await get_global_store()
         cache_key = f"processed:{self.base_url}"

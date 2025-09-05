@@ -44,7 +44,7 @@ The OC Fetcher framework is built around a composable, streaming-first architect
   - ApiLoader for API endpoints
 
 ### **Storage Layer**
-- **Base Storage**: File Storage and S3 Storage
+- **Base Storage**: File Storage and Pipeline Storage
 - **Storage Decorators**: Unzip, Bundle Resources
 
 ### **Supporting Systems**
@@ -115,14 +115,14 @@ Data Source → Unzip Decorator → Bundle Decorator → Base Storage
 
 ### Base Storage
 - **File Storage**: Local file system storage
-- **S3 Storage**: AWS S3 integration with streaming support
+- **Pipeline Storage**: AWS S3 integration with streaming support
 
 ## Configuration System
 
 The framework uses a registry-based configuration system:
 
 ```python
-from data_fetcher.registry import get_fetcher
+from data_fetcher_core.registry import get_fetcher
 
 # Get a configured fetcher
 fetcher = get_fetcher("us-fl")  # SFTP configuration
@@ -218,7 +218,7 @@ graph TB
 
         subgraph "Storage Layer"
             BS1[File Storage]
-            BS2[S3 Storage]
+            BS2[Pipeline Storage]
 
             subgraph "Storage Decorators"
                 SD1[Unzip Resource<br/>Decorator]
@@ -342,7 +342,7 @@ graph LR
 
         subgraph "Base Storage"
             File[File Storage<br/>Local Disk]
-            S3[S3 Storage<br/>AWS S3]
+            S3[Pipeline Storage<br/>AWS S3]
         end
     end
 
@@ -395,7 +395,7 @@ graph TD
 
     subgraph "Storage Layer"
         FileStorage[File Storage]
-        S3Storage[S3 Storage]
+        PipelineStorage[Pipeline Storage]
         Decorators[Storage Decorators]
     end
 
@@ -414,7 +414,7 @@ graph TD
     Context --> HttpLoader
     Context --> SftpLoader
     Context --> FileStorage
-    Context --> S3Storage
+    Context --> PipelineStorage
 
     %% Protocol relationships
     HttpLoader --> HttpManager
@@ -422,7 +422,7 @@ graph TD
 
     %% Storage relationships
     FileStorage --> Decorators
-    S3Storage --> Decorators
+    PipelineStorage --> Decorators
 
     %% Supporting relationships
     Fetcher --> KVStore

@@ -159,7 +159,7 @@ return await self._retry_engine.execute_with_retry_async(_make_request)
 ### Creating Custom Retry Engines
 
 ```python
-from data_fetcher.utils.retry import create_retry_engine
+from data_fetcher_core.utils.retry import create_retry_engine
 
 # Custom retry configuration
 custom_engine = create_retry_engine(
@@ -177,7 +177,7 @@ result = await custom_engine.execute_with_retry_async(my_function)
 ### Using Decorators
 
 ```python
-from data_fetcher.utils.retry import async_retry_with_backoff
+from data_fetcher_core.utils.retry import async_retry_with_backoff
 
 @async_retry_with_backoff(max_retries=3, base_delay=1.0)
 async def my_sftp_operation():
@@ -203,7 +203,7 @@ class MyProtocolManager:
 
 Comprehensive test coverage for the unified retry engine:
 
-- **Unit Tests**: `tests/unit/test_retry.py` (20 tests)
+- **Unit Tests**: `tests/test_unit/test_retry.py` (20 tests)
 - **Configuration Validation**: RetryConfig parameter validation
 - **Retry Logic**: Exponential backoff, jitter, max delays
 - **Factory Functions**: Pre-configured retry engines

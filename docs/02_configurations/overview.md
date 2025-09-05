@@ -66,7 +66,7 @@ See [examples/credential_provider_example.py](../../examples/credential_provider
 ### Basic Usage with Configuration System
 
 ```python
-from data_fetcher.registry import get_fetcher
+from data_fetcher_core.registry import get_fetcher
 
 # Run a predefined configuration
 fetcher = get_fetcher("us-fl")
@@ -229,7 +229,7 @@ poetry run python -m data_fetcher.main
 
 ### **Programmatic Usage**
 ```python
-from data_fetcher.registry import get_fetcher
+from data_fetcher_core.registry import get_fetcher
 
 # Run a predefined configuration
 fetcher = get_fetcher("us-fl")
@@ -242,7 +242,7 @@ result = await fetcher.run(plan)
 
 ### **Configuration Overrides**
 ```python
-from data_fetcher.registry import get_fetcher
+from data_fetcher_core.registry import get_fetcher
 
 # Get fetcher with custom configuration
 fetcher = get_fetcher("fr")
@@ -272,7 +272,7 @@ result = await fetcher.run(plan)
 
 ### **Basic Configuration**
 ```python
-from data_fetcher.configurations import Configuration
+from data_fetcher_core.configurations import Configuration
 
 class MyCustomConfig(Configuration):
     def __init__(self):
@@ -287,7 +287,7 @@ class MyCustomConfig(Configuration):
 
 ### **Configuration Registration**
 ```python
-from data_fetcher.registry import register_configuration
+from data_fetcher_core.registry import register_configuration
 
 register_configuration(MyCustomConfig())
 ```
@@ -296,7 +296,7 @@ register_configuration(MyCustomConfig())
 
 ```bash
 # Format code (or it happens automatically on save)
-poetry run black .
+poetry run ruff format .
 
 # Lint code
 poetry run ruff check .

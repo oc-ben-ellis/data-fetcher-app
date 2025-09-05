@@ -1,12 +1,12 @@
 ![OC Fetcher Logo](docs/assets/OC_Fetcher_Logo_New.svg)
 
-# OC Fetcher
+# Data Fetcher App
 
 A composable, streaming-first fetch framework for Python that pulls resources from heterogeneous remote sources and bundles them with metadata into a standard package in a common file store for further ETL processing downstream.
 
 ## 📖 View Rendered Documentation
 
-For the best reading experience, view the [rendered documentation](docs/rendered/index.html) in your browser.
+For the best reading experience, view the [rendered documentation](site/index.html) in your browser.
 
 ## Key Features
 
@@ -16,6 +16,18 @@ For the best reading experience, view the [rendered documentation](docs/rendered
 - **Multiple Protocols**: Support for HTTP(S) and SFTP with extensible architecture
 - **SFTP**: Enterprise-grade SFTP with AWS Secrets Manager, S3 upload, and date-based file patterns
 - **Structured Logging**: Built-in structlog integration with context variables and JSON output
+- **Modular Design**: Clean separation of concerns with dedicated packages for different protocols and functionality
+
+## Module Structure
+
+The framework is organized into focused, modular packages:
+
+- **`data_fetcher_app`**: Main application entry point and configuration files
+- **`data_fetcher_core`**: Core framework components and common utilities
+- **`data_fetcher_configs`**: Predefined configurations for different data sources
+- **`data_fetcher_sftp`**: SFTP-specific classes and modules
+- **`data_fetcher_http`**: HTTP-specific classes and modules
+- **`data_fetcher_http_api`**: HTTP API-specific classes and modules
 
 ## Quick Start
 
@@ -23,19 +35,19 @@ For the best reading experience, view the [rendered documentation](docs/rendered
 
 ```bash
 # Run US Florida SFTP fetcher
-poetry run python -m data_fetcher.main us-fl
+poetry run python -m data_fetcher_app.main us-fl
 
 # Run France API fetcher
-poetry run python -m data_fetcher.main fr
+poetry run python -m data_fetcher_app.main fr
 
 # List all available configurations
-poetry run python -m data_fetcher.main
+poetry run python -m data_fetcher_app.main
 ```
 
 ### Basic Usage with Configuration System
 
 ```python
-from data_fetcher.registry import get_fetcher
+from data_fetcher_core.registry import get_fetcher
 
 # Run a predefined configuration
 fetcher = get_fetcher("us-fl")
@@ -53,16 +65,16 @@ The framework supports multiple credential providers for different deployment sc
 #### AWS Secrets Manager (Default)
 ```bash
 # Use AWS Secrets Manager for credentials (default behavior)
-poetry run python -m data_fetcher.main us-fl
+poetry run python -m data_fetcher_app.main us-fl
 
 # Explicitly specify AWS provider
-poetry run python -m data_fetcher.main --credentials-provider aws us-fl
+poetry run python -m data_fetcher_app.main --credentials-provider aws us-fl
 ```
 
 #### Environment Variables
 ```bash
 # Use environment variables for credentials
-poetry run python -m data_fetcher.main --credentials-provider env us-fl
+poetry run python -m data_fetcher_app.main --credentials-provider env us-fl
 ```
 
 When using environment variables, set them in this format:
@@ -204,7 +216,7 @@ make all-checks
 
 ```bash
 # Format code (or it happens automatically on save)
-poetry run black .
+poetry run ruff format .
 
 # Lint code
 poetry run ruff check .

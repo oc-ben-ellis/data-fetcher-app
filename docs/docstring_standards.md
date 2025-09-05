@@ -218,7 +218,6 @@ convention = "google"
 ### Pre-commit Configuration
 
 The `.pre-commit-config.yaml` file includes hooks for:
-- Black (code formatting)
 - Ruff (linting and formatting)
 - MyPy (type checking)
 - Custom docstring checking

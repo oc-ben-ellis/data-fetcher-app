@@ -68,7 +68,7 @@ Storage Interface:
 **Base Storage Implementations**:
 
 - `FileStorage`: Stores files on local disk
-- `S3Storage`: Stores files in S3 with metadata
+- `PipelineStorage`: Stores files in S3 with metadata
 
 **Storage Decorators** (modify streams being passed to storage):
 

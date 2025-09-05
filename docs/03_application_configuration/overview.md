@@ -85,9 +85,9 @@ protocols:
 
 ### **Code Configuration**
 ```python
-from data_fetcher.global_storage import configure_application_storage
-from data_fetcher.global_kv_store import configure_application_kv_store
-from data_fetcher.global_credential_provider import configure_application_credential_provider
+from data_fetcher_core.global_storage import configure_application_storage
+from data_fetcher_core.global_kv_store import configure_application_kv_store
+from data_fetcher_core.global_credential_provider import configure_application_credential_provider
 
 # Configure application storage
 configure_application_storage()

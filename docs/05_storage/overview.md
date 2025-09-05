@@ -29,7 +29,7 @@ AWS S3 storage integration with metadata management and environment-specific con
 
 ### **Base Storage Implementations**
 - **FileStorage**: Local file-based persistence
-- **S3Storage**: Cloud-based object storage with metadata
+- **PipelineStorage**: Cloud-based object storage with metadata
 
 ### **Storage Decorators**
 - **UnzipResourceDecorator**: Automatic decompression of compressed resources
@@ -57,7 +57,7 @@ All storage operations are streaming-based, allowing efficient processing of lar
 
 ### **Flexible Storage Backends**
 - **Local File Storage**: Simple file-based persistence
-- **S3 Storage**: Cloud-based object storage
+- **Pipeline Storage**: Cloud-based object storage
 - **Extensible**: Easy to add new storage backends
 
 ### **Data Transformation**
@@ -79,7 +79,7 @@ All storage operations are streaming-based, allowing efficient processing of lar
 
 ### **Basic File Storage**
 ```python
-from data_fetcher.storage import FileStorage
+from data_fetcher_core.storage import FileStorage
 
 # Create file storage
 storage = FileStorage("output/files")
@@ -94,12 +94,12 @@ async with storage.open_bundle("bundle-1", {"source": "example.com"}) as bundle:
     )
 ```
 
-### **S3 Storage with Decorators**
+### **Pipeline Storage with Decorators**
 ```python
-from data_fetcher.storage import S3Storage, create_storage_stack
+from data_fetcher_core.storage import PipelineStorage, create_storage_stack
 
 # Create S3 storage with decorators
-base_storage = S3Storage("my-bucket", "prefix/")
+base_storage = PipelineStorage("my-bucket", "prefix/")
 storage = create_storage_stack(
     base_storage=base_storage,
 
@@ -110,7 +110,7 @@ storage = create_storage_stack(
 
 ### **Custom Storage Configuration**
 ```python
-from data_fetcher.storage import FileStorage, BundleResourcesDecorator
+from data_fetcher_core.storage import FileStorage, BundleResourcesDecorator
 
 # Custom storage configuration
 base_storage = FileStorage("output/custom")

@@ -1,0 +1,26 @@
+{
+    "id": "git-ssh",
+    "version": "1.0.0",
+    "name": "Git SSH and GPG Configuration",
+    "description": "Configures Git with SSH and GPG signing support, including interactive GPG key setup and shell configuration",
+    "options": {
+        "enableGpgSigning": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable GPG signing for Git commits and tags"
+        },
+        "enableSshAgent": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable SSH agent forwarding and configuration"
+        },
+        "configureShell": {
+            "type": "boolean",
+            "default": true,
+            "description": "Configure shell with GPG and SSH environment variables"
+        }
+    },
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/git:1"
+    ]
+}

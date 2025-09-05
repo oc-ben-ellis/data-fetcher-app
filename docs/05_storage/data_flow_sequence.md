@@ -9,7 +9,7 @@ The framework uses a composable storage architecture with two base storage imple
    - Supports custom output directories
    - No external dependencies
 
-2. **S3Storage** (`data_fetcher/storage/s3_storage.py`): Stores files in S3
+2. **PipelineStorage** (`data_fetcher/storage/pipeline_storage.py`): Stores files in S3
    - Direct S3 upload with metadata
    - Supports environment-specific bucket naming
    - Requires boto3 and AWS credentials
@@ -24,7 +24,7 @@ Storage decorators are located in `data_fetcher/storage/decorators/` and modify 
 ## Usage Examples
 
 ```python
-from data_fetcher.storage import FileStorage, S3Storage, BundleResourcesDecorator
+from data_fetcher_core.storage import FileStorage, PipelineStorage, BundleResourcesDecorator
 
 # Basic file storage
 storage = FileStorage("output/files")
@@ -34,7 +34,7 @@ base_storage = FileStorage("output/bundles")
 storage = BundleResourcesDecorator(base_storage)
 
 # S3 storage with resource bundling
-base_storage = S3Storage("my-bucket", "prefix/")
+base_storage = PipelineStorage("my-bucket", "prefix/")
 storage = BundleResourcesDecorator(base_storage)
 
 # Complex storage stack

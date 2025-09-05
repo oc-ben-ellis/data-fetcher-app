@@ -4,7 +4,70 @@ The component relationships diagram provides a detailed view of how all componen
 
 ## Visual Architecture Diagram
 
-![Component Relationships](../diagrams/png/component_relationships.png)
+```mermaid
+graph TD
+    subgraph "Core Components"
+        Fetcher[Fetcher]
+        Context[FetchContext]
+        Plan[FetchPlan]
+    end
+
+    subgraph "Bundle Locator Layer"
+        Provider1[SFTP Directory<br/>Bundle Locator]
+        Provider2[SFTP File<br/>Bundle Locator]
+        Provider3[HTTP URL<br/>Bundle Locator]
+    end
+
+    subgraph "Protocol Layer"
+        HttpManager[HTTP Manager]
+        SftpManager[SFTP Manager]
+    end
+
+    subgraph "Bundle Loader Layer"
+        HttpLoader[HTTP Streaming<br/>Loader]
+        SftpLoader[SFTP<br/>Loader]
+    end
+
+    subgraph "Storage Layer"
+        FileStorage[File Storage]
+        PipelineStorage[Pipeline Storage]
+        Decorators[Storage Decorators]
+    end
+
+    subgraph "Supporting Systems"
+        KVStore[Key-Value Store]
+        Logger[Structured Logger]
+        Config[Application Config]
+    end
+
+    %% Core relationships
+    Fetcher --> Context
+    Fetcher --> Plan
+    Context --> Provider1
+    Context --> Provider2
+    Context --> Provider3
+    Context --> HttpLoader
+    Context --> SftpLoader
+    Context --> FileStorage
+    Context --> PipelineStorage
+
+    %% Protocol relationships
+    HttpLoader --> HttpManager
+    SftpLoader --> SftpManager
+
+    %% Storage relationships
+    FileStorage --> Decorators
+    PipelineStorage --> Decorators
+
+    %% Supporting relationships
+    Fetcher --> KVStore
+    Fetcher --> Logger
+    Fetcher --> Config
+
+    style Fetcher fill:#e1f5fe
+    style Context fill:#e1f5fe
+    style Plan fill:#e1f5fe
+```
 
 The component relationships diagram provides a detailed view of how all components interact with each other, organized by functional layers. It shows the dependencies between components and how data flows through the system, from the core orchestration layer down to the supporting infrastructure components.
 
@@ -45,7 +108,7 @@ The loader layer contains components that fetch data from endpoints:
 The storage layer contains components that persist fetched data:
 
 - **FileStorage**: Stores files on local disk
-- **S3Storage**: Stores files in S3 with metadata
+- **PipelineStorage**: Stores files in S3 with metadata
 - **Storage Decorators**: Unzip, Bundle Resources decorators
 
 ### **Supporting Systems**
@@ -79,7 +142,7 @@ The supporting systems layer contains cross-cutting concerns:
 
 ### **Storage Dependencies**
 - **Storage Decorators** → **Base Storage**: Decorators wrap base storage implementations
-- **S3Storage** → **AWS Services**: Uses AWS S3 for data persistence
+- **PipelineStorage** → **AWS Services**: Uses AWS S3 for data persistence
 
 ## Data Flow Relationships
 

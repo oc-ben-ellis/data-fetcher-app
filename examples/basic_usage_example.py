@@ -17,8 +17,8 @@ sys.path.insert(0, str(project_root))
 async def basic_usage_example() -> None:
     """Demonstrate basic usage of OC Fetcher."""
     # Import the necessary modules
-    from data_fetcher.core import FetchPlan, FetchRunContext
-    from data_fetcher.registry import get_fetcher
+    from data_fetcher_core.core import FetchPlan, FetchRunContext
+    from data_fetcher_core.registry import get_fetcher
 
     # List available fetcher configurations
 
@@ -51,13 +51,13 @@ async def basic_usage_example() -> None:
 
 async def configuration_example() -> None:
     """Demonstrate configuration system usage."""
-    from data_fetcher.registry import list_configurations
+    from data_fetcher_core.registry import list_configurations
 
     # Show available configurations
     configs = list_configurations()
 
     # Demonstrate getting configuration setup function
-    from data_fetcher.registry import get_configuration_setup_function
+    from data_fetcher_core.registry import get_configuration_setup_function
 
     for config_name in configs:
         with contextlib.suppress(Exception):

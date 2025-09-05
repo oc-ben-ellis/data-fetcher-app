@@ -33,28 +33,24 @@ repos:
         - --hook-config=--path-to-file=README.md
         - --hook-config=--add-to-existing-file=true
 
-  - repo: https://github.com/psf/black
-    rev: 23.12.1
-    hooks:
-      - id: black
-        language_version: python3.10
-        args: [--line-length=88]
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.12
-    hooks:
-      - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-        language_version: python3.10
-#
-#  - repo: https://github.com/pre-commit/mirrors-mypy
-#    rev: v1.5.1
-#    hooks:
-#      - id: mypy
-#        language_version: python3.10
-
+  # Use poetry versions of linters so we keep the versions in sync
   - repo: local
     hooks:
+      - id: ruff
+        name: ruff
+        entry: poetry run ruff check
+        args: [--fix, --exit-non-zero-on-fix]
+        language: system
+        types: [python]
+        pass_filenames: true
+
+      - id: mypy
+        name: mypy
+        entry: poetry run mypy
+        language: system
+        types: [python]
+        pass_filenames: true
+
       - id: docstring-check
         name: Check docstrings
         entry: poetry run ruff check --select D
@@ -69,10 +65,10 @@ repos:
         types: [python]
         pass_filenames: false
 
-#      - id: unit-tests
-#        name: Run unit tests only
-#        entry: poetry run pytest tests/unit/ -v --tb=short
-#        language: system
-#        types: [python]
-#        pass_filenames: false
-#        stages: [commit]
+      # - id: unit-tests
+      #   name: Run unit tests only
+      #   entry: poetry run pytest tests/unit/ -v --tb=short
+      #   language: system
+      #   types: [python]
+      #   pass_filenames: false
+      #   stages: [commit]

@@ -29,7 +29,7 @@ Advanced persistence features including state persistence, error tracking, proce
 
 ### **Storage Backends**
 - **File Storage**: Local file-based persistence
-- **S3 Storage**: Cloud-based object storage
+- **Pipeline Storage**: Cloud-based object storage
 - **Database Storage**: Relational and NoSQL database support
 
 ### **Caching Layers**
@@ -63,7 +63,7 @@ Advanced persistence features including state persistence, error tracking, proce
 
 ### **Basic KV Store Usage**
 ```python
-from data_fetcher.kv_store import get_kv_store
+from data_fetcher_core.kv_store import get_kv_store
 
 # Get KV store instance
 kv_store = get_kv_store()
@@ -77,18 +77,18 @@ value = await kv_store.get("key")
 
 ### **Storage Configuration**
 ```python
-from data_fetcher.storage import FileStorage, S3Storage
+from data_fetcher_core.storage import FileStorage, PipelineStorage
 
 # Local file storage
 storage = FileStorage("data/")
 
 # S3 storage
-storage = S3Storage("my-bucket", "prefix/")
+storage = PipelineStorage("my-bucket", "prefix/")
 ```
 
 ### **Caching Configuration**
 ```python
-from data_fetcher.global_kv_store import configure_application_kv_store
+from data_fetcher_core.global_kv_store import configure_application_kv_store
 
 # Configure application key-value store
 configure_application_kv_store()

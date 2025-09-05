@@ -3,9 +3,13 @@
 import asyncio
 from datetime import datetime, timedelta
 
-from data_fetcher import run_fetcher
-from data_fetcher.kv_store import configure_global_store, get_global_store, range_get
-from data_fetcher.utils.persistence_utils import (
+from data_fetcher_core.fetcher import run_fetcher
+from data_fetcher_core.kv_store import (
+    configure_global_store,
+    get_global_store,
+    range_get,
+)
+from data_fetcher_core.utils.persistence_utils import (
     create_persistence_manager,
     create_retry_manager,
     create_state_tracker,

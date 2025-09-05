@@ -85,13 +85,7 @@
 - [ ] Add optional content checksum calculation (sha256) for uploads
 - [ ] Implement ETag handling and store in metadata
 - [ ] Add validation for re-uploads or duplicate detection if configured
-- [ ] Files: `data_fetcher/storage/s3_storage.py`, `data_fetcher/storage/file_storage.py`
-
-## Lineage Integration
-- [ ] Wire existing lineage bundle (`data_fetcher/storage/lineage_storage.py`) into default storage builder
-- [ ] Add config flags to enable lineage emission
-- [ ] Add optional lineage publishing to SQS/Kinesis/OTEL
-- [ ] Files: `data_fetcher/storage/builder.py`, `data_fetcher/global_storage.py`
+- [ ] Files: `data_fetcher/storage/pipeline_storage.py`, `data_fetcher/storage/file_storage.py`
 
 ## Metrics and Observability
 - [ ] Add counters/timers for key stages (requests queued, processed, bundle writes, retries)
@@ -102,7 +96,7 @@
 ## Configuration Parity and Examples
 - [ ] Ensure examples include both HTTP/API and SFTP configurations
 - [ ] Add FTP configuration example once implemented
-- [ ] Provide config for enabling SQS notifications, lineage, and checksums
+- [ ] Provide config for enabling SQS notifications and checksums
 - [ ] Files: `data_fetcher/configurations/*`, `docs/02_configurations/`
 
 ## State Management Enhancements
@@ -127,7 +121,7 @@
 - [ ] Document new CLI list command usage
 - [ ] Add HTML scraper behavior documentation
 - [ ] Document FTP support once implemented
-- [ ] Add lineage/checksums enablement instructions
+- [ ] Add checksums enablement instructions
 - [ ] Files: `docs/01_architecture/*`, `docs/05_storage/*`, `docs/02_configurations/*`, `docs/APPLICATION_REQUIREMENTS.md`
 
 ## Development Ergonomics

@@ -1,68 +1,27 @@
-# Documentation Builder
+# Scripts Directory
 
-This directory contains scripts for building and maintaining the OC Fetcher documentation.
+This directory contains utility scripts for the OC Fetcher project.
 
-## Build Documentation
+## Available Scripts
 
-The documentation builder converts markdown files to HTML with modern styling and navigation.
+### Class Naming Check
 
-### Using Poetry (Recommended)
-
-```bash
-# Build documentation
-poetry run build-docs
-
-# Or using the Makefile
-make docs
-```
-
-### Using Makefile
+`check_class_naming.py` - Validates that class names follow the project's naming conventions.
 
 ```bash
-# Build documentation
-make docs
-
-# Build and open in browser (Linux/Mac)
-make docs/open
+# Run class naming check
+poetry run python scripts/check_class_naming.py
 ```
 
-## What Gets Built
+## Documentation
 
-The builder processes the following files:
-- `README.md` → `docs/rendered/index.html`
-- `docs/*.md` → `docs/rendered/*.html`
+The project now uses **MkDocs** for documentation instead of custom build scripts. See the main project documentation for details on:
 
-## Features
+- Building documentation: `make docs`
+- Development server: `make docs/serve`
+- Deployment: `make docs/deploy`
 
-- **Modern Styling**: Clean, responsive design with syntax highlighting
-- **Navigation**: Sidebar navigation with all documentation pages
-- **Syntax Highlighting**: Code blocks are highlighted using Pygments
-- **Internal Links**: Automatically converts `.md` links to `.html` links
-- **Asset Copying**: Copies images and diagrams from `docs/diagrams/` to `docs/rendered/assets/`
-- **Responsive Design**: Works on desktop and mobile devices
-
-## Output Structure
-
+For more information, run:
+```bash
+make docs/help
 ```
-docs/rendered/
-├── index.html              # Main documentation page (from README.md)
-├── architecture.html       # Architecture documentation
-├── storage.html           # Storage documentation
-├── ...                    # Other documentation pages
-└── assets/
-    ├── style.css          # Main stylesheet
-    ├── pygments.css       # Syntax highlighting styles
-    └── ...                # Images and diagrams
-```
-
-## Customization
-
-The styling can be customized by modifying the CSS in `scripts/build_docs.py`. The template uses Jinja2 for HTML generation.
-
-## Dependencies
-
-- `markdown`: Markdown to HTML conversion
-- `jinja2`: HTML templating
-- `pygments`: Syntax highlighting
-
-These are automatically installed as dev dependencies in `pyproject.toml`.

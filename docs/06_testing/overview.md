@@ -40,7 +40,7 @@ The project uses pytest with the following configuration:
 - `tests/test_configurations/` - Configuration-specific tests
 - `tests/test_storage/` - Storage system tests
 - `tests/test_protocols/` - Protocol manager tests
-- `tests/mocks/` - Mock services for testing
+- `stubs/` - Mock services and type stubs for testing
 
 ### Test Markers
 
@@ -116,13 +116,13 @@ Some tests require AWS services. Use LocalStack for local testing:
 
 ```bash
 # Start LocalStack
-docker-compose -f tests/mocks/docker-compose.yml up -d
+docker-compose -f stubs/docker-compose.yml up -d
 
 # Run tests that require LocalStack
 poetry run pytest -m localstack
 
 # Stop LocalStack
-docker-compose -f tests/mocks/docker-compose.yml down
+docker-compose -f stubs/docker-compose.yml down
 ```
 
 ### Mock API Server
@@ -130,14 +130,13 @@ docker-compose -f tests/mocks/docker-compose.yml down
 For API testing, a mock Sirene API server is provided:
 
 ```bash
-# Start mock API server
-docker-compose -f tests/mocks/siren_api/docker-compose.yml up -d
+# Manual testing (optional)
+cd mocks/fr_siren_api
+docker build -t siren_api_mock .
+docker run -p 5000:5000 siren_api_mock
 
-# Run API tests
-poetry run pytest tests/test_configurations/test_fr.py
-
-# Stop mock server
-docker-compose -f tests/mocks/siren_api/docker-compose.yml down
+# Run API tests (mock is automatically started by test fixtures)
+poetry run pytest tests/test_functional/test_fr.py
 ```
 
 ## Writing Tests
@@ -146,7 +145,7 @@ docker-compose -f tests/mocks/siren_api/docker-compose.yml down
 
 ```python
 import pytest
-from data_fetcher.registry import get_fetcher
+from data_fetcher_core.registry import get_fetcher
 
 @pytest.mark.asyncio
 async def test_basic_fetch():
@@ -306,8 +305,7 @@ The following testing dependencies are included:
 - `coverage`: Code coverage reporting
 - `testcontainers`: Container-based testing
 - `mypy`: Type checking
-- `black`: Code formatting
-- `ruff`: Linting
+- `ruff`: Code formatting and linting
 
 ## Best Practices
 

@@ -1,5 +1,162 @@
-site_name: "docs"
-docs_dir: "."
-edit_uri: ""
+site_name: Data Fetcher Documentation
+site_description: A composable, streaming-first fetch framework for Python
+site_author: OpenCorporates
+site_url: https://openc.github.io/data-fetcher-sftp
+
+# Repository
+repo_name: openc/data-fetcher-sftp
+repo_url: https://github.com/openc/data-fetcher-sftp
+edit_uri: edit/main/docs/
+
+# Configuration
+theme:
+  name: material
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: red
+      accent: red
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: red
+      accent: red
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+
+  icon:
+    repo: fontawesome/brands/github
+
+# Plugins
 plugins:
-  - same-dir
+  - search:
+      lang: en
+  - mermaid2:
+      arguments:
+        theme: default
+        themeVariables:
+          primaryColor: '#9f1f34'
+          primaryTextColor: '#2c3e50'
+          primaryBorderColor: '#9f1f34'
+          lineColor: '#6c757d'
+          secondaryColor: '#f8f9fa'
+          tertiaryColor: '#ffffff'
+
+# Markdown extensions
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences
+  - pymdownx.tilde
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+# Navigation structure - maintaining your current order
+nav:
+  - Home: index.md
+  - Documentation Guide: documentation_guide.md
+  - Troubleshooting: troubleshooting.md
+  - Docstring Standards: docstring_standards.md
+  - Application Requirements: APPLICATION_REQUIREMENTS.md
+
+  - Architecture:
+    - Architecture Overview: 01_architecture/README.md
+    - Overview: 01_architecture/overview.md
+    - High Level Architecture: 01_architecture/high_level_architecture.md
+    - Core Orchestration Flow: 01_architecture/core_orchestration_flow.md
+    - Component Relationships: 01_architecture/component_relationships.md
+    - Component Interactions: 01_architecture/component_interactions.md
+    - Module Hierarchy: 01_architecture/module_hierarchy.md
+    - Storage Architecture: 01_architecture/storage_architecture.md
+
+  - Configurations:
+    - Overview: 02_configurations/overview.md
+    - API Configurations: 02_configurations/api.md
+    - SFTP Configurations: 02_configurations/sftp.md
+    - Scheduling: 02_configurations/scheduling.md
+    - US FL Test Setup: 02_configurations/us_fl_test_setup.md
+
+  - Application Configuration:
+    - System Configuration: 03_application_configuration/README.md
+    - Overview: 03_application_configuration/overview.md
+    - Detailed Configuration: 03_application_configuration/detailed_configuration.md
+    - Logging: 03_application_configuration/logging.md
+
+  - Persistence:
+    - Key-Value Store: 04_persistence/README.md
+    - Overview: 04_persistence/overview.md
+    - Features: 04_persistence/features.md
+    - KV Store: 04_persistence/kv_store.md
+
+  - Storage:
+    - Storage Overview: 05_storage/README.md
+    - Overview: 05_storage/overview.md
+    - S3 Integration: 05_storage/s3.md
+    - Data Flow Sequence: 05_storage/data_flow_sequence.md
+
+  - Testing:
+    - Testing Overview: 06_testing/README.md
+    - Overview: 06_testing/overview.md
+
+  - Deployment:
+    - Deployment Overview: 07_deployment/README.md
+    - Overview: 07_deployment/overview.md
+
+# Extra configuration
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/openc/data-fetcher-sftp
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/data-fetcher-sftp/
+
+# Copyright
+copyright: Copyright &copy; 2025 OpenCorporates

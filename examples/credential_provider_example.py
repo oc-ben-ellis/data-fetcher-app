@@ -18,10 +18,10 @@ sys.path.insert(0, str(project_root))
 
 async def credential_provider_example() -> None:
     """Demonstrate different credential providers."""
-    from data_fetcher.credentials import (
+    from data_fetcher_core.credentials import (
         EnvironmentCredentialProvider,
     )
-    from data_fetcher.global_credential_provider import (
+    from data_fetcher_core.global_credential_provider import (
         configure_global_credential_provider,
         get_default_credential_provider,
     )

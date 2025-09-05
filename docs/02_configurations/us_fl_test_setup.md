@@ -152,8 +152,8 @@ Create a test script (`tmp/test_us_fl.py`):
 
 import asyncio
 import os
-from data_fetcher.core import FetchPlan, FetchRunContext
-from data_fetcher.registry import get_fetcher
+from data_fetcher_core.core import FetchPlan, FetchRunContext
+from data_fetcher_core.registry import get_fetcher
 
 async def test_us_fl_fetcher():
     """Test the US Florida SFTP fetcher."""
@@ -324,4 +324,4 @@ After successful local testing:
 1. **Review the [SFTP Configuration Guide](sftp.md)** for production setup
 2. **Check the [Application Configuration](03_application_configuration/) documentation** for advanced settings
 3. **Explore the [Deployment Guide](../07_deployment/)** for production deployment
-4. **Run the functional tests** to verify everything works: `make test ARGS=tests/functional/test_functional_us_fl.py`
+4. **Run the functional tests** to verify everything works: `make test ARGS=tests/test_functional/test_us_fl.py`

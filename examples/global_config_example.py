@@ -22,7 +22,7 @@ async def demonstrate_storage_config() -> None:
     os.environ["AWS_REGION"] = "eu-west-2"
 
     # Import and configure storage
-    from data_fetcher.global_storage import configure_application_storage
+    from data_fetcher_core.global_storage import configure_application_storage
 
     configure_application_storage()
 
@@ -43,7 +43,7 @@ async def demonstrate_kv_store_config() -> None:
     os.environ.pop("OC_KV_STORE_REDIS_HOST", None)
 
     # Import and configure KV store
-    from data_fetcher.global_kv_store import configure_application_kv_store
+    from data_fetcher_core.global_kv_store import configure_application_kv_store
 
     configure_application_kv_store()
 
@@ -65,7 +65,7 @@ async def demonstrate_credential_provider_config() -> None:
     os.environ.pop("OC_CREDENTIAL_PROVIDER_TYPE", None)
 
     # Import and configure credential provider
-    from data_fetcher.global_credential_provider import (
+    from data_fetcher_core.global_credential_provider import (
         configure_application_credential_provider,
     )
 
@@ -85,11 +85,11 @@ async def demonstrate_usage() -> None:
     """Demonstrate how to use the configured components."""
     try:
         # Get the configured components
-        from data_fetcher.global_credential_provider import (
+        from data_fetcher_core.global_credential_provider import (
             get_default_credential_provider,
         )
-        from data_fetcher.kv_store import get_global_store
-        from data_fetcher.storage.builder import get_global_storage
+        from data_fetcher_core.kv_store import get_global_store
+        from data_fetcher_core.storage.builder import get_global_storage
 
         # Get storage
         get_global_storage()

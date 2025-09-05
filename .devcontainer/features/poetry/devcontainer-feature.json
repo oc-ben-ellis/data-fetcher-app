@@ -1,0 +1,16 @@
+{
+    "id": "poetry",
+    "version": "1.0.0",
+    "name": "Poetry Package Manager",
+    "description": "Installs Poetry package manager and configures Python virtual environment settings for development",
+    "options": {
+        "installPoetry": {
+            "type": "boolean",
+            "default": true,
+            "description": "Install Poetry package manager"
+        }
+    },
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/python:1"
+    ]
+}

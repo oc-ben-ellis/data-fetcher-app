@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .app-layer { fill: #e3f2fd; stroke: #1976d2; stroke-width: 3px; }
+      .core-layer { fill: #f3e5f5; stroke: #7b1fa2; stroke-width: 3px; }
+      .config-layer { fill: #e8f5e8; stroke: #388e3c; stroke-width: 2px; }
+      .protocol-layer { fill: #fff3e0; stroke: #f57c00; stroke-width: 2px; }
+      .component-layer { fill: #fce4ec; stroke: #c2185b; stroke-width: 1px; }
+      .text { font-family: Arial, sans-serif; font-size: 12px; text-anchor: middle; }
+      .title { font-weight: bold; font-size: 14px; }
+      .arrow { stroke: #666; stroke-width: 2px; fill: none; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+    </marker>
+  </defs>
+
+  <!-- Application Layer -->
+  <rect x="50" y="50" width="200" height="80" class="app-layer" rx="5"/>
+  <text x="150" y="75" class="text title">data_fetcher_app</text>
+  <text x="150" y="90" class="text">📱 Main Application</text>
+  <text x="150" y="105" class="text">• Entry point (main.py)</text>
+  <text x="150" y="120" class="text">• CLI interface</text>
+
+  <!-- Core Framework -->
+  <rect x="300" y="200" width="200" height="100" class="core-layer" rx="5"/>
+  <text x="400" y="225" class="text title">data_fetcher_core</text>
+  <text x="400" y="240" class="text">🏗️ Core Framework</text>
+  <text x="400" y="255" class="text">• Fetcher orchestration</text>
+  <text x="400" y="270" class="text">• Registry system</text>
+  <text x="400" y="285" class="text">• Global providers</text>
+
+  <!-- Configuration Layer -->
+  <rect x="50" y="350" width="200" height="80" class="config-layer" rx="5"/>
+  <text x="150" y="375" class="text title">data_fetcher_configs</text>
+  <text x="150" y="390" class="text">⚙️ Predefined Configurations</text>
+  <text x="150" y="405" class="text">• Country-specific configs</text>
+  <text x="150" y="420" class="text">• us-fl (SFTP), fr (API)</text>
+
+  <!-- Protocol Implementations -->
+  <rect x="300" y="350" width="150" height="80" class="protocol-layer" rx="5"/>
+  <text x="375" y="375" class="text title">data_fetcher_sftp</text>
+  <text x="375" y="390" class="text">🔐 SFTP Protocol</text>
+  <text x="375" y="405" class="text">• Authentication</text>
+  <text x="375" y="420" class="text">• Bundle locators</text>
+
+  <rect x="500" y="350" width="150" height="80" class="protocol-layer" rx="5"/>
+  <text x="575" y="375" class="text title">data_fetcher_http</text>
+  <text x="575" y="390" class="text">🌐 HTTP Protocol</text>
+  <text x="575" y="405" class="text">• HTTP loader</text>
+  <text x="575" y="420" class="text">• HTTP manager</text>
+
+  <rect x="300" y="450" width="150" height="80" class="protocol-layer" rx="5"/>
+  <text x="375" y="475" class="text title">data_fetcher_http_api</text>
+  <text x="375" y="490" class="text">🔌 HTTP API Protocol</text>
+  <text x="375" y="505" class="text">• API bundle locators</text>
+  <text x="375" y="520" class="text">• Pagination support</text>
+
+  <!-- Core Components Detail -->
+  <rect x="550" y="200" width="120" height="120" class="component-layer" rx="5"/>
+  <text x="610" y="220" class="text title">Core Components</text>
+  <text x="610" y="235" class="text">• Registry System</text>
+  <text x="610" y="250" class="text">• Fetcher Core</text>
+  <text x="610" y="265" class="text">• Storage System</text>
+  <text x="610" y="280" class="text">• Credential Providers</text>
+  <text x="610" y="295" class="text">• KV Store</text>
+  <text x="610" y="310" class="text">• Structured Logging</text>
+
+  <!-- Arrows showing dependencies -->
+  <line x1="150" y1="130" x2="400" y2="200" class="arrow"/>
+  <line x1="150" y1="130" x2="150" y2="350" class="arrow"/>
+  <line x1="150" y1="430" x2="400" y2="200" class="arrow"/>
+  <line x1="375" y1="350" x2="400" y2="300" class="arrow"/>
+  <line x1="575" y1="350" x2="400" y2="300" class="arrow"/>
+  <line x1="375" y1="530" x2="400" y2="300" class="arrow"/>
+  <line x1="150" y1="430" x2="375" y2="350" class="arrow"/>
+  <line x1="150" y1="430" x2="375" y2="450" class="arrow"/>
+  <line x1="400" y1="200" x2="610" y2="200" class="arrow"/>
+
+  <!-- Labels for arrows -->
+  <text x="275" y="165" class="text" style="font-size: 10px;">depends on</text>
+  <text x="275" y="240" class="text" style="font-size: 10px;">uses</text>
+  <text x="275" y="390" class="text" style="font-size: 10px;">depends on</text>
+  <text x="275" y="470" class="text" style="font-size: 10px;">depends on</text>
+  <text x="275" y="550" class="text" style="font-size: 10px;">depends on</text>
+  <text x="275" y="390" class="text" style="font-size: 10px;">uses</text>
+  <text x="275" y="470" class="text" style="font-size: 10px;">uses</text>
+  <text x="505" y="190" class="text" style="font-size: 10px;">contains</text>
+</svg>

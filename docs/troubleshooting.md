@@ -252,7 +252,7 @@ ERROR: Storage upload failed
 
 Check configuration before running:
 ```python
-from data_fetcher.registry import get_fetcher
+from data_fetcher_core.registry import get_fetcher
 
 try:
     fetcher = get_fetcher("us-fl")

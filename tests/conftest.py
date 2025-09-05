@@ -20,7 +20,7 @@ from testcontainers.core.waiting_utils import (  # type: ignore[import-untyped]
     wait_for_logs,
 )
 
-from data_fetcher.core import BundleRef
+from data_fetcher_core.core import BundleRef
 
 """Pytest configuration and shared fixtures for OC Fetcher tests."""
 
@@ -38,7 +38,7 @@ def _signal_handler(signum: int, frame: Any) -> None:
 
 
 @pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
+def event_loop() -> Generator[asyncio.AbstractEventLoop]:
     """Create an instance of the default event loop for the test session."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
     # Ensure the newly created loop is the current event loop for the session
@@ -99,7 +99,7 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 
 
 @pytest.fixture
-def temp_dir() -> Generator[str, None, None]:
+def temp_dir() -> Generator[str]:
     """Create a temporary directory for testing."""
     with tempfile.TemporaryDirectory() as temp_dir:
         yield temp_dir
@@ -116,10 +116,10 @@ def bundle_ref() -> BundleRef:
     )
 
 
-def create_test_stream(content: bytes) -> AsyncGenerator[bytes, None]:
+def create_test_stream(content: bytes) -> AsyncGenerator[bytes]:
     """Create a test stream from bytes."""
 
-    async def stream() -> AsyncGenerator[bytes, None]:
+    async def stream() -> AsyncGenerator[bytes]:
         yield content
 
     return stream()

@@ -26,7 +26,7 @@ The OC Fetcher framework provides comprehensive support for API-based fetching w
 
 ### **Generic API Configuration**
 ```python
-from data_fetcher.configurations import ApiConfiguration
+from data_fetcher_core.configurations import ApiConfiguration
 
 class GenericApiConfig(ApiConfiguration):
     def __init__(self):
@@ -44,7 +44,7 @@ class GenericApiConfig(ApiConfiguration):
 
 ### **Custom API Configuration**
 ```python
-from data_fetcher.configurations import ApiConfiguration
+from data_fetcher_core.configurations import ApiConfiguration
 
 class CustomApiConfig(ApiConfiguration):
     def __init__(self, base_url: str, auth_token: str):
@@ -74,8 +74,8 @@ class CustomApiConfig(ApiConfiguration):
 The `ApiLoader` component handles API requests with authentication and response processing:
 
 ```python
-from data_fetcher.bundle_loaders import ApiLoader
-from data_fetcher.protocols import HttpManager
+from data_fetcher_core.bundle_loaders import ApiLoader
+from data_fetcher_core.protocols import HttpManager
 
 # Create API loader with authentication
 http_manager = HttpManager(
@@ -94,7 +94,7 @@ api_loader = ApiLoader(
 The `ApiPaginationBundleLocator` handles URL generation for paginated APIs:
 
 ```python
-from data_fetcher.bundle_locators import ApiPaginationBundleLocator
+from data_fetcher_core.bundle_locators import ApiPaginationBundleLocator
 
 # Create pagination locator
 locator = ApiPaginationBundleLocator(
@@ -108,7 +108,7 @@ locator = ApiPaginationBundleLocator(
 
 ### **Bearer Token Authentication**
 ```python
-from data_fetcher.protocols import BearerTokenAuthenticationMechanism
+from data_fetcher_core.protocols import BearerTokenAuthenticationMechanism
 
 auth = BearerTokenAuthenticationMechanism("your-api-token")
 http_manager = HttpManager(auth_mechanism=auth)
@@ -116,7 +116,7 @@ http_manager = HttpManager(auth_mechanism=auth)
 
 ### **Basic Authentication**
 ```python
-from data_fetcher.protocols import BasicAuthenticationMechanism
+from data_fetcher_core.protocols import BasicAuthenticationMechanism
 
 auth = BasicAuthenticationMechanism("username", "password")
 http_manager = HttpManager(auth_mechanism=auth)
@@ -124,7 +124,7 @@ http_manager = HttpManager(auth_mechanism=auth)
 
 ### **OAuth Authentication**
 ```python
-from data_fetcher.protocols import OAuthAuthenticationMechanism
+from data_fetcher_core.protocols import OAuthAuthenticationMechanism
 
 auth = OAuthAuthenticationMechanism(
     client_id="your-client-id",
@@ -138,7 +138,7 @@ http_manager = HttpManager(auth_mechanism=auth)
 
 ### **Cursor-based Pagination**
 ```python
-from data_fetcher.bundle_locators import CursorPaginationStrategy
+from data_fetcher_core.bundle_locators import CursorPaginationStrategy
 
 strategy = CursorPaginationStrategy(
     cursor_param="next_cursor",
@@ -148,7 +148,7 @@ strategy = CursorPaginationStrategy(
 
 ### **Offset-based Pagination**
 ```python
-from data_fetcher.bundle_locators import OffsetPaginationStrategy
+from data_fetcher_core.bundle_locators import OffsetPaginationStrategy
 
 strategy = OffsetPaginationStrategy(
     offset_param="offset",
@@ -159,7 +159,7 @@ strategy = OffsetPaginationStrategy(
 
 ### **Page-based Pagination**
 ```python
-from data_fetcher.bundle_locators import PagePaginationStrategy
+from data_fetcher_core.bundle_locators import PagePaginationStrategy
 
 strategy = PagePaginationStrategy(
     page_param="page",
@@ -184,7 +184,7 @@ result = await run_fetcher(
 
 ### **Custom API Configuration**
 ```python
-from data_fetcher.configurations import CustomApiConfig
+from data_fetcher_core.configurations import CustomApiConfig
 
 # Create custom configuration
 config = CustomApiConfig(
@@ -198,9 +198,9 @@ result = await config.run()
 
 ### **Programmatic API Usage**
 ```python
-from data_fetcher.core import FetchContext, FetchPlan
-from data_fetcher.bundle_loaders import ApiLoader
-from data_fetcher.bundle_locators import ApiPaginationBundleLocator
+from data_fetcher_core.core import FetchContext, FetchPlan
+from data_fetcher_core.bundle_loaders import ApiLoader
+from data_fetcher_core.bundle_locators import ApiPaginationBundleLocator
 
 # Create components
 loader = ApiLoader(http_manager, "https://api.example.com", "token")

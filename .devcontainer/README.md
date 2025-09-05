@@ -5,19 +5,22 @@ This directory contains configuration files for the OC Fetcher development conta
 ## Features
 
 - Base Image: Ubuntu-based development container
-- Python 3.10: With Poetry for dependency management
+- Python 3.13: With Poetry package manager (via poetry feature)
 - Node.js 22.18.0: For development tools like Mermaid and Puppeteer
 - Docker-in-Docker: For running containers within the devcontainer
 - AWS CLI: For AWS service interactions
 - Git & GitHub CLI: For version control and GitHub integration
+- Poetry Feature: Dedicated feature for Poetry installation and configuration
 
 ## Files
 
 - `devcontainer.json` - Main devcontainer configuration
-- `shell-config.sh` - Bash shell configuration (paging disabled, agent prompts)
-- `zsh-config.sh` - Zsh shell configuration (agent prompts)
 - `aws-config` - AWS CLI configuration
-- `git-config` - Git configuration
+- `git-config` - Git configuration (legacy, now handled by git-ssh feature)
+- `features/` - Custom devcontainer features directory
+  - `poetry/` - Poetry package manager feature
+  - `git-ssh/` - Git and SSH configuration feature
+  - `cursor-safe/` - Cursor-specific configuration feature
 - `README.md` - This file
 
 ## CLI Tool Configuration
@@ -41,9 +44,10 @@ Tools affected:
 
 The following configuration files are automatically copied and sourced:
 
-- Shell configuration: `~/.bashrc` sources `~/shell-config.sh` and `~/.zshrc` sources `~/zsh-config.sh`
+- Shell configuration: `~/.bashrc` and `~/.zshrc` configured via git-ssh feature
+- Poetry environment: `~/poetry-env.sh` configured via poetry feature
 - AWS CLI config: `~/.aws/config` with paging disabled
-- Git config: `~/.gitconfig` with paging disabled and useful defaults
+- Git config: Applied via git-ssh feature
 
 ### Environment Variables
 
@@ -57,7 +61,7 @@ LESS=""                      # Disable less paging
 MORE=""                      # Disable more paging
 MANPAGER=cat                 # Disable manual paging
 PYTHONUNBUFFERED=1           # Ensure Python output is not buffered
-POETRY_VENV_IN_PROJECT=1     # Keep Poetry virtual environment in project
+POETRY_VENV_IN_PROJECT=1     # Keep Poetry virtual environment in project (set by poetry feature)
 ```
 
 ## Shell Configuration
@@ -68,7 +72,8 @@ The devcontainer automatically configures both bash and zsh shells with:
 - Disabled paging for CLI tools (AWS, Git, etc.)
 - AWS CLI configuration
 - Docker settings
-- Python/Poetry environment variables
+- Python environment variables
+- Poetry environment configuration (via poetry feature)
 - Development editor settings
 
 ### Agent Session Prompts
@@ -114,7 +119,7 @@ To add more CLI tools or modify the configuration:
 1. Edit `.devcontainer/shell-config.sh` for bash/zsh environment variables
 2. Edit `.devcontainer/zsh-config.sh` for zsh-specific prompt or options
 3. Edit `.devcontainer/aws-config` for AWS CLI settings
-4. Edit `.devcontainer/git-config` for Git settings
+4. Edit `.devcontainer/features/cursor-safe/git-config.sh` for Git settings (agent sessions only)
 5. Update `.devcontainer/devcontainer.json` for container-level changes
 
 ## Troubleshooting

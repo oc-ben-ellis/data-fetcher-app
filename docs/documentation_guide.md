@@ -4,11 +4,11 @@ This guide explains how to structure and maintain the OC Fetcher documentation, 
 
 ## Overview
 
-The OC Fetcher documentation uses a custom build system that converts Markdown files to HTML with modern styling. The build process automatically:
+The OC Fetcher documentation uses **MkDocs** with the Material theme to create a modern, responsive documentation site. The build process automatically:
 
 - Converts Markdown to HTML with syntax highlighting
-- Generates navigation structure
-- Processes images and diagrams
+- Generates navigation structure from configuration
+- Renders Mermaid diagrams natively
 - Creates a responsive, searchable documentation site
 
 ## File Structure
@@ -47,13 +47,13 @@ docs/
 
 ### How It Works
 
-The build system (`scripts/build_docs.py`) processes documentation in the following order:
+MkDocs processes documentation in the following order:
 
-1. **File Discovery**: Scans for Markdown files in `docs/` and subdirectories
-2. **Asset Processing**: Converts SVG files to PNG for better browser compatibility
+1. **Configuration**: Reads `mkdocs.yaml` for site configuration and navigation
+2. **File Discovery**: Scans for Markdown files in `docs/` and subdirectories
 3. **Content Processing**: Converts Markdown to HTML with syntax highlighting
-4. **Navigation Generation**: Creates hierarchical navigation based on file structure
-5. **Template Rendering**: Applies consistent styling and layout
+4. **Plugin Processing**: Renders Mermaid diagrams and applies other plugins
+5. **Template Rendering**: Applies Material theme styling and layout
 
 ### Build Commands
 
@@ -65,28 +65,30 @@ make docs
 make docs/open
 
 # Direct build command
-poetry run build-docs
+poetry run mkdocs build
 ```
 
 ### Output Location
 
-Built documentation is generated in `docs/rendered/` with the following structure:
+Built documentation is generated in `site/` with the following structure:
 
 ```
-docs/rendered/
-├── index.html                    # Main page (from README.md)
-├── overview.html                 # Overview page
-├── architecture_guide.html      # Architecture guide
-├── troubleshooting.html         # Troubleshooting guide
-├── deployment.html              # Deployment guide
-├── testing_guide.html           # Testing guide
-├── protocol_differences.html    # Protocol differences
-├── assets/                      # Processed assets
-│   ├── style.css                # Generated CSS
-│   ├── pygments.css             # Syntax highlighting
-│   ├── *.png                    # Converted images
-│   └── *.svg                    # Original SVG files
-└── [subdirectories]/            # Organized by section
+site/
+├── index.html                    # Main page (from docs/index.md)
+├── documentation_guide/          # Documentation guide
+├── troubleshooting/              # Troubleshooting guide
+├── architecture/                 # Architecture documentation
+├── configurations/               # Configuration documentation
+├── application_configuration/    # Application configuration
+├── persistence/                  # Persistence documentation
+├── storage/                      # Storage documentation
+├── testing/                      # Testing documentation
+├── deployment/                   # Deployment documentation
+├── assets/                       # Static assets
+│   ├── stylesheets/              # CSS files
+│   ├── javascripts/              # JavaScript files
+│   └── images/                   # Images and diagrams
+└── search/                       # Search index
 ```
 
 ## Writing Documentation
@@ -207,7 +209,7 @@ Use language-specific code blocks:
 
 ```python
 # Python code
-from data_fetcher.registry import get_fetcher
+from data_fetcher_core.registry import get_fetcher
 
 fetcher = get_fetcher("us-fl")
 result = await fetcher.run(plan)
@@ -332,7 +334,7 @@ pip install poetry
 poetry install
 
 # Build fails
-poetry run build-docs
+poetry run mkdocs build
 ```
 
 #### Navigation Issues
@@ -353,22 +355,22 @@ poetry run build-docs
 
 ```bash
 # Verbose build output
-poetry run build-docs
+poetry run mkdocs build --verbose
 
 # Check generated files
-ls -la docs/rendered/
+ls -la site/
 ```
 
 #### Validate Links
 
 ```bash
 # Check for broken links in generated HTML
-grep -r "href=" docs/rendered/ | grep -v "http"
+grep -r "href=" site/ | grep -v "http"
 ```
 
 #### Test Navigation
 
-1. Open `docs/rendered/index.html` in browser
+1. Open `site/index.html` in browser
 2. Navigate through all sections
 3. Check that links work correctly
 4. Verify images display properly
@@ -402,7 +404,7 @@ grep -r "href=" docs/rendered/ | grep -v "http"
 
 The build system generates CSS automatically, but you can customize:
 
-1. **Modify template**: Edit `scripts/build_docs.py`
+1. **Modify theme**: Edit `mkdocs.yaml` configuration
 2. **Add custom styles**: Extend the CSS generation
 3. **Theme changes**: Update color schemes and fonts
 

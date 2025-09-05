@@ -1,0 +1,188 @@
+# Data Fetcher App
+
+A composable, streaming-first fetch framework for Python that pulls resources from heterogeneous remote sources and bundles them with metadata into a standard package in a common file store for further ETL processing downstream.
+
+## Key Features
+
+- **Composable Architecture**: Bundle locators generate URLs for loading
+- **Streaming-First**: Bundle loaders stream large payloads directly to Storage to keep RAM small
+- **Protocol-Level Policies**: Managers handle cross-cutting concerns like rate limiting and scheduling
+- **Multiple Protocols**: Support for HTTP(S) and SFTP with extensible architecture
+- **SFTP**: Enterprise-grade SFTP with AWS Secrets Manager, S3 upload, and date-based file patterns
+- **Structured Logging**: Built-in structlog integration with context variables and JSON output
+- **Modular Design**: Clean separation of concerns with dedicated packages for different protocols and functionality
+
+## Module Structure
+
+The framework is organized into focused, modular packages:
+
+- **`data_fetcher_app`**: Main application entry point and configuration files
+- **`data_fetcher_core`**: Core framework components and common utilities
+- **`data_fetcher_configs`**: Predefined configurations for different data sources
+- **`data_fetcher_sftp`**: SFTP-specific classes and modules
+- **`data_fetcher_http`**: HTTP-specific classes and modules
+- **`data_fetcher_http_api`**: HTTP API-specific classes and modules
+
+## Quick Start
+
+### Using the Configuration System (Recommended)
+
+```bash
+# Run US Florida SFTP fetcher
+poetry run python -m data_fetcher_app.main us-fl
+
+# Run France API fetcher
+poetry run python -m data_fetcher_app.main fr
+
+# List all available configurations
+poetry run python -m data_fetcher_app.main
+```
+
+### Basic Usage with Configuration System
+
+```python
+from data_fetcher_core.registry import get_fetcher
+
+# Run a predefined configuration
+fetcher = get_fetcher("us-fl")
+result = await fetcher.run(plan)
+
+# Run France configuration
+fetcher = get_fetcher("fr")
+result = await fetcher.run(plan)
+```
+
+### Credential Providers
+
+The framework supports multiple credential providers for different deployment scenarios:
+
+#### AWS Secrets Manager (Default)
+```bash
+# Use AWS Secrets Manager for credentials (default behavior)
+poetry run python -m data_fetcher_app.main us-fl
+
+# Explicitly specify AWS provider
+poetry run python -m data_fetcher_app.main --credentials-provider aws us-fl
+```
+
+#### Environment Variables
+```bash
+# Use environment variables for credentials
+poetry run python -m data_fetcher_app.main --credentials-provider env us-fl
+```
+
+When using environment variables, set them in this format:
+```bash
+# For US Florida configuration (us-fl)
+export OC_CREDENTIAL_US_FL_HOST="sftp.example.com"
+export OC_CREDENTIAL_US_FL_USERNAME="username"
+export OC_CREDENTIAL_US_FL_PASSWORD="password"
+
+# For France API configuration (fr-api)
+export OC_CREDENTIAL_FR_API_CLIENT_ID="client-id"
+export OC_CREDENTIAL_FR_API_CLIENT_SECRET="client-secret"
+```
+
+**Note**: Configuration names with hyphens (e.g., 'us-fl') are converted to underscores (e.g., 'US_FL') in environment variable names.
+
+See [examples/credential_provider_example.py](examples/credential_provider_example.py) for more detailed usage examples.
+
+## Installation
+
+### Option 1: Using DevContainer (Recommended)
+
+The project includes a DevContainer configuration that provides a consistent development environment.
+
+#### Prerequisites
+- **Docker Desktop** (Windows/Mac) or **Docker Engine** (Linux)
+- **VS Code** with the **Dev Containers extension** or **Cursor**
+
+#### Setup
+1. Open the project folder in VS Code/Cursor
+2. When prompted, click "Reopen in Container" or press `Ctrl+Shift+P` and run "Dev Containers: Reopen in Container"
+3. Wait for the container to build and dependencies to install
+
+### Option 2: Local Installation
+
+```bash
+# Install Poetry (if not already installed)
+pip install poetry
+
+# Install dependencies
+poetry install
+
+# Activate virtual environment
+poetry shell
+```
+
+## Available Configurations
+
+The framework comes with several predefined country-code based configurations:
+
+### SFTP Configurations
+- **`us-fl`**: US Florida - SFTP batch processing
+
+### HTTP/API Configurations
+- **`fr`**: France - API Fetcher
+
+## Getting Started
+
+1. **Start with the [Complete Overview](configurations/overview.md)** for framework introduction and quick start
+2. **Explore [Architecture](architecture/README.md)** to understand the system design
+3. **Check [Configurations](configurations/overview.md)** for available predefined setups
+4. **Review [Deployment](deployment/README.md)** for production deployment guidance
+
+## Development
+
+### Code Quality
+
+The project enforces strict code quality standards including PEP 257 compliance and Google-style docstrings. All Python code must follow these standards:
+
+```bash
+# Format and check code quality
+make format
+
+# Check docstring compliance
+make lint/docstrings
+
+# Add standard headers to Python files
+make headers
+
+# Install pre-commit hooks for automatic checks
+make pre-commit
+
+# Run all quality checks
+make all-checks
+```
+
+### Basic Development Commands
+
+```bash
+# Format code (or it happens automatically on save)
+poetry run ruff format .
+
+# Lint code
+poetry run ruff check .
+
+# Type check
+poetry run mypy .
+
+# Run tests
+poetry run pytest
+
+# Run examples
+poetry run python examples/basic_usage_example.py
+```
+
+### Docstring Standards
+
+- **PEP 257 Compliance**: All modules, functions, classes, and methods must have docstrings
+- **Google Style Format**: Use Google-style docstring format for consistency
+- **Module Headers**: Every Python file includes author and copyright information
+- **Automatic Enforcement**: Pre-commit hooks and CI checks ensure compliance
+
+See [Docstring Standards](docstring_standards.md) for detailed guidelines and examples.
+
+---
+
+© 2025 OpenCorporates. All rights reserved.

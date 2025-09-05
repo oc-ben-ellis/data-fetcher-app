@@ -36,7 +36,7 @@ Utility classes for managing persistence operations:
 
 #### PersistenceManager
 ```python
-from data_fetcher.utils.persistence_utils import create_persistence_manager
+from data_fetcher_core.utils.persistence_utils import create_persistence_manager
 
 # Create a persistence manager
 persistence = await create_persistence_manager("my_provider")
@@ -60,7 +60,7 @@ failed_items = await persistence.get_failed_items(max_retries=3)
 
 #### RetryManager
 ```python
-from data_fetcher.utils.persistence_utils import create_retry_manager
+from data_fetcher_core.utils.persistence_utils import create_retry_manager
 
 # Create a retry manager
 retry_manager = await create_retry_manager(max_retries=3, backoff_factor=2.0)
@@ -80,7 +80,7 @@ if await retry_manager.should_retry("failed_item"):
 
 #### StateTracker
 ```python
-from data_fetcher.utils.persistence_utils import create_state_tracker
+from data_fetcher_core.utils.persistence_utils import create_state_tracker
 
 # Create a state tracker
 tracker = await create_state_tracker("my_tracker")
@@ -126,7 +126,7 @@ export OC_KV_STORE_DEFAULT_TTL=3600
 ### Programmatic Configuration
 
 ```python
-from data_fetcher.kv_store import configure_global_store
+from data_fetcher_core.kv_store import configure_global_store
 
 # Configure for production
 configure_global_store(
@@ -162,7 +162,7 @@ result = await run_fetcher("fr-api", concurrency=2)
 ### 2. Custom Error Handling
 
 ```python
-from data_fetcher.utils.persistence_utils import create_persistence_manager, create_retry_manager
+from data_fetcher_core.utils.persistence_utils import create_persistence_manager, create_retry_manager
 
 async def handle_failed_request(request, error):
     persistence = await create_persistence_manager("my_provider")
@@ -185,7 +185,7 @@ async def handle_failed_request(request, error):
 ### 3. Monitoring and Statistics
 
 ```python
-from data_fetcher.utils.persistence_utils import create_state_tracker
+from data_fetcher_core.utils.persistence_utils import create_state_tracker
 
 async def monitor_processing():
     tracker = await create_state_tracker("monitoring")
@@ -205,7 +205,7 @@ async def monitor_processing():
 ### 4. Recovery and Cleanup
 
 ```python
-from data_fetcher.utils.persistence_utils import create_persistence_manager
+from data_fetcher_core.utils.persistence_utils import create_persistence_manager
 
 async def cleanup_and_recover():
     persistence = await create_persistence_manager("my_provider")

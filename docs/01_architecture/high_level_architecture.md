@@ -100,7 +100,7 @@ The OC Fetcher framework is built around a composable, streaming-first architect
   - ApiLoader for API endpoints
 
 #### **Storage Layer**
-- **Base Storage**: File Storage and S3 Storage
+- **Base Storage**: File Storage and Pipeline Storage
 - **Storage Decorators**: Unzip, Bundle Resources
 
 #### **Supporting Systems**

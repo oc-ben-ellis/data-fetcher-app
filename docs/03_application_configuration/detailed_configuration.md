@@ -262,7 +262,7 @@ If you were previously using hard-coded values, you can migrate by:
 # In your code
 storage_config = (
     create_storage_config()
-    .s3_storage(
+    .pipeline_storage(
         bucket="my-old-bucket",
         prefix="old-prefix/",
         region="us-west-1"
