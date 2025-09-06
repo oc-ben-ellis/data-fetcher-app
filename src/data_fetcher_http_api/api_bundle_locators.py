@@ -13,18 +13,33 @@ from typing import Any
 import structlog
 
 from data_fetcher_core.core import BundleRef, FetchRunContext, RequestMeta
-from data_fetcher_core.kv_store import KeyValueStore, get_global_store
-from data_fetcher_http.http_manager import HttpManager
+from data_fetcher_core.kv_store import KeyValueStore
+from data_fetcher_core.protocol_config import HttpProtocolConfig
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
 
 
+class NoKeyValueStoreError(ValueError):
+    """Raised when no key-value store is available in context."""
+
+    def __init__(self) -> None:
+        """Initialize the no key-value store error.
+
+        This error is raised when a bundle locator requires persistence
+        but no key-value store is available in the context.
+        """
+        super().__init__(
+            "No kv_store available in context - persistence is required for this locator"
+        )
+
+
 @dataclass
-class ApiPaginationBundleLocator:
+class PaginationHttpBundleLocator:
     """Generic API bundle locator with pagination support."""
 
-    http_manager: HttpManager
+    http_config: HttpProtocolConfig
+    store: KeyValueStore
     base_url: str
     date_start: str
     date_end: str | None = None
@@ -34,7 +49,7 @@ class ApiPaginationBundleLocator:
     query_params: dict[str, Any] | None = None
     headers: dict[str, str] | None = None
     query_builder: Callable[[str], str] | None = None
-    persistence_prefix: str = "api_provider"
+    state_management_prefix: str = "api_provider"
 
     def __post_init__(self) -> None:
         """Initialize the bundle locator state and internal variables."""
@@ -45,20 +60,17 @@ class ApiPaginationBundleLocator:
         self._initialized: bool = False
         self._last_request_time: float = 0.0
         self._rate_limit_lock: asyncio.Lock = asyncio.Lock()
-        self._store: KeyValueStore | None = None
 
-    async def _get_store(self) -> KeyValueStore:
-        """Get the key-value store instance."""
-        if self._store is None:
-            self._store = await get_global_store()
-        return self._store
-
-    async def _load_persistence_state(self) -> None:
+    async def _load_persistence_state(self, context: FetchRunContext) -> None:  # noqa: ARG002
         """Load persistence state from kvstore."""
-        store = await self._get_store()
+        if not self.store:
+            raise NoKeyValueStoreError
+        store = self.store
 
         # Load processed URLs
-        processed_urls_key = f"{self.persistence_prefix}:processed_urls:{self.base_url}"
+        processed_urls_key = (
+            f"{self.state_management_prefix}:processed_urls:{self.base_url}"
+        )
         processed_urls_data = await store.get(processed_urls_key, [])
         if isinstance(processed_urls_data, list):
             self._processed_urls = set(processed_urls_data)
@@ -66,7 +78,7 @@ class ApiPaginationBundleLocator:
             self._processed_urls = set()
 
         # Load current state
-        state_key = f"{self.persistence_prefix}:state:{self.base_url}"
+        state_key = f"{self.state_management_prefix}:state:{self.base_url}"
         state_data = await store.get(state_key, {})
 
         if state_data:
@@ -78,18 +90,22 @@ class ApiPaginationBundleLocator:
             self._initialized = state_data.get("initialized", False)  # type: ignore[attr-defined]
             self._last_request_time = state_data.get("last_request_time", 0.0)  # type: ignore[attr-defined]
 
-    async def _save_persistence_state(self) -> None:
+    async def _save_persistence_state(self, context: FetchRunContext) -> None:  # noqa: ARG002
         """Save persistence state to kvstore."""
-        store = await self._get_store()
+        if not self.store:
+            raise NoKeyValueStoreError
+        store = self.store
 
         # Save processed URLs
-        processed_urls_key = f"{self.persistence_prefix}:processed_urls:{self.base_url}"
+        processed_urls_key = (
+            f"{self.state_management_prefix}:processed_urls:{self.base_url}"
+        )
         await store.put(
             processed_urls_key, list(self._processed_urls), ttl=timedelta(days=7)
         )
 
         # Save current state
-        state_key = f"{self.persistence_prefix}:state:{self.base_url}"
+        state_key = f"{self.state_management_prefix}:state:{self.base_url}"
         state_data = {
             "current_date": (
                 self._current_date.strftime("%Y-%m-%d")
@@ -107,15 +123,16 @@ class ApiPaginationBundleLocator:
         self,
         request: RequestMeta,
         bundle_refs: list[BundleRef],
+        context: FetchRunContext,  # noqa: ARG002
         *,
         success: bool = True,
     ) -> None:
         """Save processing result to kvstore."""
-        store = await self._get_store()
+        if not self.store:
+            raise NoKeyValueStoreError
+        store = self.store
 
-        result_key = (
-            f"{self.persistence_prefix}:results:{self.base_url}:{hash(request.url)}"
-        )
+        result_key = f"{self.state_management_prefix}:results:{self.base_url}:{hash(request.url)}"
         result_data = {
             "url": request.url,
             "timestamp": datetime.now(UTC).isoformat(),
@@ -125,12 +142,19 @@ class ApiPaginationBundleLocator:
         }
         await store.put(result_key, result_data, ttl=timedelta(days=30))
 
-    async def _save_error_state(self, request: RequestMeta, error: str) -> None:
+    async def _save_error_state(
+        self,
+        request: RequestMeta,
+        error: str,
+        context: FetchRunContext,  # noqa: ARG002
+    ) -> None:
         """Save error state for retry logic."""
-        store = await self._get_store()
+        if not self.store:
+            raise NoKeyValueStoreError
+        store = self.store
 
         error_key = (
-            f"{self.persistence_prefix}:errors:{self.base_url}:{hash(request.url)}"
+            f"{self.state_management_prefix}:errors:{self.base_url}:{hash(request.url)}"
         )
         error_data = {
             "url": request.url,
@@ -140,10 +164,10 @@ class ApiPaginationBundleLocator:
         }
         await store.put(error_key, error_data, ttl=timedelta(hours=24))
 
-    async def get_next_urls(self, _ctx: FetchRunContext) -> list[RequestMeta]:
+    async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
         """Get the next batch of API URLs to process."""
         if not self._initialized:
-            await self._load_persistence_state()
+            await self._load_persistence_state(ctx)
             await self._initialize()
 
         urls: list[RequestMeta] = []
@@ -155,24 +179,24 @@ class ApiPaginationBundleLocator:
                 self._processed_urls.add(url)
 
         # Save state after generating URLs
-        await self._save_persistence_state()
+        await self._save_persistence_state(ctx)
         return urls
 
     async def handle_url_processed(
-        self, request: RequestMeta, bundle_refs: list[BundleRef], _ctx: FetchRunContext
+        self, request: RequestMeta, bundle_refs: list[BundleRef], ctx: FetchRunContext
     ) -> None:
         """Handle when a URL has been processed and potentially generate next URLs."""
         # Mark as processed
         self._processed_urls.add(request.url)
 
         # Save processing result
-        await self._save_processing_result(request, bundle_refs, success=True)
+        await self._save_processing_result(request, bundle_refs, ctx, success=True)
 
         # Check if we need to generate more URLs based on response
         if bundle_refs and len(bundle_refs) > 0:
             # Extract cursor from response if available
             # This would need to be implemented based on the actual API response format
-            await self._generate_next_urls(_ctx)
+            await self._generate_next_urls(ctx)
 
         # If no more URLs in queue and we haven't finished the date range, generate more
         if not self._url_queue and self._current_date and self.date_end:
@@ -185,12 +209,17 @@ class ApiPaginationBundleLocator:
                 await self._generate_urls_for_current_date()
 
         # Save state after processing
-        await self._save_persistence_state()
+        await self._save_persistence_state(ctx)
 
-    async def handle_url_error(self, request: RequestMeta, error: str) -> None:
+    async def handle_url_error(
+        self,
+        request: RequestMeta,
+        error: str,
+        context: FetchRunContext,
+    ) -> None:
         """Handle when a URL processing fails."""
-        await self._save_error_state(request, error)
-        await self._save_persistence_state()
+        await self._save_error_state(request, error, context)
+        await self._save_persistence_state(context)
 
     async def _initialize(self) -> None:
         """Initialize the provider with the date range."""
@@ -258,7 +287,7 @@ class ApiPaginationBundleLocator:
 
         self._url_queue.append(url)
 
-    async def _generate_next_urls(self, _ctx: FetchRunContext) -> None:
+    async def _generate_next_urls(self, ctx: FetchRunContext) -> None:  # noqa: ARG002
         """Generate next URLs based on pagination or date progression."""
         # This would be called after processing a response to determine if we need more URLs
         # For now, we'll implement a simple date progression
@@ -285,10 +314,11 @@ class ApiPaginationBundleLocator:
 
 
 @dataclass
-class SingleApiBundleLocator:
+class SingleHttpBundleLocator:
     """Bundle locator for single API endpoints."""
 
-    http_manager: HttpManager
+    http_config: HttpProtocolConfig
+    store: KeyValueStore
     urls: list[str]
     headers: dict[str, str] | None = None
     persistence_prefix: str = "single_api_provider"
@@ -297,17 +327,12 @@ class SingleApiBundleLocator:
         """Initialize the single API bundle locator state and internal variables."""
         self._processed_urls: set[str] = set()
         self._url_queue: list[str] = self.urls.copy()
-        self._store: KeyValueStore | None = None
 
-    async def _get_store(self) -> KeyValueStore:
-        """Get the key-value store instance."""
-        if self._store is None:
-            self._store = await get_global_store()
-        return self._store
-
-    async def _load_persistence_state(self) -> None:
+    async def _load_persistence_state(self, context: FetchRunContext) -> None:  # noqa: ARG002
         """Load persistence state from kvstore."""
-        store = await self._get_store()
+        if not self.store:
+            raise NoKeyValueStoreError
+        store = self.store
 
         # Load processed URLs
         processed_urls_key = f"{self.persistence_prefix}:processed_urls"
@@ -322,9 +347,11 @@ class SingleApiBundleLocator:
             url for url in self._url_queue if url not in self._processed_urls
         ]
 
-    async def _save_persistence_state(self) -> None:
+    async def _save_persistence_state(self, context: FetchRunContext) -> None:  # noqa: ARG002
         """Save persistence state to kvstore."""
-        store = await self._get_store()
+        if not self.store:
+            raise NoKeyValueStoreError
+        store = self.store
 
         # Save processed URLs
         processed_urls_key = f"{self.persistence_prefix}:processed_urls"
@@ -336,11 +363,14 @@ class SingleApiBundleLocator:
         self,
         request: RequestMeta,
         bundle_refs: list[BundleRef],
+        context: FetchRunContext,  # noqa: ARG002
         *,
         success: bool = True,
     ) -> None:
         """Save processing result to kvstore."""
-        store = await self._get_store()
+        if not self.store:
+            raise NoKeyValueStoreError
+        store = self.store
 
         result_key = f"{self.persistence_prefix}:results:{hash(request.url)}"
         result_data = {
@@ -352,11 +382,11 @@ class SingleApiBundleLocator:
         }
         await store.put(result_key, result_data, ttl=timedelta(days=30))
 
-    async def get_next_urls(self, _ctx: FetchRunContext) -> list[RequestMeta]:
+    async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
         """Get the next batch of API URLs to process."""
         # Load persistence state on first call
         if not self._processed_urls:
-            await self._load_persistence_state()
+            await self._load_persistence_state(ctx)
 
         urls: list[RequestMeta] = []
         BATCH_SIZE = 10  # noqa: N806
@@ -367,25 +397,32 @@ class SingleApiBundleLocator:
                 self._processed_urls.add(url)
 
         # Save state after generating URLs
-        await self._save_persistence_state()
+        await self._save_persistence_state(ctx)
         return urls
 
     async def handle_url_processed(
-        self, request: RequestMeta, bundle_refs: list[BundleRef], _ctx: FetchRunContext
+        self, request: RequestMeta, bundle_refs: list[BundleRef], ctx: FetchRunContext
     ) -> None:
         """Handle when a URL has been processed."""
         # Mark as processed
         self._processed_urls.add(request.url)
 
         # Save processing result
-        await self._save_processing_result(request, bundle_refs, success=True)
+        await self._save_processing_result(request, bundle_refs, ctx, success=True)
 
         # Save state after processing
-        await self._save_persistence_state()
+        await self._save_persistence_state(ctx)
 
-    async def handle_url_error(self, request: RequestMeta, error: str) -> None:
+    async def handle_url_error(
+        self,
+        request: RequestMeta,
+        error: str,
+        context: FetchRunContext,  # noqa: ARG002
+    ) -> None:
         """Handle when a URL processing fails."""
-        store = await self._get_store()
+        if not self.store:
+            raise NoKeyValueStoreError
+        store = self.store
 
         error_key = f"{self.persistence_prefix}:errors:{hash(request.url)}"
         error_data = {

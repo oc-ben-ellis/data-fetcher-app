@@ -1,26 +1,27 @@
 """SFTP protocol manager and connection handling.
 
 This module provides the SFTPManager class for managing SFTP connections,
-including authentication, file operations, and connection management.
+including authentication, file operations, and connection management with
+support for multiple connection pools based on configuration.
 """
 
 import asyncio
+import os
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import pysftp
 import structlog
 
-from data_fetcher_core.utils.retry import (
-    async_retry_with_backoff,
-    create_connection_retry_engine,
-    create_operation_retry_engine,
-)
+from data_fetcher_core.protocol_config import SftpProtocolConfig
+from data_fetcher_core.utils.retry import create_retry_engine
+from data_fetcher_sftp.sftp_credentials import SftpCredentialsWrapper
 
 if TYPE_CHECKING:
-    from data_fetcher_core.credentials.sftp_credentials import SftpCredentialsWrapper
+    from data_fetcher_core.config_factory import FetcherConfig
+    from data_fetcher_core.core import FetchRunContext
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -95,53 +96,58 @@ class OncePerIntervalGate:
 
 
 @dataclass
-class SftpManager:
-    """SFTP connection manager with scheduling, rate limiting, and retry logic."""
+class SftpConnectionPool:
+    """SFTP connection pool for a specific configuration."""
 
-    credentials_provider: "SftpCredentialsWrapper"
-    connect_timeout: float = 20.0
+    config: SftpProtocolConfig
     daily_gate: ScheduledDailyGate | None = None
     interval_gate: OncePerIntervalGate | None = None
-    rate_limit_requests_per_second: float = 5.0
-    max_retries: int = 3
-    base_retry_delay: float = 1.0
-    max_retry_delay: float = 60.0
-    retry_exponential_base: float = 2.0
+    _last_request_time: float = 0.0
+    _rate_limit_lock: asyncio.Lock | None = None
+    _connection: pysftp.Connection | None = None
+    _retry_engine: Any = None
 
     def __post_init__(self) -> None:
-        """Initialize the SFTP manager with internal state and connection management."""
-        self._last_request_time = 0.0
-        self._rate_limit_lock = asyncio.Lock()
-        self._connection: pysftp.Connection | None = None
+        """Initialize the connection pool."""
+        if self._rate_limit_lock is None:
+            self._rate_limit_lock = asyncio.Lock()
 
-        # Create retry engines for different operations
-        self._connection_retry_engine = create_connection_retry_engine()
-        self._operation_retry_engine = create_operation_retry_engine()
-
-    @async_retry_with_backoff(
-        max_retries=3,
-        base_delay=1.0,
-        max_delay=60.0,
-        exponential_base=2.0,
-        jitter=True,
-    )
-    async def get_connection(self) -> pysftp.Connection:
-        """Get or create SFTP connection with retry logic."""
-        if self._connection is None:
-            credentials = await self.credentials_provider.get_credentials()
-
-            # Configure connection options to allow unknown hosts
-            cnopts = pysftp.CnOpts()
-            cnopts.hostkeys = None  # Disable host key checking for testing
-
-            self._connection = pysftp.Connection(
-                host=credentials.host,
-                username=credentials.username,
-                password=credentials.password,
-                port=credentials.port,
-                cnopts=cnopts,
+        if self._retry_engine is None:
+            self._retry_engine = create_retry_engine(
+                max_retries=self.config.max_retries
             )
-        return self._connection
+
+    async def get_connection(
+        self,
+        app_config: "FetcherConfig",
+        credentials_provider: "SftpCredentialsWrapper",
+    ) -> pysftp.Connection:
+        """Get or create SFTP connection with retry logic."""
+
+        async def _create_connection() -> pysftp.Connection:
+            if self._connection is None:
+                # Update credentials provider with app_config
+                credentials_provider.update_credential_provider(
+                    app_config.credential_provider
+                )
+                credentials = await credentials_provider.get_credentials()
+
+                # Configure connection options to allow unknown hosts
+                cnopts = pysftp.CnOpts()
+                cnopts.hostkeys = None  # Disable host key checking for testing
+
+                self._connection = pysftp.Connection(
+                    host=credentials.host,
+                    username=credentials.username,
+                    password=credentials.password,
+                    port=credentials.port,
+                    cnopts=cnopts,
+                )
+            return self._connection
+
+        # Execute with retry logic using the unified retry engine
+        result = await self._retry_engine.execute_with_retry_async(_create_connection)
+        return cast("pysftp.Connection", result)
 
     async def wait_for_gates(self) -> None:
         """Wait for all gates to allow execution."""
@@ -151,46 +157,50 @@ class SftpManager:
         if self.interval_gate:
             await self.interval_gate.wait_if_needed()
 
-    @async_retry_with_backoff(
-        max_retries=3,
-        base_delay=1.0,
-        max_delay=60.0,
-        exponential_base=2.0,
-        jitter=True,
-    )
-    async def request(self, operation: str, *args: object, **kwargs: object) -> object:
+    async def request(
+        self,
+        app_config: "FetcherConfig",
+        credentials_provider: "SftpCredentialsWrapper",
+        operation: str,
+        *args: object,
+        **kwargs: object,
+    ) -> object:
         """Make an SFTP request with rate limiting and retry logic."""
-        # Wait for gates
-        await self.wait_for_gates()
 
-        # Rate limiting
-        async with self._rate_limit_lock:
-            now = time.time()
-            time_since_last = now - self._last_request_time
-            min_interval = 1.0 / self.rate_limit_requests_per_second
+        async def _make_request() -> object:
+            # Wait for gates
+            await self.wait_for_gates()
 
-            if time_since_last < min_interval:
-                await asyncio.sleep(min_interval - time_since_last)
+            # Rate limiting
+            async with self._rate_limit_lock:  # type: ignore[union-attr]
+                now = time.time()
+                time_since_last = now - self._last_request_time
+                min_interval = 1.0 / self.config.rate_limit_requests_per_second
 
-            self._last_request_time = now
+                if time_since_last < min_interval:
+                    await asyncio.sleep(min_interval - time_since_last)
 
-        # Execute operation
-        conn = await self.get_connection()
-        method = getattr(conn, operation)
-        return method(*args, **kwargs)
+                # Update last request time after any sleep
+                self._last_request_time = time.time()
 
-    @async_retry_with_backoff(
-        max_retries=2,
-        base_delay=0.5,
-        max_delay=10.0,
-        exponential_base=2.0,
-        jitter=True,
-    )
+            # Execute operation
+            conn = await self.get_connection(app_config, credentials_provider)
+            method = getattr(conn, operation)
+            return method(*args, **kwargs)
+
+        # Execute with retry logic using the unified retry engine
+        return await self._retry_engine.execute_with_retry_async(_make_request)
+
     async def close(self) -> None:
         """Close the SFTP connection with retry logic."""
-        if self._connection:
-            self._connection.close()
-            self._connection = None
+
+        async def _close_connection() -> None:
+            if self._connection:
+                self._connection.close()
+                self._connection = None
+
+        # Execute with retry logic using the unified retry engine
+        await self._retry_engine.execute_with_retry_async(_close_connection)
 
     async def reset_connection(self) -> None:
         """Reset the SFTP connection, useful after connection errors."""
@@ -206,28 +216,205 @@ class SftpManager:
             finally:
                 self._connection = None
 
-    @async_retry_with_backoff(
-        max_retries=3,
-        base_delay=1.0,
-        max_delay=60.0,
-        exponential_base=2.0,
-        jitter=True,
-    )
-    async def test_connection(self) -> bool:
+    async def test_connection(
+        self,
+        app_config: "FetcherConfig",
+        credentials_provider: "SftpCredentialsWrapper",
+    ) -> bool:
         """Test the SFTP connection with retry logic.
 
         Returns:
             True if connection is working, False otherwise.
         """
-        try:
-            conn = await self.get_connection()
-            # Try a simple operation to test the connection
-            _ = conn.pwd  # Test connection by accessing pwd attribute
-        except Exception as e:
-            logger.exception(
-                "Error testing SFTP connection",
-                error=str(e),
+
+        async def _test_connection() -> bool:
+            try:
+                conn = await self.get_connection(app_config, credentials_provider)
+                # Try a simple operation to test the connection
+                _ = conn.pwd  # Test connection by accessing pwd attribute
+            except Exception as e:
+                logger.exception(
+                    "Error testing SFTP connection",
+                    error=str(e),
+                )
+                return False
+            else:
+                return True
+
+        # Execute with retry logic using the unified retry engine
+        result = await self._retry_engine.execute_with_retry_async(_test_connection)
+        return cast("bool", result)
+
+
+class SftpManager:
+    """SFTP connection manager with support for multiple connection pools."""
+
+    def __init__(self) -> None:
+        """Initialize the SFTP manager with empty connection pools."""
+        self._connection_pools: dict[str, SftpConnectionPool] = {}
+
+    def _get_or_create_pool(
+        self,
+        config: SftpProtocolConfig,
+        daily_gate: ScheduledDailyGate | None = None,
+        interval_gate: OncePerIntervalGate | None = None,
+    ) -> SftpConnectionPool:
+        """Get or create a connection pool for the given configuration.
+
+        Args:
+            config: The SFTP protocol configuration.
+            daily_gate: Optional daily scheduling gate.
+            interval_gate: Optional interval scheduling gate.
+
+        Returns:
+            The connection pool for this configuration.
+        """
+        connection_key = config.get_connection_key()
+
+        if connection_key not in self._connection_pools:
+            self._connection_pools[connection_key] = SftpConnectionPool(
+                config=config,
+                daily_gate=daily_gate,
+                interval_gate=interval_gate,
             )
-            return False
-        else:
-            return True
+
+        return self._connection_pools[connection_key]
+
+    async def close_all(self) -> None:
+        """Close all SFTP connections."""
+        for pool in self._connection_pools.values():
+            await pool.close()
+
+    async def reset_all_connections(self) -> None:
+        """Reset all SFTP connections."""
+        for pool in self._connection_pools.values():
+            await pool.reset_connection()
+
+    # Direct SFTP operation methods
+    async def listdir(
+        self,
+        config: SftpProtocolConfig,
+        context: "FetchRunContext",
+        path: str,
+        daily_gate: ScheduledDailyGate | None = None,
+        interval_gate: OncePerIntervalGate | None = None,
+    ) -> list[str]:
+        """List directory contents."""
+        pool = self._get_or_create_pool(config, daily_gate, interval_gate)
+        credentials_provider = SftpCredentialsWrapper(
+            config.config_name,
+            context.app_config.credential_provider,  # type: ignore[union-attr]
+        )
+        return await pool.request(  # type: ignore[return-value]
+            context.app_config,  # type: ignore[arg-type]
+            credentials_provider,
+            "listdir",
+            path,
+        )
+
+    async def stat(
+        self,
+        config: SftpProtocolConfig,
+        context: "FetchRunContext",
+        path: str,
+        daily_gate: ScheduledDailyGate | None = None,
+        interval_gate: OncePerIntervalGate | None = None,
+    ) -> os.stat_result:
+        """Get file/directory statistics."""
+        pool = self._get_or_create_pool(config, daily_gate, interval_gate)
+        credentials_provider = SftpCredentialsWrapper(
+            config.config_name,
+            context.app_config.credential_provider,  # type: ignore[union-attr]
+        )
+        return await pool.request(  # type: ignore[return-value]
+            context.app_config,  # type: ignore[arg-type]
+            credentials_provider,
+            "stat",
+            path,
+        )
+
+    async def open(
+        self,
+        config: SftpProtocolConfig,
+        context: "FetchRunContext",
+        path: str,
+        mode: str = "r",
+        daily_gate: ScheduledDailyGate | None = None,
+        interval_gate: OncePerIntervalGate | None = None,
+    ) -> object:
+        """Open a file for reading/writing."""
+        pool = self._get_or_create_pool(config, daily_gate, interval_gate)
+        credentials_provider = SftpCredentialsWrapper(
+            config.config_name,
+            context.app_config.credential_provider,  # type: ignore[union-attr]
+        )
+        return await pool.request(
+            context.app_config,  # type: ignore[arg-type]
+            credentials_provider,
+            "open",
+            path,
+            mode,
+        )
+
+    async def exists(
+        self,
+        config: SftpProtocolConfig,
+        context: "FetchRunContext",
+        path: str,
+        daily_gate: ScheduledDailyGate | None = None,
+        interval_gate: OncePerIntervalGate | None = None,
+    ) -> bool:
+        """Check if file/directory exists."""
+        pool = self._get_or_create_pool(config, daily_gate, interval_gate)
+        credentials_provider = SftpCredentialsWrapper(
+            config.config_name,
+            context.app_config.credential_provider,  # type: ignore[union-attr]
+        )
+        return await pool.request(  # type: ignore[return-value]
+            context.app_config,  # type: ignore[arg-type]
+            credentials_provider,
+            "exists",
+            path,
+        )
+
+    async def isdir(
+        self,
+        config: SftpProtocolConfig,
+        context: "FetchRunContext",
+        path: str,
+        daily_gate: ScheduledDailyGate | None = None,
+        interval_gate: OncePerIntervalGate | None = None,
+    ) -> bool:
+        """Check if path is a directory."""
+        pool = self._get_or_create_pool(config, daily_gate, interval_gate)
+        credentials_provider = SftpCredentialsWrapper(
+            config.config_name,
+            context.app_config.credential_provider,  # type: ignore[union-attr]
+        )
+        return await pool.request(  # type: ignore[return-value]
+            context.app_config,  # type: ignore[arg-type]
+            credentials_provider,
+            "isdir",
+            path,
+        )
+
+    async def isfile(
+        self,
+        config: SftpProtocolConfig,
+        context: "FetchRunContext",
+        path: str,
+        daily_gate: ScheduledDailyGate | None = None,
+        interval_gate: OncePerIntervalGate | None = None,
+    ) -> bool:
+        """Check if path is a file."""
+        pool = self._get_or_create_pool(config, daily_gate, interval_gate)
+        credentials_provider = SftpCredentialsWrapper(
+            config.config_name,
+            context.app_config.credential_provider,  # type: ignore[union-attr]
+        )
+        return await pool.request(  # type: ignore[return-value]
+            context.app_config,  # type: ignore[arg-type]
+            credentials_provider,
+            "isfile",
+            path,
+        )

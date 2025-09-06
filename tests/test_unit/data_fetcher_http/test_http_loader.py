@@ -9,8 +9,9 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from data_fetcher_core.core import FetchRunContext, RequestMeta
+from data_fetcher_core.protocol_config import HttpProtocolConfig
 from data_fetcher_core.storage import FileStorage
-from data_fetcher_http.http_loader import HttpxStreamingLoader
+from data_fetcher_http.http_loader import StreamingHttpBundleLoader
 
 
 def create_mock_storage() -> Mock:
@@ -21,17 +22,13 @@ def create_mock_storage() -> Mock:
 def setup_storage_bundle_mock(mock_storage: Mock) -> AsyncMock:
     """Set up the storage bundle mock properly."""
     mock_bundle = AsyncMock()
-    # Create a proper async context manager mock
-    mock_context = AsyncMock()
-    # Configure the async context manager methods
-    mock_context.__aenter__ = AsyncMock(return_value=mock_bundle)
-    mock_context.__aexit__ = AsyncMock(return_value=None)
-    mock_storage.open_bundle.return_value = mock_context
+    # Set up start_bundle to return the bundle directly (not as context manager)
+    mock_storage.start_bundle = AsyncMock(return_value=mock_bundle)
     return mock_bundle
 
 
-class TestHttpxStreamingLoader:
-    """Test HttpxStreamingLoader class."""
+class TestStreamingHttpBundleLoader:
+    """Test StreamingHttpBundleLoader class."""
 
     @pytest.fixture
     def mock_http_manager(self) -> AsyncMock:
@@ -42,17 +39,29 @@ class TestHttpxStreamingLoader:
         return manager
 
     @pytest.fixture
-    def loader(self, mock_http_manager: AsyncMock) -> HttpxStreamingLoader:
+    def http_config(self) -> HttpProtocolConfig:
+        """Create a mock HTTP protocol config."""
+        return HttpProtocolConfig(
+            timeout=5.0,
+            rate_limit_requests_per_second=100.0,
+            max_retries=1,
+        )
+
+    @pytest.fixture
+    def loader(
+        self, mock_http_manager: AsyncMock, http_config: HttpProtocolConfig
+    ) -> StreamingHttpBundleLoader:
         """Create a loader instance for testing."""
-        return HttpxStreamingLoader(
+        return StreamingHttpBundleLoader(
             http_manager=mock_http_manager,
+            http_config=http_config,
             max_related=2,
             follow_redirects=True,
             max_redirects=5,
         )
 
     def test_loader_creation(
-        self, loader: HttpxStreamingLoader, mock_http_manager: AsyncMock
+        self, loader: StreamingHttpBundleLoader, mock_http_manager: AsyncMock
     ) -> None:
         """Test loader creation."""
         assert loader.http_manager == mock_http_manager
@@ -62,7 +71,7 @@ class TestHttpxStreamingLoader:
 
     @pytest.mark.asyncio
     async def test_load_successful_request(
-        self, loader: HttpxStreamingLoader, mock_http_manager: AsyncMock
+        self, loader: StreamingHttpBundleLoader, mock_http_manager: AsyncMock
     ) -> None:
         """Test successful HTTP request loading."""
         # Mock the HTTP manager response
@@ -79,7 +88,7 @@ class TestHttpxStreamingLoader:
 
         # Create request and context
         request = RequestMeta(url="https://example.com")
-        ctx = FetchRunContext()
+        ctx = FetchRunContext(run_id="test_run")
 
         # Mock storage bundle
         mock_storage = Mock()
@@ -98,7 +107,7 @@ class TestHttpxStreamingLoader:
 
     @pytest.mark.asyncio
     async def test_load_with_custom_headers(
-        self, loader: HttpxStreamingLoader, mock_http_manager: AsyncMock
+        self, loader: StreamingHttpBundleLoader, mock_http_manager: AsyncMock
     ) -> None:
         """Test loading with custom headers."""
         # Mock response
@@ -118,7 +127,7 @@ class TestHttpxStreamingLoader:
             url="https://example.com",
             headers={"Authorization": "Bearer token123"},
         )
-        ctx = FetchRunContext()
+        ctx = FetchRunContext(run_id="test_run")
 
         # Mock storage bundle
         mock_storage = Mock()
@@ -133,7 +142,7 @@ class TestHttpxStreamingLoader:
 
     @pytest.mark.asyncio
     async def test_load_with_error_response(
-        self, loader: HttpxStreamingLoader, mock_http_manager: AsyncMock
+        self, loader: StreamingHttpBundleLoader, mock_http_manager: AsyncMock
     ) -> None:
         """Test loading with error response."""
         # Mock error response
@@ -150,7 +159,7 @@ class TestHttpxStreamingLoader:
 
         # Create request and context
         request = RequestMeta(url="https://example.com/notfound")
-        ctx = FetchRunContext()
+        ctx = FetchRunContext(run_id="test_run")
 
         # Mock storage bundle
         mock_storage = Mock()
@@ -165,7 +174,7 @@ class TestHttpxStreamingLoader:
 
     @pytest.mark.asyncio
     async def test_load_with_http_error(
-        self, loader: HttpxStreamingLoader, mock_http_manager: AsyncMock
+        self, loader: StreamingHttpBundleLoader, mock_http_manager: AsyncMock
     ) -> None:
         """Test loading when HTTP manager raises an error."""
         # Mock HTTP manager to raise an exception
@@ -173,7 +182,7 @@ class TestHttpxStreamingLoader:
 
         # Create request and context
         request = RequestMeta(url="https://example.com")
-        ctx = FetchRunContext()
+        ctx = FetchRunContext(run_id="test_run")
 
         # Mock storage bundle
         mock_storage = Mock()

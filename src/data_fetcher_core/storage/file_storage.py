@@ -4,18 +4,23 @@ This module provides the FileStorage class for storing data to local file
 systems, including directory management and file operations.
 """
 
-import hashlib
 import importlib.util
 import re
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
+import structlog
+
+from data_fetcher_core.storage.bundle_storage_context import BundleStorageContext
+
 if TYPE_CHECKING:
-    from data_fetcher_core.core import BundleRef
+    from data_fetcher_core.core import BundleRef, FetcherRecipe
+
+# Get logger for this module
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -29,20 +34,116 @@ class FileStorage:
         """Initialize the file storage and create output directory if needed."""
         if self.create_dirs:
             Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+        self._active_bundles: dict[str, Any] = {}
 
-    @asynccontextmanager
-    async def open_bundle(
-        self, bundle_ref: "BundleRef"
-    ) -> AsyncGenerator["FileBundle"]:
-        """Open a bundle for writing."""
-        bundle = FileBundle(self.output_dir, bundle_ref)
-        try:
-            yield bundle
-        finally:
-            await bundle.close()
+    # New interface methods
+    async def start_bundle(
+        self, bundle_ref: "BundleRef", recipe: "FetcherRecipe"
+    ) -> "BundleStorageContext":
+        """Initialize a new bundle and return a BundleStorageContext."""
+        # Create file bundle
+        bundle = FileStorageBundle(self.output_dir, bundle_ref)
+        self._active_bundles[str(bundle_ref.bid)] = bundle
+
+        # Create and return BundleStorageContext
+        context = BundleStorageContext(bundle_ref, recipe, self)
+        logger.debug(
+            "Bundle started", bid=str(bundle_ref.bid), recipe_id=recipe.recipe_id
+        )
+        return context
+
+    async def _add_resource_to_bundle(
+        self,
+        bundle_ref: "BundleRef",
+        url: str,
+        content_type: str | None,
+        status_code: int,
+        stream: AsyncGenerator[bytes],
+    ) -> None:
+        """Internal method to add a resource to a bundle."""
+        bundle = self._active_bundles.get(str(bundle_ref.bid))
+        if not bundle:
+            error_message = "Bundle not found"
+            raise ValueError(error_message)
+
+        await bundle.write_resource(url, content_type, status_code, stream)
+
+    async def complete_bundle_with_callbacks_hook(
+        self,
+        bundle_ref: "BundleRef",
+        recipe: "FetcherRecipe",
+        _metadata: dict[str, "Any"],
+    ) -> None:
+        """Complete bundle and execute all completion callbacks."""
+        # Finalize the bundle
+        await self._finalize_bundle(bundle_ref)
+
+        # Execute completion callbacks using the recipe
+        await self._execute_completion_callbacks(bundle_ref, recipe)
+
+        logger.debug(
+            "Bundle completed", bid=str(bundle_ref.bid), recipe_id=recipe.recipe_id
+        )
+
+    async def _finalize_bundle(
+        self,
+        bundle_ref: "BundleRef",
+    ) -> None:
+        """Internal method to finalize a bundle."""
+        bundle = self._active_bundles.get(str(bundle_ref.bid))
+        if not bundle:
+            error_message = "Bundle not found"
+            raise ValueError(error_message)
+
+        # Finalize the file bundle
+        await bundle.close()
+
+        # Clean up
+        del self._active_bundles[str(bundle_ref.bid)]
+
+    async def _execute_completion_callbacks(
+        self, bundle_ref: "BundleRef", recipe: "FetcherRecipe"
+    ) -> None:
+        """Execute completion callbacks from recipe components."""
+        # Execute loader completion callback
+        if hasattr(recipe.bundle_loader, "on_bundle_complete_hook"):
+            try:
+                await recipe.bundle_loader.on_bundle_complete_hook(bundle_ref)
+                logger.debug(
+                    "Loader completion callback executed",
+                    bid=str(bundle_ref.bid),
+                    recipe_id=recipe.recipe_id,
+                    loader_type=type(recipe.bundle_loader).__name__,
+                )
+            except Exception as e:
+                logger.exception(
+                    "Error executing loader completion callback",
+                    error=str(e),
+                    bid=str(bundle_ref.bid),
+                    recipe_id=recipe.recipe_id,
+                )
+
+        # Execute locator completion callbacks
+        for locator in recipe.bundle_locators:
+            if hasattr(locator, "on_bundle_complete_hook"):
+                try:
+                    await locator.on_bundle_complete_hook(bundle_ref)
+                    logger.debug(
+                        "Locator completion callback executed",
+                        bid=str(bundle_ref.bid),
+                        recipe_id=recipe.recipe_id,
+                        locator_type=type(locator).__name__,
+                    )
+                except Exception as e:
+                    logger.exception(
+                        "Error executing locator completion callback",
+                        error=str(e),
+                        bid=str(bundle_ref.bid),
+                        recipe_id=recipe.recipe_id,
+                    )
 
 
-class FileBundle:
+class FileStorageBundle:
     """File bundle for writing resources to disk."""
 
     def __init__(self, output_dir: str, bundle_ref: "BundleRef") -> None:
@@ -58,9 +159,9 @@ class FileBundle:
 
     def _create_bundle_dir(self) -> str:
         """Create a directory for this bundle."""
-        # Create a unique directory name based on the primary URL
-        url_hash = hashlib.sha256(self.bundle_ref.primary_url.encode()).hexdigest()[:8]
-        bundle_dir = str(Path(self.output_dir) / f"bundle_{url_hash}")
+        # Use BID for directory naming to enable time-based organization
+        # BID contains timestamp information from UUIDv7
+        bundle_dir = str(Path(self.output_dir) / f"bundle_{self.bundle_ref.bid}")
         Path(bundle_dir).mkdir(parents=True, exist_ok=True)
         return bundle_dir
 
@@ -121,6 +222,7 @@ class FileBundle:
         # Update bundle metadata
         meta_filepath = str(Path(self.bundle_dir) / "bundle.meta")
         metadata = {
+            "bid": str(self.bundle_ref.bid),
             "primary_url": self.bundle_ref.primary_url,
             "resources_count": self.bundle_ref.resources_count,
             "storage_key": self.bundle_dir,

@@ -1,0 +1,11 @@
+{
+  "bid": "17572980-7624-da39-ac17-72fdf10e8e32",
+  "primary_url": "http://localhost:5001/entreprises/sirene/V3.11/siren?nombre=1000&curseur=*&q=-periode(categorieJuridiqueUniteLegale:1000)+AND+statutDiffusionUniteLegale:O+AND+dateDernierTraitementUniteLegale:%5B2025-09-03T00:00:00%20TO%202025-09-03T23:59:59%5D",
+  "resources_count": 1,
+  "storage_key": "tmp/test_output/bundle_17572980-7624-da39-ac17-72fdf10e8e32",
+  "meta": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "content_length": null
+  }
+}

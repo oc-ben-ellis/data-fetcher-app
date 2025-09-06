@@ -6,26 +6,28 @@ alwaysApply: true
 Documentation Maintenance Rule
 
 Overview
-Always read and follow the documentation guide (docs/documentation_guide.md) when working with documentation. This rule ensures consistent, high-quality documentation that follows established patterns and build system requirements.
+Always review the documentation structure in the docs/ directory when working with documentation. This rule ensures consistent, high-quality documentation that follows established patterns and MkDocs build system requirements.
 
 Core Requirements
 
 1. Read Documentation Guide First
-- Always read docs/documentation_guide.md before making any documentation changes
-- Understand the build system (scripts/build_docs.py) and how it processes files
+- Always read the documentation structure in docs/ directory before making changes
+- Understand the MkDocs build system and how it processes files
 - Follow the established file structure and naming conventions
 
 2. Build System Compliance
-- Use make docs or poetry run build-docs after ANY documentation changes
+- Use make docs after ANY documentation changes
 - Ensure all changes render correctly in the HTML output
 - Test navigation and links work properly
 - Verify images and diagrams display correctly
 
 3. File Structure Standards
 - Main documentation: Place high-level docs directly in docs/
-- Subdirectories: Use for related content (e.g., docs/configurations/)
+- Numbered directories: Use for ordered content (e.g., docs/01_architecture/, docs/02_configurations/)
+- Subdirectories: Use for related content (e.g., docs/architecture/, docs/09_configurations/)
 - README.md files: Include in subdirectories for navigation ordering
 - Assets: Place in docs/assets/ or docs/diagrams/
+- Navigation: Configured in mkdocs.yaml
 
 4. Content Organization
 - Start each section with a clear overview
@@ -62,7 +64,7 @@ Core Requirements
 Specific Guidelines
 
 When Adding New Documentation
-1. Read docs/documentation_guide.md completely
+1. Review the docs/ directory structure completely
 2. Choose appropriate location (main docs vs subdirectory)
 3. Follow naming conventions
 4. Update navigation if needed
@@ -79,8 +81,8 @@ When Updating Existing Documentation
 6. Test rendered output
 
 When Fixing Issues
-1. Check docs/troubleshooting.md for common solutions
-2. Verify build system is working (poetry run build-docs)
+1. Check docs/12_troubleshooting/troubleshooting_guide.md for common solutions
+2. Verify build system is working (make docs)
 3. Check file paths and naming conventions
 4. Ensure all dependencies are installed
 5. Test navigation and links
@@ -111,7 +113,7 @@ Maintenance Quality
 Common Mistakes to Avoid
 
 Do This Instead
-- Always read docs/documentation_guide.md first
+- Always review the docs/ directory structure first
 - Test all code examples before including them
 - Follow established file structure
 - Run make docs after every change
@@ -124,7 +126,7 @@ Verification Checklist
 
 Before committing documentation changes, verify:
 
-- Read docs/documentation_guide.md
+- Reviewed docs/ directory structure
 - Followed file structure guidelines
 - Used correct API calls in examples
 - Updated navigation if needed
@@ -143,20 +145,40 @@ make docs
 # Build and open in browser
 make docs/open
 
-# Direct build command
-poetry run build-docs
+# Start development server
+make docs/serve
 
-# Check for build errors
-poetry run build-docs 2>&1 | grep -i error
+# Validate MkDocs configuration
+make docs/validate
+
+# Check for broken links
+make docs/check-links
+
+# Clean build artifacts
+make docs/clean
 
 Resources
 
-- Documentation Guide: docs/documentation_guide.md
-- Build Script: scripts/build_docs.py
-- Troubleshooting: docs/troubleshooting.md
+- Documentation Structure: docs/ directory
+- MkDocs Configuration: mkdocs.yaml
+- Troubleshooting: docs/12_troubleshooting/troubleshooting_guide.md
 - Examples: examples/ directory
-- Rendered Output: docs/rendered/
+- Rendered Output: site/ directory
 
-Remember: Good documentation is as important as good code. Always follow the established patterns and maintain high quality standards.
+Current Documentation Structure:
+- docs/01_architecture/ - Architecture documentation
+- docs/02_configurations/ - Configuration guides
+- docs/03_application_configuration/ - App configuration
+- docs/04_state_management/ - State management (formerly persistence)
+- docs/05_storage/ - Storage documentation
+- docs/06_testing/ - Testing guides
+- docs/07_deployment/ - Deployment guides
+- docs/08_user_guide/ - User guides
+- docs/09_configurations/ - Detailed configurations
+- docs/10_contributing/ - Contributing guides
+- docs/11_references/ - Reference materials
+- docs/12_troubleshooting/ - Troubleshooting guides
+- docs/architecture/ - Detailed architecture docs
+- docs/adr/ - Architecture Decision Records
 
 Remember: Good documentation is as important as good code. Always follow the established patterns and maintain high quality standards.

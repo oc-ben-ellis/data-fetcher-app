@@ -10,10 +10,8 @@ import os
 import boto3
 from botocore.exceptions import ClientError
 
-from .base import CredentialProvider
 
-
-class AWSSecretsCredentialProvider(CredentialProvider):
+class AWSSecretsCredentialProvider:
     """Default credential provider that fetches credentials from AWS Secrets Manager."""
 
     def __init__(

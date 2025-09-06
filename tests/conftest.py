@@ -5,10 +5,14 @@ utilities that are used across multiple test files.
 """
 
 import asyncio
+import atexit
 import os
 import signal
+import subprocess
 import tempfile
+import uuid
 from collections.abc import AsyncGenerator, Coroutine, Generator
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import boto3
@@ -27,14 +31,225 @@ from data_fetcher_core.core import BundleRef
 # Global flag to track if we're shutting down
 _shutdown_requested = False
 
+# Generate a unique test run ID for this session
+TEST_RUN_ID = str(uuid.uuid4())[:8]
+
+
+def cleanup_test_containers() -> None:
+    """Stop all containers tagged with the current test run ID."""
+    try:
+        # Query Docker for containers with our test label
+        result = subprocess.run(
+            [
+                "docker",
+                "ps",
+                "-a",
+                "--filter",
+                f"label=test-run-id={TEST_RUN_ID}",
+                "--format",
+                "{{.ID}} {{.Names}}",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        if not result.stdout.strip():
+            return  # No containers found
+
+        container_lines = result.stdout.strip().split("\n")
+        print(
+            f"\nCleaning up {len(container_lines)} test containers (run-id: {TEST_RUN_ID})..."
+        )
+
+        for line in container_lines:
+            if not line.strip():
+                continue
+            parts = line.split(" ", 1)
+            container_id = parts[0]
+            container_name = (
+                parts[1] if len(parts) > 1 else f"container-{container_id[:12]}"
+            )
+
+            try:
+                print(f"Stopping container: {container_name} ({container_id[:12]})")
+                subprocess.run(
+                    ["docker", "stop", container_id], capture_output=True, check=True
+                )
+                subprocess.run(
+                    ["docker", "rm", container_id], capture_output=True, check=True
+                )
+            except subprocess.CalledProcessError as e:
+                print(f"Warning: Failed to stop/remove container {container_name}: {e}")
+            except Exception as e:
+                print(
+                    f"Warning: Unexpected error cleaning up container {container_name}: {e}"
+                )
+
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to query Docker containers: {e}")
+    except Exception as e:
+        print(f"Warning: Unexpected error during container cleanup: {e}")
+
+
+def add_test_label_to_container(container: DockerContainer) -> None:
+    """Add test run label to a container during creation for cleanup tracking."""
+    try:
+        # Add the test label to the container's labels using with_kwargs
+        container.with_kwargs(labels={"test-run-id": TEST_RUN_ID})
+        print(f"Container will be tagged with test-run-id: {TEST_RUN_ID}")
+    except Exception as e:
+        print(f"Warning: Failed to add test label to container: {e}")
+
+
+def start_container(
+    container: DockerContainer, name: str = "container"
+) -> DockerContainer:
+    """Start a single container and return it."""
+    try:
+        print(f"Starting {name}...")
+        container.start()
+        print(f"{name} started successfully")
+        return container
+    except Exception as e:
+        print(f"Failed to start {name}: {e}")
+        raise
+
+
+def stop_container(container: DockerContainer, name: str = "container") -> None:
+    """Stop a single container."""
+    try:
+        print(f"Stopping {name}...")
+        container.stop()
+        print(f"{name} stopped successfully")
+    except Exception as e:
+        print(f"Warning: Failed to stop {name}: {e}")
+
+
+def start_containers_parallel(
+    containers: list[tuple[DockerContainer, str]],
+) -> list[DockerContainer]:
+    """Start multiple containers in parallel."""
+    if not containers:
+        return []
+
+    print(f"Starting {len(containers)} containers in parallel...")
+    started_containers = []
+
+    with ThreadPoolExecutor(max_workers=min(len(containers), 4)) as executor:
+        # Submit all container start tasks
+        future_to_container = {
+            executor.submit(start_container, container, name): (container, name)
+            for container, name in containers
+        }
+
+        # Collect results as they complete
+        for future in as_completed(future_to_container):
+            container, name = future_to_container[future]
+            try:
+                started_container = future.result()
+                started_containers.append(started_container)
+            except Exception as e:
+                print(f"Failed to start {name}: {e}")
+                # Stop any containers that were already started
+                for started_container in started_containers:
+                    try:
+                        stop_container(started_container, "failed-container")
+                    except:
+                        pass
+                raise
+
+    print(f"Successfully started {len(started_containers)} containers")
+    return started_containers
+
+
+def stop_containers_parallel(containers: list[tuple[DockerContainer, str]]) -> None:
+    """Stop multiple containers in parallel."""
+    if not containers:
+        return
+
+    print(f"Stopping {len(containers)} containers in parallel...")
+
+    with ThreadPoolExecutor(max_workers=min(len(containers), 4)) as executor:
+        # Submit all container stop tasks
+        futures = [
+            executor.submit(stop_container, container, name)
+            for container, name in containers
+        ]
+
+        # Wait for all to complete
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                print(f"Warning: Container stop failed: {e}")
+
+    print(f"Successfully stopped {len(containers)} containers")
+
+
+def create_parallel_container_fixture(
+    container_configs: list[tuple[str, dict[str, Any], str]],
+) -> Any:
+    """Create a pytest fixture that starts multiple containers in parallel.
+
+    Args:
+        container_configs: List of (image, config_dict, name) tuples
+
+    Returns:
+        A pytest fixture function
+    """
+
+    def _fixture() -> Any:
+        # Create containers
+        containers = []
+        for image, config, name in container_configs:
+            container = DockerContainer(image)
+
+            # Apply configuration
+            for key, value in config.items():
+                if key == "env":
+                    for env_key, env_value in value.items():
+                        container.with_env(env_key, env_value)
+                elif key == "ports":
+                    container.with_exposed_ports(*value)
+                elif key == "command":
+                    container.with_command(value)
+                elif key == "labels":
+                    container.with_kwargs(labels=value)
+                else:
+                    # Pass other config as kwargs
+                    container.with_kwargs(**{key: value})
+
+            # Add test label
+            add_test_label_to_container(container)
+            containers.append((container, name))
+
+        # Start containers in parallel
+        try:
+            start_containers_parallel(containers)
+            yield [container for container, _ in containers]
+        finally:
+            # Stop containers in parallel
+            stop_containers_parallel(containers)
+
+    return _fixture
+
 
 def _signal_handler(signum: int, frame: Any) -> None:
     """Handle shutdown signals gracefully."""
     global _shutdown_requested
     _shutdown_requested = True
     print(f"\nReceived signal {signum}, shutting down gracefully...")
+
+    # Clean up containers before exiting
+    cleanup_test_containers()
+
     # Force exit to bypass pytest's signal handling
     os._exit(130)  # Exit code 130 is standard for SIGINT
+
+
+# Register atexit handler for cleanup
+atexit.register(cleanup_test_containers)
 
 
 @pytest.fixture(scope="session")
@@ -145,40 +360,57 @@ def localstack_container() -> DockerContainer:
         container.with_env("AWS_ACCESS_KEY_ID", "test")
         container.with_env("AWS_SECRET_ACCESS_KEY", "test")
         container.with_env("DEBUG", "1")
-        container.with_env("PERSISTENCE", "1")
+        container.with_env("STATE_MANAGEMENT", "1")
         container.with_exposed_ports(4566)
+
+        # Add test label for cleanup tracking (before starting)
+        add_test_label_to_container(container)
 
         container.start()
 
         # Wait for localstack to be ready
         wait_for_logs(container, "Ready.")
 
-        # Wait a bit more for all services to be fully ready
+        # Optimized health check with faster timeout
         import time
 
-        time.sleep(5)
-
-        # Test if Secrets Manager is ready
-        try:
-            test_client = boto3.client(
-                "secretsmanager",
-                endpoint_url="http://localhost:4566",
-                aws_access_key_id="test",
-                aws_secret_access_key="test",
-                region_name="us-east-1",
-            )
-            # Try to list secrets to verify the service is ready
-            test_client.list_secrets()
-            print("Secrets Manager service is ready")
-        except Exception as e:
-            print(f"Warning: Secrets Manager not ready yet: {e}")
-            # Wait a bit more
-            time.sleep(10)
+        # Quick health check instead of long sleep
+        max_attempts = 10  # Reduced from 30+ seconds to 10 attempts
+        for attempt in range(max_attempts):
+            try:
+                # Test S3 service directly with a simple connection
+                # Use container host IP for Docker-in-Docker environments
+                host_ip = container.get_container_host_ip()
+                s3_client = boto3.client(
+                    "s3",
+                    endpoint_url=f"http://{host_ip}:{container.get_exposed_port(4566)}",
+                    aws_access_key_id="test",
+                    aws_secret_access_key="test",
+                    region_name="us-east-1",
+                )
+                # Quick test - list buckets (should work even if empty)
+                s3_client.list_buckets()
+                print("LocalStack S3 service is ready")
+                break
+            except Exception as e:
+                if attempt < max_attempts - 1:
+                    time.sleep(0.5)  # Reduced from 1 second to 0.5 seconds
+                else:
+                    print(
+                        f"Warning: LocalStack S3 not ready after {max_attempts} attempts: {e}"
+                    )
+                    # Don't fail the test, just continue with a warning
 
         yield container
 
+        # Stop container (label cleanup will be handled by Docker query)
         container.stop()
     except Exception as e:
+        # Ensure container is stopped even if setup fails
+        try:
+            container.stop()
+        except:
+            pass
         pytest.fail(f"Failed to start localstack container: {e}")
 
 
@@ -192,24 +424,60 @@ def redis_container() -> DockerContainer:
     try:
         container = DockerContainer("redis:7-alpine")
         container.with_exposed_ports(6379)
+
+        # Add test label for cleanup tracking (before starting)
+        add_test_label_to_container(container)
+
         container.start()
 
-        # Wait for Redis to be ready
+        # Wait for Redis to be ready with optimized health check
         wait_for_logs(container, "Ready to accept connections")
+
+        # Quick health check to ensure Redis is actually responding
+        import time
+
+        import redis
+
+        max_attempts = 5  # Reduced attempts for faster startup
+        for attempt in range(max_attempts):
+            try:
+                test_client = redis.Redis(
+                    host=container.get_container_host_ip(),
+                    port=container.get_exposed_port(6379),
+                    db=0,
+                    socket_connect_timeout=1,  # Fast timeout
+                )
+                test_client.ping()
+                print("Redis is ready and responding")
+                break
+            except Exception as e:
+                if attempt < max_attempts - 1:
+                    time.sleep(0.2)  # Very short wait between attempts
+                else:
+                    print(f"Warning: Redis health check failed: {e}")
+                    # Continue anyway, the test will fail if Redis isn't working
 
         yield container
 
+        # Stop container (label cleanup will be handled by Docker query)
         container.stop()
     except Exception as e:
+        # Ensure container is stopped even if setup fails
+        try:
+            container.stop()
+        except:
+            pass
         pytest.fail(f"Failed to start Redis container: {e}")
 
 
 @pytest.fixture
 def s3_client(localstack_container: DockerContainer) -> Any:
     """Create S3 client connected to localstack."""
+    # Use container host IP for Docker-in-Docker environments
+    host_ip = localstack_container.get_container_host_ip()
     return boto3.client(
         "s3",
-        endpoint_url=f"http://localhost:{localstack_container.get_exposed_port(4566)}",
+        endpoint_url=f"http://{host_ip}:{localstack_container.get_exposed_port(4566)}",
         aws_access_key_id="test",
         aws_secret_access_key="test",
         region_name="us-east-1",
@@ -219,9 +487,11 @@ def s3_client(localstack_container: DockerContainer) -> Any:
 @pytest.fixture
 def secretsmanager_client(localstack_container: DockerContainer) -> Any:
     """Create Secrets Manager client connected to localstack."""
+    # Use container host IP for Docker-in-Docker environments
+    host_ip = localstack_container.get_container_host_ip()
     return boto3.client(
         "secretsmanager",
-        endpoint_url=f"http://localhost:{localstack_container.get_exposed_port(4566)}",
+        endpoint_url=f"http://{host_ip}:{localstack_container.get_exposed_port(4566)}",
         aws_access_key_id="test",
         aws_secret_access_key="test",
         region_name="us-east-1",
@@ -231,7 +501,7 @@ def secretsmanager_client(localstack_container: DockerContainer) -> Any:
 @pytest.fixture
 def test_bucket(s3_client: Any) -> str:
     """Create test bucket in localstack."""
-    bucket_name = "test-oc-fetcher-bucket"
+    bucket_name = "test-data-fetcher-app-bucket"
     try:
         s3_client.create_bucket(Bucket=bucket_name)
     except Exception:
@@ -253,7 +523,7 @@ def test_secrets(secretsmanager_client: Any) -> dict[str, dict[str, str]]:
         "port": "22",
     }
 
-    # Create test OAuth credentials for fr-api configuration
+    # Create test OAuth credentials for fr configuration
     fr_api_credentials = {
         "consumer_key": "test_client_id",
         "consumer_secret": "test_client_secret",
@@ -271,8 +541,8 @@ def test_secrets(secretsmanager_client: Any) -> dict[str, dict[str, str]]:
         # Secret might already exist
         pass
 
-    # Create fr-api secret (AWS credential provider expects -sftp-credentials suffix)
-    fr_api_secret_name = "fr-api-sftp-credentials"
+    # Create fr secret (AWS credential provider expects -sftp-credentials suffix)
+    fr_api_secret_name = "fr-api-credentials"
     try:
         secretsmanager_client.create_secret(
             Name=fr_api_secret_name, SecretString=json.dumps(fr_api_credentials)
@@ -283,8 +553,90 @@ def test_secrets(secretsmanager_client: Any) -> dict[str, dict[str, str]]:
 
     return {
         "us-fl-sftp-credentials": us_fl_credentials,
-        "fr-api-sftp-credentials": fr_api_credentials,
+        "fr-api-credentials": fr_api_credentials,
     }
+
+
+@pytest.fixture(scope="class")
+def parallel_containers() -> Generator[tuple[DockerContainer, DockerContainer]]:
+    """Start both localstack and Redis containers in parallel for faster test setup."""
+    # Fail if running in CI without Docker
+    if os.getenv("CI") and not os.path.exists("/var/run/docker.sock"):
+        pytest.fail("Docker not available in CI environment")
+
+    # Create containers
+    localstack_container = DockerContainer("localstack/localstack:3.0")
+    localstack_container.with_env("SERVICES", "s3,secretsmanager")
+    localstack_container.with_env("DEFAULT_REGION", "us-east-1")
+    localstack_container.with_env("AWS_ACCESS_KEY_ID", "test")
+    localstack_container.with_env("AWS_SECRET_ACCESS_KEY", "test")
+    localstack_container.with_env("DEBUG", "1")
+    localstack_container.with_env("STATE_MANAGEMENT", "1")
+    localstack_container.with_exposed_ports(4566)
+    add_test_label_to_container(localstack_container)
+
+    redis_container = DockerContainer("redis:7-alpine")
+    redis_container.with_exposed_ports(6379)
+    add_test_label_to_container(redis_container)
+
+    # Start containers in parallel
+    containers_to_start = [
+        (localstack_container, "localstack"),
+        (redis_container, "redis"),
+    ]
+
+    try:
+        start_containers_parallel(containers_to_start)
+
+        # Wait for services to be ready
+        print("Waiting for services to be ready...")
+        wait_for_logs(localstack_container, "Ready.")
+        wait_for_logs(redis_container, "Ready to accept connections")
+
+        # Wait a bit more for all services to be fully ready
+        import time
+
+        time.sleep(2)
+
+        # Test if Secrets Manager is ready
+        try:
+            # Use container host IP for Docker-in-Docker environments
+            host_ip = localstack_container.get_container_host_ip()
+            test_client = boto3.client(
+                "secretsmanager",
+                endpoint_url=f"http://{host_ip}:{localstack_container.get_exposed_port(4566)}",
+                aws_access_key_id="test",
+                aws_secret_access_key="test",
+                region_name="us-east-1",
+            )
+            # Try to list secrets to verify the service is ready
+            test_client.list_secrets()
+            print("Secrets Manager service is ready")
+        except Exception as e:
+            print(f"Warning: Secrets Manager not ready yet: {e}")
+            # Wait a bit more
+            time.sleep(10)
+
+        yield localstack_container, redis_container
+
+        # Stop containers in parallel
+        containers_to_stop = [
+            (localstack_container, "localstack"),
+            (redis_container, "redis"),
+        ]
+        stop_containers_parallel(containers_to_stop)
+
+    except Exception as e:
+        # Ensure containers are stopped even if setup fails
+        try:
+            containers_to_stop = [
+                (localstack_container, "localstack"),
+                (redis_container, "redis"),
+            ]
+            stop_containers_parallel(containers_to_stop)
+        except:
+            pass
+        pytest.fail(f"Failed to start parallel containers: {e}")
 
 
 # Mark tests that require Docker/localstack
@@ -302,7 +654,11 @@ def pytest_configure(config: Any) -> None:
 
 
 def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
-    """Clean up any remaining asyncio tasks at the end of the test session."""
+    """Clean up any remaining containers and asyncio tasks at the end of the test session."""
+    # Clean up containers first
+    cleanup_test_containers()
+
+    # Then clean up asyncio tasks
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():

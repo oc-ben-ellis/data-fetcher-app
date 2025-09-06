@@ -18,19 +18,19 @@ sys.path.insert(0, str(project_root))
 
 async def credential_provider_example() -> None:
     """Demonstrate different credential providers."""
+    from data_fetcher_app.config.credential_provider import (  # type: ignore[import-untyped]
+        configure_application_credential_provider,
+        get_default_credential_provider,
+    )
     from data_fetcher_core.credentials import (
         EnvironmentCredentialProvider,
-    )
-    from data_fetcher_core.global_credential_provider import (
-        configure_global_credential_provider,
-        get_default_credential_provider,
     )
 
     # Example 1: AWS Secrets Manager Provider (default)
     try:
         # Configure AWS provider
         os.environ["OC_CREDENTIAL_PROVIDER_TYPE"] = "aws"
-        configure_global_credential_provider()
+        configure_application_credential_provider()
 
         provider = get_default_credential_provider()
 
@@ -43,7 +43,7 @@ async def credential_provider_example() -> None:
     try:
         # Configure environment provider
         os.environ["OC_CREDENTIAL_PROVIDER_TYPE"] = "environment"
-        configure_global_credential_provider()
+        configure_application_credential_provider()
 
         provider = get_default_credential_provider()
 

@@ -6,8 +6,8 @@ including HTTP authentication headers and SFTP key management.
 
 import asyncio
 import base64
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Protocol
 
 import httpx
 import structlog
@@ -18,29 +18,29 @@ from data_fetcher_core.credentials import CredentialProvider
 logger = structlog.get_logger(__name__)
 
 
-class AuthenticationMechanism(ABC):
+class AuthenticationMechanism(Protocol):
     """Interface for authentication mechanisms."""
 
-    @abstractmethod
     async def authenticate_request(
-        self, request_headers: dict[str, str]
+        self, request_headers: dict[str, str], credential_provider: CredentialProvider
     ) -> dict[str, str]:
         """Add authentication headers to the request.
 
         Args:
             request_headers: The existing request headers
+            credential_provider: The credential provider to use for authentication
 
         Returns:
             Updated headers with authentication information
         """
+        ...
 
 
 @dataclass
-class OAuthAuthenticationMechanism(AuthenticationMechanism):
+class OAuthAuthenticationMechanism:
     """OAuth client credentials authentication mechanism."""
 
     token_url: str
-    credential_provider: CredentialProvider
     config_name: str
     grant_type: str = "client_credentials"
 
@@ -50,17 +50,19 @@ class OAuthAuthenticationMechanism(AuthenticationMechanism):
         self._token_expires_at: float | None = None
 
     async def authenticate_request(
-        self, request_headers: dict[str, str]
+        self, request_headers: dict[str, str], credential_provider: CredentialProvider
     ) -> dict[str, str]:
         """Add OAuth Bearer token to request headers."""
-        await self._ensure_valid_token()
+        await self._ensure_valid_token(credential_provider)
 
         if self._access_token:
             request_headers["Authorization"] = f"Bearer {self._access_token}"
 
         return request_headers
 
-    async def _ensure_valid_token(self) -> None:
+    async def _ensure_valid_token(
+        self, credential_provider: CredentialProvider
+    ) -> None:
         """Ensure we have a valid OAuth access token."""
         # Check if we need to refresh the token
         if (
@@ -70,16 +72,16 @@ class OAuthAuthenticationMechanism(AuthenticationMechanism):
         ):
             return  # Token is still valid
 
-        await self._fetch_new_token()
+        await self._fetch_new_token(credential_provider)
 
-    async def _fetch_new_token(self) -> None:
+    async def _fetch_new_token(self, credential_provider: CredentialProvider) -> None:
         """Fetch a new OAuth access token."""
         try:
             # Get credentials from provider
-            consumer_key = await self.credential_provider.get_credential(
+            consumer_key = await credential_provider.get_credential(
                 self.config_name, "consumer_key"
             )
-            consumer_secret = await self.credential_provider.get_credential(
+            consumer_secret = await credential_provider.get_credential(
                 self.config_name, "consumer_secret"
             )
 
@@ -135,10 +137,9 @@ class OAuthAuthenticationMechanism(AuthenticationMechanism):
 
 
 @dataclass
-class BasicAuthenticationMechanism(AuthenticationMechanism):
+class BasicAuthenticationMechanism:
     """Basic authentication mechanism."""
 
-    credential_provider: CredentialProvider
     config_name: str
     username_key: str = "username"
     password_key: str = "password"  # noqa: S105
@@ -148,14 +149,14 @@ class BasicAuthenticationMechanism(AuthenticationMechanism):
         self._cached_credentials: tuple[str, str] | None = None
 
     async def authenticate_request(
-        self, request_headers: dict[str, str]
+        self, request_headers: dict[str, str], credential_provider: CredentialProvider
     ) -> dict[str, str]:
         """Add Basic authentication to request headers."""
         if not self._cached_credentials:
-            username = await self.credential_provider.get_credential(
+            username = await credential_provider.get_credential(
                 self.config_name, self.username_key
             )
-            password = await self.credential_provider.get_credential(
+            password = await credential_provider.get_credential(
                 self.config_name, self.password_key
             )
             self._cached_credentials = (username, password)
@@ -169,10 +170,9 @@ class BasicAuthenticationMechanism(AuthenticationMechanism):
 
 
 @dataclass
-class BearerTokenAuthenticationMechanism(AuthenticationMechanism):
+class BearerTokenAuthenticationMechanism:
     """Bearer token authentication mechanism."""
 
-    credential_provider: CredentialProvider
     config_name: str
     token_key: str = "token"  # noqa: S105
 
@@ -181,11 +181,11 @@ class BearerTokenAuthenticationMechanism(AuthenticationMechanism):
         self._cached_token: str | None = None
 
     async def authenticate_request(
-        self, request_headers: dict[str, str]
+        self, request_headers: dict[str, str], credential_provider: CredentialProvider
     ) -> dict[str, str]:
         """Add Bearer token to request headers."""
         if not self._cached_token:
-            self._cached_token = await self.credential_provider.get_credential(
+            self._cached_token = await credential_provider.get_credential(
                 self.config_name, self.token_key
             )
 
@@ -196,11 +196,12 @@ class BearerTokenAuthenticationMechanism(AuthenticationMechanism):
 
 
 @dataclass
-class NoAuthenticationMechanism(AuthenticationMechanism):
+class NoAuthenticationMechanism:
     """No authentication mechanism - passes through headers unchanged."""
 
     async def authenticate_request(
-        self, request_headers: dict[str, str]
+        self, request_headers: dict[str, str], credential_provider: CredentialProvider
     ) -> dict[str, str]:
         """Return headers unchanged."""
+        _ = credential_provider  # Unused parameter for Protocol compliance
         return request_headers

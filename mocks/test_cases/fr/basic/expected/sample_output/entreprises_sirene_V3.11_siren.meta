@@ -1,0 +1,1 @@
+{'url': 'http://localhost:33981/entreprises/sirene/V3.11/siren?nombre=1000&curseur=*&q=-periode(categorieJuridiqueUniteLegale:1000)+AND+statutDiffusionUniteLegale:O+AND+dateDernierTraitementUniteLegale:%5B2025-09-08T00:00:00%20TO%202025-09-08T23:59:59%5D', 'content_type': 'application/json', 'status_code': 200, 'size': 1206}

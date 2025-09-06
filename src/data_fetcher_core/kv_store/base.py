@@ -1,41 +1,23 @@
-"""Base key-value store interface and abstract classes.
+"""Base key-value store interface and protocols.
 
-This module defines the base KeyValueStore interface and abstract classes
-that all key-value store implementations must implement.
+This module defines the base KeyValueStore protocol for persisting application state
+across different storage backends. All key-value store implementations must implement this protocol.
 """
 
-import json
-import pickle
-from abc import ABC, abstractmethod
 from datetime import timedelta
-from typing import Any, cast
+from typing import Any, Protocol, cast
+
+from .helper import deserialize_value, get_prefixed_key, normalize_ttl, serialize_value
 
 
-class KeyValueStore(ABC):
-    """Abstract base class for key-value store implementations.
+class KeyValueStore(Protocol):
+    """Protocol for key-value store implementations.
 
-    This class defines the interface that all key-value store implementations
-    must follow. It provides basic CRUD operations plus range queries.
+    This protocol defines the interface that all key-value store implementations
+    must follow for persisting application state. It provides basic CRUD operations
+    plus range queries for state data.
     """
 
-    def __init__(self, **kwargs: object) -> None:
-        """Initialize the key-value store."""
-        self._serializer: str = cast("str", kwargs.get("serializer", "json"))
-        self._default_ttl: int | None = cast("int | None", kwargs.get("default_ttl"))
-        self._key_prefix: str = cast("str", kwargs.get("key_prefix", "")) or ""
-
-    def _get_prefixed_key(self, key: str, prefix: str | None = None) -> str:
-        """Get the key with prefix applied."""
-        # Use provided prefix if available, otherwise use instance prefix
-        effective_prefix = prefix if prefix is not None else self._key_prefix
-        if effective_prefix:
-            # Ensure prefix ends with a colon for better key organization
-            if not effective_prefix.endswith(":"):
-                effective_prefix = f"{effective_prefix}:"
-            return f"{effective_prefix}{key}"
-        return key
-
-    @abstractmethod
     async def put(
         self,
         key: str,
@@ -53,8 +35,8 @@ class KeyValueStore(ABC):
             prefix: Optional prefix to prepend to the key. If None, uses the store's default prefix
             **kwargs: Additional implementation-specific parameters
         """
+        ...
 
-    @abstractmethod
     async def get(
         self,
         key: str,
@@ -73,8 +55,8 @@ class KeyValueStore(ABC):
         Returns:
             The stored value or default if not found
         """
+        ...
 
-    @abstractmethod
     async def delete(
         self, key: str, prefix: str | None = None, **kwargs: object
     ) -> bool:
@@ -88,8 +70,8 @@ class KeyValueStore(ABC):
         Returns:
             True if the key was deleted, False if it didn't exist
         """
+        ...
 
-    @abstractmethod
     async def exists(
         self, key: str, prefix: str | None = None, **kwargs: object
     ) -> bool:
@@ -103,8 +85,8 @@ class KeyValueStore(ABC):
         Returns:
             True if the key exists, False otherwise
         """
+        ...
 
-    @abstractmethod
     async def range_get(
         self,
         start_key: str,
@@ -125,41 +107,60 @@ class KeyValueStore(ABC):
         Returns:
             List of (key, value) tuples in the specified range
         """
+        ...
 
-    @abstractmethod
     async def close(self) -> None:
         """Close the store and release any resources."""
-
-    def _serialize(self, value: object) -> str:
-        """Serialize a value for storage."""
-        if self._serializer == "json":
-            return json.dumps(value, default=str)
-        if self._serializer == "pickle":
-            return pickle.dumps(value).hex()
-        raise ValueError(f"Bad serializer: {self._serializer}")  # noqa: TRY003
-
-    def _deserialize(self, value: str) -> object:
-        """Deserialize a value from storage."""
-        if self._serializer == "json":
-            return json.loads(value)
-        if self._serializer == "pickle":
-            # Note: pickle.loads can be unsafe with untrusted data, but this is for internal use only
-            return pickle.loads(bytes.fromhex(value))  # noqa: S301
-        raise ValueError(f"Bad serializer: {self._serializer}")  # noqa: TRY003
-
-    def _normalize_ttl(self, ttl: int | timedelta | None) -> int | None:
-        """Normalize TTL to seconds."""
-        if ttl is None:
-            return self._default_ttl
-
-        if isinstance(ttl, timedelta):
-            return int(ttl.total_seconds())
-
-        return ttl
+        ...
 
     async def __aenter__(self) -> "KeyValueStore":
         """Async context manager entry."""
-        return self
+        ...
+
+    async def __aexit__(
+        self, exc_type: object, exc_val: object, exc_tb: object
+    ) -> None:
+        """Async context manager exit."""
+        ...
+
+
+class BaseKeyValueStore:
+    """Base class providing common functionality for key-value store implementations.
+
+    This class provides helper methods and initialization logic that concrete
+    implementations can inherit from. It implements the KeyValueStore protocol.
+    """
+
+    def __init__(self, **kwargs: object) -> None:
+        """Initialize the key-value store with common configuration."""
+        self._serializer: str = cast("str", kwargs.get("serializer", "json"))
+        self._default_ttl: int | None = cast("int | None", kwargs.get("default_ttl"))
+        self._key_prefix: str = cast("str", kwargs.get("key_prefix", "")) or ""
+
+    def _get_prefixed_key(self, key: str, prefix: str | None = None) -> str:
+        """Get the key with prefix applied."""
+        effective_prefix = prefix if prefix is not None else self._key_prefix
+        return get_prefixed_key(key, effective_prefix)
+
+    def _serialize(self, value: object) -> str:
+        """Serialize a value for storage."""
+        return serialize_value(value, self._serializer)
+
+    def _deserialize(self, value: str) -> object:
+        """Deserialize a value from storage."""
+        return deserialize_value(value, self._serializer)
+
+    def _normalize_ttl(self, ttl: int | timedelta | None) -> int | None:
+        """Normalize TTL to seconds."""
+        return normalize_ttl(ttl, self._default_ttl)
+
+    async def close(self) -> None:
+        """Close the store and release any resources."""
+        # Base implementation does nothing - subclasses should override if needed
+
+    async def __aenter__(self) -> "KeyValueStore":
+        """Async context manager entry."""
+        return cast("KeyValueStore", self)
 
     async def __aexit__(
         self, exc_type: object, exc_val: object, exc_tb: object

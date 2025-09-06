@@ -6,8 +6,23 @@ from typing import TYPE_CHECKING, Union, cast
 
 import structlog
 
-from data_fetcher_core.core import BundleRef, FetchRunContext, RequestMeta
+from data_fetcher_core.core import (
+    BundleRef,
+    FetcherRecipe,
+    FetchRunContext,
+    RequestMeta,
+)
+from data_fetcher_core.protocol_config import HttpProtocolConfig
 from data_fetcher_http.http_manager import HttpManager
+
+
+class StorageRequiredError(Exception):
+    """Raised when storage is required but not provided."""
+
+    def __init__(self) -> None:
+        """Initialize the error."""
+        super().__init__("Storage is required but was None")
+
 
 if TYPE_CHECKING:
     from data_fetcher_core.storage.file_storage import FileStorage
@@ -21,10 +36,10 @@ logger = structlog.get_logger(__name__)
 
 
 @dataclass
-class ApiLoader:
+class HttpBundleLoader:
     """Generic API loader for HTTP-based APIs."""
 
-    http_manager: HttpManager
+    http_config: HttpProtocolConfig
     meta_load_name: str = "api_loader"
     follow_redirects: bool = True
     max_redirects: int = 5
@@ -33,28 +48,36 @@ class ApiLoader:
     async def load(
         self,
         request: RequestMeta,
-        storage: Storage | None,
-        ctx: FetchRunContext,  # noqa: ARG002
+        storage: Storage,
+        ctx: FetchRunContext,
+        recipe: FetcherRecipe,
     ) -> list[BundleRef]:
-        """Load data from API endpoint.
+        """Load data from API endpoint using BundleStorageContext.
 
         Args:
             request: The request to process
             storage: Storage backend for saving data
             ctx: Fetch run context
+            recipe: The fetcher recipe
 
         Returns:
             List of bundle references
         """
+        if not storage:
+            raise StorageRequiredError
+
         try:
             logger.debug(
-                "Loading API request",
+                "LOADING_API_REQUEST",
                 url=request.url,
                 meta_load_name=self.meta_load_name,
             )
 
             # Make HTTP request (authentication is handled by HttpManager)
-            response = await self.http_manager.request(
+            http_manager = HttpManager()
+            response = await http_manager.request(
+                self.http_config,
+                ctx.app_config,  # type: ignore[arg-type]
                 "GET",
                 request.url,
                 headers=request.headers,
@@ -62,7 +85,7 @@ class ApiLoader:
             )
 
             logger.debug(
-                "Received HTTP response",
+                "RECEIVED_HTTP_RESPONSE",
                 url=request.url,
                 status_code=response.status_code,
                 content_type=response.headers.get("content-type"),
@@ -74,7 +97,7 @@ class ApiLoader:
                 request.url, response.status_code
             ):
                 logger.warning(
-                    "Request rejected by error handler",
+                    "REQUEST_REJECTED_BY_ERROR_HANDLER",
                     url=request.url,
                     status_code=response.status_code,
                 )
@@ -91,39 +114,52 @@ class ApiLoader:
                 },
             )
 
-            # Stream to storage
-            if storage:
-                logger.debug("Streaming response to storage", url=request.url)
-                async with storage.open_bundle(bundle_ref) as bundle:
-                    # Write primary resource
-                    await bundle.write_resource(
-                        url=request.url,
-                        content_type=response.headers.get("content-type"),
-                        status_code=response.status_code,
-                        stream=cast("AsyncGenerator[bytes]", response.aiter_bytes()),
-                    )
-                logger.debug("Successfully streamed to storage", url=request.url)
-            else:
-                logger.debug(
-                    "No storage configured, skipping storage write", url=request.url
+            # Create logger with BID context for tracing
+            bid_logger = logger.bind(bid=str(bundle_ref.bid))
+
+            # Use new BundleStorageContext interface
+            bid_logger.debug("STREAMING_RESPONSE_TO_STORAGE", url=request.url)
+
+            # 1. Start bundle and get context
+            bundle_context = await storage.start_bundle(bundle_ref, recipe)
+
+            try:
+                # 2. Add primary resource
+                await bundle_context.add_resource(
+                    url=request.url,
+                    content_type=response.headers.get("content-type"),
+                    status_code=response.status_code,
+                    stream=cast("AsyncGenerator[bytes]", response.aiter_bytes()),
                 )
 
-            logger.info(
-                "API request loaded successfully",
+                # 3. Complete bundle
+                await bundle_context.complete(
+                    {"source": "http_api", "run_id": ctx.run_id, "resources_count": 1}
+                )
+
+            except Exception as e:
+                # BundleStorageContext will handle cleanup
+                bid_logger.exception("Error in bundle processing", error=str(e))
+                raise
+
+            bid_logger.debug("SUCCESSFULLY_STREAMED_TO_STORAGE", url=request.url)
+
+            bid_logger.info(
+                "API_REQUEST_LOADED_SUCCESSFULLY",
                 url=request.url,
                 status_code=response.status_code,
                 bundle_ref=bundle_ref,
             )
 
         except Exception as e:
-            logger.exception("Error loading request", url=request.url, error=str(e))
+            logger.exception("REQUEST_LOADING_ERROR", url=request.url, error=str(e))
             return []
         else:
             return [bundle_ref]
 
 
 @dataclass
-class TrackingApiLoader(ApiLoader):
+class TrackingHttpBundleLoader(HttpBundleLoader):
     """API loader that tracks failed requests for retry purposes."""
 
     def __post_init__(self) -> None:

@@ -5,11 +5,30 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, Union
 
-import pysftp
 import structlog
 
-from data_fetcher_core.core import BundleRef, FetchRunContext, RequestMeta
+from data_fetcher_core.core import (
+    BundleRef,
+    FetcherRecipe,
+    FetchRunContext,
+    RequestMeta,
+)
+from data_fetcher_core.protocol_config import SftpProtocolConfig
 from data_fetcher_sftp.sftp_manager import SftpManager
+
+
+class StorageRequiredError(Exception):
+    """Raised when storage is required but not provided."""
+
+    def __init__(self) -> None:
+        """Initialize the error."""
+        super().__init__("Storage is required but was None")
+
+
+def _raise_storage_required() -> None:
+    """Raise StorageRequiredError."""
+    raise StorageRequiredError
+
 
 if TYPE_CHECKING:
     from data_fetcher_core.storage import FileStorage, PipelineStorage
@@ -36,16 +55,20 @@ logger = structlog.get_logger(__name__)
 
 
 @dataclass
-class SFTPLoader:
+class SftpBundleLoader:
     """SFTP loader with AWS integration and file pattern support."""
 
-    sftp_manager: SftpManager
+    sftp_config: SftpProtocolConfig
     remote_dir: str = "/"
     filename_pattern: str = "*"
     meta_load_name: str = "sftp_loader"
 
     async def load(
-        self, request: RequestMeta, storage: Storage | None, ctx: FetchRunContext
+        self,
+        request: RequestMeta,
+        storage: Storage,
+        ctx: FetchRunContext,
+        recipe: FetcherRecipe,
     ) -> list[BundleRef]:
         """Load data from SFTP endpoint.
 
@@ -53,13 +76,14 @@ class SFTPLoader:
             request: The request to process
             storage: Storage backend for saving data
             ctx: Fetch run context
+            recipe: The fetcher recipe configuration
 
         Returns:
             List of bundle references
         """
         try:
-            # Get SFTP connection
-            conn = await self.sftp_manager.get_connection()
+            # Get SFTP manager
+            sftp_manager = SftpManager()
 
             # List files in remote directory
             remote_path = request.url.replace("sftp://", "")
@@ -68,14 +92,23 @@ class SFTPLoader:
 
             # Check if it's a file or directory
             try:
-                stat = conn.stat(remote_path)
+                stat = await sftp_manager.stat(self.sftp_config, ctx, remote_path)
                 if stat.st_mode is not None and stat.st_mode & 0o40000:  # Directory
-                    return await self._load_directory(conn, remote_path, storage, ctx)
+                    return await self._load_directory(
+                        sftp_manager,
+                        self.sftp_config,
+                        remote_path,
+                        storage,
+                        ctx,
+                        recipe,
+                    )
                 # File
-                return await self._load_file(conn, remote_path, storage, ctx)
+                return await self._load_file(
+                    sftp_manager, self.sftp_config, remote_path, storage, ctx, recipe
+                )
             except Exception as e:
                 logger.exception(
-                    "Error accessing remote path",
+                    "ERROR_ACCESSING_REMOTE_PATH",
                     remote_path=remote_path,
                     error=str(e),
                 )
@@ -83,7 +116,7 @@ class SFTPLoader:
 
         except Exception as e:
             logger.exception(
-                "Error loading SFTP request",
+                "ERROR_LOADING_SFTP_REQUEST",
                 url=request.url,
                 error=str(e),
             )
@@ -91,15 +124,17 @@ class SFTPLoader:
 
     async def _load_file(
         self,
-        conn: pysftp.Connection,
+        sftp_manager: SftpManager,
+        sftp_config: SftpProtocolConfig,
         remote_path: str,
-        storage: Storage | None,
+        storage: Storage,
         _ctx: FetchRunContext,
+        recipe: FetcherRecipe,
     ) -> list[BundleRef]:
         """Load a single file from SFTP."""
         try:
             # Get file info
-            stat = conn.stat(remote_path)
+            stat = await sftp_manager.stat(sftp_config, _ctx, remote_path)
 
             # Create bundle reference
             bundle_ref = BundleRef(
@@ -114,21 +149,47 @@ class SFTPLoader:
                 },
             )
 
-            # Stream to storage
-            if storage:
-                async with storage.open_bundle(bundle_ref) as bundle:
-                    # Create a temporary file to stream from
-                    with conn.open(remote_path, "rb") as remote_file:
-                        await bundle.write_resource(
-                            url=f"sftp://{self.remote_dir}/{remote_path}",
-                            content_type="application/octet-stream",
-                            status_code=200,
-                            stream=self._stream_from_file(remote_file),
-                        )
+            # Create logger with BID context for tracing
+            bid_logger = logger.bind(bid=str(bundle_ref.bid))
+
+            # Stream to storage using new BundleStorageContext interface
+            if not storage:
+                _raise_storage_required()
+
+            bid_logger.debug("STREAMING_FILE_TO_STORAGE", remote_path=remote_path)
+
+            # 1. Start bundle and get context
+            bundle_context = await storage.start_bundle(bundle_ref, recipe)
+
+            try:
+                # 2. Add file resource
+                with await sftp_manager.open(  # type: ignore[attr-defined]
+                    sftp_config, _ctx, remote_path, "rb"
+                ) as remote_file:
+                    await bundle_context.add_resource(
+                        url=f"sftp://{self.remote_dir}/{remote_path}",
+                        content_type="application/octet-stream",
+                        status_code=200,
+                        stream=self._stream_from_file(remote_file),
+                    )
+
+                # 3. Complete bundle
+                await bundle_context.complete(
+                    {"source": "sftp", "run_id": _ctx.run_id, "resources_count": 1}
+                )
+
+            except Exception as e:
+                # BundleStorageContext will handle cleanup
+                bid_logger.exception("Error in bundle processing", error=str(e))
+                raise
+
+            bid_logger.debug(
+                "SUCCESSFULLY_STREAMED_FILE_TO_STORAGE", remote_path=remote_path
+            )
 
         except Exception as e:
             logger.exception(
-                "Error loading file",
+                "ERROR_LOADING_FILE",
                 remote_path=remote_path,
                 error=str(e),
             )
@@ -138,17 +199,19 @@ class SFTPLoader:
 
     async def _load_directory(
         self,
-        conn: pysftp.Connection,
+        sftp_manager: SftpManager,
+        sftp_config: SftpProtocolConfig,
         remote_path: str,
-        storage: Storage | None,
+        storage: Storage,
         ctx: FetchRunContext,
+        recipe: FetcherRecipe,
     ) -> list[BundleRef]:
         """Load all files in a directory from SFTP."""
         bundle_refs = []
 
         try:
             # List files in directory
-            files = conn.listdir(remote_path)
+            files = await sftp_manager.listdir(sftp_config, ctx, remote_path)
 
             for filename in files:
                 if filename in [".", ".."]:
@@ -161,12 +224,14 @@ class SFTPLoader:
                     continue
 
                 # Load the file
-                file_bundles = await self._load_file(conn, file_path, storage, ctx)
+                file_bundles = await self._load_file(
+                    sftp_manager, sftp_config, file_path, storage, ctx, recipe
+                )
                 bundle_refs.extend(file_bundles)
 
         except Exception as e:
             logger.exception(
-                "Error loading directory",
+                "ERROR_LOADING_DIRECTORY",
                 remote_path=remote_path,
                 error=str(e),
             )

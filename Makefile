@@ -5,7 +5,7 @@ GIT_REPOSITORY_NAME=$$(basename `git rev-parse --show-toplevel`)
 GIT_COMMIT_ID=$$(git rev-parse --short HEAD)
 
 # Default parameter values
-AWS_PROFILE ?= default
+AWS_PROFILE ?= oc-management-dev
 DATE ?= $(shell date +%Y%m%d)
 ENV ?= play
 SOURCE_ID ?=
@@ -13,13 +13,10 @@ AWS_REGION = eu-west-2
 AWS_ACCOUNT_ID ?= $(shell aws sts get-caller-identity --query Account --output text --profile $(AWS_PROFILE))
 ECR_REPOSITORY ?= data-fetcher-sftp
 
-# Simplified mode detection - use docker-compose by default
-MODE ?= docker-compose
-
 # Set LOCAL mode automatically if in container, unless explicitly overridden
 ifeq ($(USER),vscode)
 	# Dev Container environment (detected by USER=vscode)
-	MODE=local
+	MODE ?= local
 endif
 
 # Define run commands based on mode
@@ -58,36 +55,42 @@ TEST_WORKERS ?= auto
 
 all-checks: format lint test/with-coverage
 
-# New targets for docker-compose pipeline
-setup:
-	@echo "Setting up docker-compose build pipeline..."
-	$(DOCKER_COMPOSE) up -d devcontainer-builder
-	@echo "Build pipeline setup complete!"
-
-build-pipeline: setup
-	@echo "Running full build pipeline..."
-	$(DOCKER_COMPOSE) up build-container
-	@echo "Build pipeline completed!"
-
-clean-pipeline:
-	@echo "Cleaning up docker-compose containers and volumes..."
-	$(DOCKER_COMPOSE) down -v
-	@echo "Cleanup complete!"
-
 build/for-deployment:
 	$(DOCKER) build -t "$(GIT_REPOSITORY_NAME):$(GIT_COMMIT_ID)" \
 	--build-arg POETRY_HTTP_BASIC_OCPY_PASSWORD \
 	.
 
-# Simplified ensure function - just check if docker-compose is available
+# Check docker-compose availability and required directories for mounts
 ensure-docker-compose:
-	@if [ "$(MODE)" != "local" ]; then \
+	@if [ "$(MODE)" = "local" ]; then \
 		if ! command -v docker-compose >/dev/null 2>&1; then \
 			echo "Error: docker-compose not found. Please install Docker Compose."; \
 			exit 1; \
 		fi; \
-		echo "Docker Compose is available."; \
+		MISSING_DIRS=""; \
+		REQUIRED_DIRS="$$HOME/.gnupg $$HOME/.ssh $$HOME/.aws"; \
+		for dir in $$REQUIRED_DIRS; do \
+			if [ ! -d "$$dir" ]; then \
+				MISSING_DIRS="$$MISSING_DIRS $$dir"; \
+			fi; \
+		done; \
+		if [ -n "$$MISSING_DIRS" ]; then \
+			echo ""; \
+			echo "❌ Error: Required directories for docker-compose mounts are missing:"; \
+			for dir in $$MISSING_DIRS; do \
+				echo "   - $$dir"; \
+			done; \
+			echo ""; \
+			echo "🔧 How to resolve:"; \
+			echo "   1. Create the missing directories:"; \
+			for dir in $$MISSING_DIRS; do \
+				echo "      mkdir -p $$dir"; \
+			done; \
+			echo ""; \
+			exit 1; \
+		fi; \
 	fi
+
 
 
 format: ensure-docker-compose
@@ -129,8 +132,8 @@ lint/ruff: ensure-docker-compose
 lint/mypy: ensure-docker-compose
 	$(call run_in_container,mypy .)
 
-test: ensure-docker-compose
-	$(call run_in_container,pytest $(PYTEST_ARGS) -n $(TEST_WORKERS))
+test: test/unit test/integration test/functional
+	@echo "All tests completed successfully"
 
 test/not-in-parallel: ensure-docker-compose
 	$(call run_in_container,pytest $(PYTEST_ARGS))
@@ -173,9 +176,6 @@ endif
 help:
 	@echo "Available commands:"
 	@echo "  all-checks          - Run format, lint, and tests with coverage"
-	@echo "  setup               - Set up docker-compose build pipeline"
-	@echo "  build-pipeline      - Run full build pipeline (build + test + lint)"
-	@echo "  clean-pipeline      - Clean up docker-compose containers and volumes"
 	@echo "  build/for-deployment - Build Docker image for deployment"
 	@echo "  format              - Format code with ruff"
 	@echo "  headers             - Add standard headers to Python files"
@@ -188,6 +188,10 @@ help:
 	@echo "  test/unit           - Run unit tests only"
 	@echo "  test/integration    - Run integration tests only"
 	@echo "  test/functional     - Run functional tests only"
+	@echo "  test/fast           - Run only fast tests (excludes slow tests)"
+	@echo "  test/slow           - Run only slow tests (takes >30 seconds)"
+	@echo "  test/integration-fast - Run fast integration tests only"
+	@echo "  test/integration-slow - Run slow integration tests only"
 	@echo "  test/not-in-parallel - Run tests sequentially (fallback)"
 	@echo "  test/parallel      - Run tests in parallel (explicit)"
 	@echo "  test/with-coverage - Run tests with coverage report (parallel)"
@@ -209,8 +213,7 @@ help:
 	@echo "Mode detection:"
 	@echo "  - Automatically detects container environments (Docker, DevContainer, etc.)"
 	@echo "  - Uses LOCAL mode (poetry run) when in containers"
-	@echo "  - Uses DOCKER-COMPOSE mode when running from host (uses docker-compose)"
-	@echo "  - Can be overridden with MODE=local or MODE=docker-compose"
+	@echo "  - Can be overridden with MODE=local or MODE=docker"
 	@echo ""
 	@echo "Usage examples:"
 	@echo "  make run ARGS=us-il"
@@ -223,7 +226,7 @@ help:
 	@echo "  make test/parallel TEST_WORKERS=4"
 	@echo "  make test PYTEST_ARGS='-v -s tests/test_fetcher.py'"
 	@echo "  make MODE=local run ARGS=us-fl"
-	@echo "  make MODE=docker-compose run ARGS=us-fl"
+	@echo "  make MODE=docker run ARGS=us-fl"
 	@echo ""
 	@echo "Test parallelization:"
 	@echo "  TEST_WORKERS=auto  - Auto-detect CPU cores (default)"

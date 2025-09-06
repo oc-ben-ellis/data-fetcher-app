@@ -1,0 +1,23 @@
+{
+    "description": "Basic US FL SFTP test case",
+    "recipe": "us_fl",
+    "credentials": {
+        "provider_type": "environment",
+        "username": "test",
+        "password": "test",
+        "host": "localhost",
+        "port": 2222
+    },
+    "storage": {
+        "type": "file",
+        "path": "tmp/test_output"
+    },
+    "sftp_config": {
+        "remote_path": "/data",
+        "file_pattern": "*.csv",
+        "date_range": {
+            "start_date": "2025-09-01",
+            "end_date": "2025-09-07"
+        }
+    }
+}

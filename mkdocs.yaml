@@ -1,4 +1,4 @@
-site_name: Data Fetcher Documentation
+site_name: Data Pipeline - Fetcher Application Documentation
 site_description: A composable, streaming-first fetch framework for Python
 site_author: OpenCorporates
 site_url: https://openc.github.io/data-fetcher-sftp
@@ -11,6 +11,7 @@ edit_uri: edit/main/docs/
 # Configuration
 theme:
   name: material
+  logo: assets/OC_Fetcher_Logo_New.svg
   palette:
     # Palette toggle for automatic mode
     - media: "(prefers-color-scheme)"
@@ -21,8 +22,8 @@ theme:
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: red
-      accent: red
+      primary: white
+      accent: blue
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
@@ -30,8 +31,8 @@ theme:
     # Palette toggle for dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: red
-      accent: red
+      primary: black
+      accent: yellow
       toggle:
         icon: material/brightness-4
         name: Switch to system preference
@@ -55,6 +56,20 @@ theme:
 plugins:
   - search:
       lang: en
+  - offline
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      slide_effect: slide
+      width: 90%
+      height: auto
+      zoomable: true
+      draggable: true
+      auto_caption: false
+      caption_position: bottom
+      background: white
+      shadow: true
   - mermaid2:
       arguments:
         theme: default
@@ -99,56 +114,85 @@ markdown_extensions:
   - toc:
       permalink: true
 
-# Navigation structure - maintaining your current order
+# Navigation structure - User Guide and Contributing organization
 nav:
   - Home: index.md
-  - Documentation Guide: documentation_guide.md
-  - Troubleshooting: troubleshooting.md
-  - Docstring Standards: docstring_standards.md
-  - Application Requirements: APPLICATION_REQUIREMENTS.md
 
   - Architecture:
-    - Architecture Overview: 01_architecture/README.md
-    - Overview: 01_architecture/overview.md
-    - High Level Architecture: 01_architecture/high_level_architecture.md
-    - Core Orchestration Flow: 01_architecture/core_orchestration_flow.md
-    - Component Relationships: 01_architecture/component_relationships.md
-    - Component Interactions: 01_architecture/component_interactions.md
-    - Module Hierarchy: 01_architecture/module_hierarchy.md
-    - Storage Architecture: 01_architecture/storage_architecture.md
+    - Architecture Documentation: architecture/README.md
+    - Architecture Overview: architecture/overview/README.md
+    - Orchestration: architecture/orchestration/README.md
+    - Persistent Queue: architecture/queue/README.md
+    - ProtocolConfig: architecture/protocol_config/README.md
+    - Recipes: architecture/recipes/README.md
+    - Locators: architecture/locators/README.md
+    - Loaders: architecture/loaders/README.md
+    - Storage: architecture/storage/README.md
+    - Notifications: architecture/notifications/README.md
+    - State Management: architecture/state_management/README.md
+    - Retry Engine: architecture/retry_engine/README.md
 
-  - Configurations:
-    - Overview: 02_configurations/overview.md
-    - API Configurations: 02_configurations/api.md
-    - SFTP Configurations: 02_configurations/sftp.md
-    - Scheduling: 02_configurations/scheduling.md
-    - US FL Test Setup: 02_configurations/us_fl_test_setup.md
+  - User Guide:
+    - User Guide Documentation: user_guide/README.md
+    - Getting Started: user_guide/getting_started.md
+    - Command Line Usage: user_guide/command_line_usage.md
+    - Docker Usage: user_guide/docker_usage.md
+    - Application Configuration: user_guide/application_configuration.md
+    - Deployment: deployment/overview.md
+    - Health Checks: deployment/health_checks.md
 
-  - Application Configuration:
-    - System Configuration: 03_application_configuration/README.md
-    - Overview: 03_application_configuration/overview.md
-    - Detailed Configuration: 03_application_configuration/detailed_configuration.md
-    - Logging: 03_application_configuration/logging.md
+  - Recipes:
+    - Recipes Documentation: configurations/README.md
+    - Contributing:
+      - Creating a Recipe: configurations/creating_a_recipe.md
+    - Available Strategies:
+      - API:
+        - FR - Siren:
+          - TrackingApiLoader: configurations/strategies/api/siren/tracking_api_loader.md
+          - ComplexPaginationBundleLocator: configurations/strategies/api/siren/complex_pagination_bundle_locator.md
+          - ReversePaginationBundleLocator: configurations/strategies/api/siren/reverse_pagination_bundle_locator.md
+          - SingleApiBundleLocator: configurations/strategies/api/siren/single_api_bundle_locator.md
+      - SFTP:
+        - Loaders:
+          - SFTPLoader: configurations/strategies/sftp/loaders/sftp_loader.md
+        - Locators:
+          - DirectorySftpBundleLocator: configurations/strategies/sftp/locators/generic_directory_bundle_locator.md
+          - FileSftpBundleLocator: configurations/strategies/sftp/locators/generic_file_bundle_locator.md
+    - Available Recipes:
+      - FR - France API: configurations/fr_api.md
+      - US_FL - US Florida SFTP: configurations/us_fl_sftp.md
 
-  - Persistence:
-    - Key-Value Store: 04_persistence/README.md
-    - Overview: 04_persistence/overview.md
-    - Features: 04_persistence/features.md
-    - KV Store: 04_persistence/kv_store.md
+  - Contributing:
+    - Contributing Guide: contributing/contributing_guide.md
+    - Development Setup: contributing/development_setup.md
+    - Code Standards: contributing/code_standards.md
+    - Logging Development: contributing/logging_development.md
+    - Testing:
+      - Testing Guide: testing/overview.md
+      - Test Cases Framework: testing/test_cases_framework.md
+      - Writing Tests: testing/writing_tests.md
+      - Mock Services: testing/mock_services.md
+      - Debugging Tests: testing/debugging_tests.md
+      - Mock Environments:
+        - Mock Environments Documentation: testing/mock_environments/README.md
+        - FR Test Setup: testing/mock_environments/fr_test_setup.md
+        - US FL Test Setup: testing/mock_environments/us_fl_test_setup.md
 
-  - Storage:
-    - Storage Overview: 05_storage/README.md
-    - Overview: 05_storage/overview.md
-    - S3 Integration: 05_storage/s3.md
-    - Data Flow Sequence: 05_storage/data_flow_sequence.md
+  - Troubleshooting: troubleshooting/troubleshooting_guide.md
 
-  - Testing:
-    - Testing Overview: 06_testing/README.md
-    - Overview: 06_testing/overview.md
-
-  - Deployment:
-    - Deployment Overview: 07_deployment/README.md
-    - Overview: 07_deployment/overview.md
+  - References:
+    - References Documentation: references/README.md
+    - Architecture Decision Records:
+      - ADR Documentation: adr/README.md
+      - "ADR 0001: Record Architecture Decisions": adr/0001-record-architecture-decisions.md
+      - "ADR 0003: Checkov Exclusion List": adr/0003-checkov-exclusion-list.md
+    - Additional Resources:
+      - Terminology: references/terminology.md
+      - Factory Functions: references/factory_functions.md
+      - Naming Conventions: references/naming_conventions.md
+      - Retry Consolidation Summary: references/retry_consolidation_summary.md
+      - US Florida Test Setup: references/us_fl_test_setup.md
+      - Diagrams: references/diagrams/README.md
 
 # Extra configuration
 extra:
@@ -157,6 +201,15 @@ extra:
       link: https://github.com/openc/data-fetcher-sftp
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/data-fetcher-sftp/
+
+# Custom CSS for OpenCorporates branding
+extra_css:
+  - stylesheets/opencorporates.css
+  - stylesheets/logo-sizing.css
+
+# Custom JavaScript for enhanced functionality
+extra_javascript:
+  - assets/javascripts/mermaid-to-lightbox.js
 
 # Copyright
 copyright: Copyright &copy; 2025 OpenCorporates

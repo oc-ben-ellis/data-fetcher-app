@@ -9,7 +9,7 @@ import json
 import os
 import tempfile
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager, suppress
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -20,8 +20,12 @@ import structlog
 from boto3.s3.transfer import S3Transfer
 from botocore.config import Config
 
+from data_fetcher_core.core import BundleRef
+from data_fetcher_core.storage.bundle_storage_context import BundleStorageContext
+
 if TYPE_CHECKING:
-    from data_fetcher_core.core import BundleRef
+    from data_fetcher_core.core import FetcherRecipe, FetchRunContext
+    from data_fetcher_core.notifications.sqs_publisher import SqsPublisher
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -40,21 +44,28 @@ class MissingAWSCredentialsError(ValueError):
 
 @dataclass
 class PipelineStorage:
-    """Pipeline storage implementation."""
+    """Pipeline storage implementation with mandatory SQS notifications and pending completion processing."""
 
     bucket_name: str
+    sqs_publisher: "SqsPublisher"
     prefix: str = ""
     region: str | None = None
     endpoint_url: str | None = None
 
     def __post_init__(self) -> None:
         """Initialize the S3 storage and create S3 client."""
+        # Validate that SQS publisher is provided
+        if not self.sqs_publisher:
+            error_message = "SQS publisher is required for PipelineStorage but was None"
+            raise ValueError(error_message)
+
         # Use AWS_REGION environment variable if region is not specified
         if self.region is None:
             self.region = os.getenv("AWS_REGION", "eu-west-2")
 
         # Declare the attribute once to avoid mypy no-redef complaints
         self.s3_client: Any = None
+        self._active_bundles: dict[str, Any] = {}
 
         # Create S3 client with optional custom endpoint
         if self.endpoint_url:
@@ -75,17 +86,186 @@ class PipelineStorage:
         else:
             self.s3_client = boto3.client("s3", region_name=self.region)
 
-    @asynccontextmanager
-    async def open_bundle(self, bundle_ref: "BundleRef") -> AsyncGenerator["S3Bundle"]:
-        """Open a bundle for writing to S3."""
-        bundle = S3Bundle(self.s3_client, self.bucket_name, self.prefix, bundle_ref)
-        try:
-            yield bundle
-        finally:
-            await bundle.close()
+    # New interface methods
+    async def start_bundle(
+        self, bundle_ref: "BundleRef", recipe: "FetcherRecipe"
+    ) -> "BundleStorageContext":
+        """Initialize a new bundle and return a BundleStorageContext."""
+        # Create S3 bundle
+        bundle = S3StorageBundle(
+            self.s3_client, self.bucket_name, self.prefix, bundle_ref
+        )
+        self._active_bundles[str(bundle_ref.bid)] = bundle
+
+        # Create and return BundleStorageContext
+        context = BundleStorageContext(bundle_ref, recipe, self)
+        logger.debug(
+            "Bundle started", bid=str(bundle_ref.bid), recipe_id=recipe.recipe_id
+        )
+        return context
+
+    async def _add_resource_to_bundle(
+        self,
+        bundle_ref: "BundleRef",
+        url: str,
+        content_type: str | None,
+        status_code: int,
+        stream: AsyncGenerator[bytes],
+    ) -> None:
+        """Internal method to add a resource to a bundle."""
+        bundle = self._active_bundles.get(str(bundle_ref.bid))
+        if not bundle:
+            error_message = "Bundle not found"
+            raise ValueError(error_message)
+
+        await bundle.write_resource(url, content_type, status_code, stream)
+
+    async def complete_bundle_with_callbacks_hook(
+        self,
+        bundle_ref: "BundleRef",
+        recipe: "FetcherRecipe",
+        metadata: dict[str, Any],
+    ) -> None:
+        """Complete bundle and execute all completion callbacks."""
+        # Finalize the bundle
+        await self._finalize_bundle(bundle_ref)
+
+        # Execute completion callbacks using the recipe
+        await self._execute_completion_callbacks(bundle_ref, recipe)
+
+        # Send SQS notification (mandatory)
+        await self.sqs_publisher.publish_bundle_completion(
+            bundle_ref, metadata, recipe.recipe_id
+        )
+
+        logger.debug(
+            "Bundle completed", bid=str(bundle_ref.bid), recipe_id=recipe.recipe_id
+        )
+
+    async def _finalize_bundle(
+        self,
+        bundle_ref: "BundleRef",
+    ) -> None:
+        """Internal method to finalize a bundle."""
+        bundle = self._active_bundles.get(str(bundle_ref.bid))
+        if not bundle:
+            error_message = "Bundle not found"
+            raise ValueError(error_message)
+
+        # Finalize the S3 bundle (upload metadata, etc.)
+        await bundle.close()
+
+        # Clean up
+        del self._active_bundles[str(bundle_ref.bid)]
+
+    async def _execute_completion_callbacks(
+        self, bundle_ref: "BundleRef", recipe: "FetcherRecipe"
+    ) -> None:
+        """Execute completion callbacks from recipe components."""
+        # Execute loader completion callback
+        if hasattr(recipe.bundle_loader, "on_bundle_complete_hook"):
+            try:
+                await recipe.bundle_loader.on_bundle_complete_hook(bundle_ref)
+                logger.debug(
+                    "Loader completion callback executed",
+                    bid=str(bundle_ref.bid),
+                    recipe_id=recipe.recipe_id,
+                    loader_type=type(recipe.bundle_loader).__name__,
+                )
+            except Exception as e:
+                logger.exception(
+                    "Error executing loader completion callback",
+                    error=str(e),
+                    bid=str(bundle_ref.bid),
+                    recipe_id=recipe.recipe_id,
+                )
+
+        # Execute locator completion callbacks
+        for locator in recipe.bundle_locators:
+            if hasattr(locator, "on_bundle_complete_hook"):
+                try:
+                    await locator.on_bundle_complete_hook(bundle_ref)
+                    logger.debug(
+                        "Locator completion callback executed",
+                        bid=str(bundle_ref.bid),
+                        recipe_id=recipe.recipe_id,
+                        locator_type=type(locator).__name__,
+                    )
+                except Exception as e:
+                    logger.exception(
+                        "Error executing locator completion callback",
+                        error=str(e),
+                        bid=str(bundle_ref.bid),
+                        recipe_id=recipe.recipe_id,
+                    )
+
+    # Optional hook - not part of protocol
+    async def on_run_start(
+        self, context: "FetchRunContext", recipe: "FetcherRecipe"
+    ) -> None:
+        """Hook called at the start of a fetcher run to process pending completions."""
+        await self._process_pending_completions(context, recipe)
+
+    async def _process_pending_completions(
+        self, context: "FetchRunContext", recipe: "FetcherRecipe"
+    ) -> None:
+        """Process any pending SQS notifications from previous runs."""
+        if not context.app_config or not context.app_config.kv_store:
+            logger.debug(
+                "No kv_store available - skipping pending completion processing"
+            )
+            return
+
+        # Find all pending completion keys for this recipe
+        pending_keys = await context.app_config.kv_store.scan(  # type: ignore[attr-defined]
+            f"sqs_notifications:pending:{recipe.recipe_id}:*"
+        )
+
+        if not pending_keys:
+            logger.debug("No pending completions found", recipe_id=recipe.recipe_id)
+            return
+
+        logger.info(
+            "Processing pending completions",
+            recipe_id=recipe.recipe_id,
+            pending_count=len(pending_keys),
+        )
+
+        for key in pending_keys:
+            pending_data = await context.app_config.kv_store.get(key)
+            if pending_data:
+                try:
+                    # Reconstruct bundle_ref
+                    bundle_ref = BundleRef.from_dict(pending_data["bundle_ref"])  # type: ignore[index]
+                    metadata = pending_data["metadata"]  # type: ignore[index]
+
+                    # Re-execute completion callbacks
+                    await self._execute_completion_callbacks(bundle_ref, recipe)
+
+                    # Re-send SQS notification
+                    await self.sqs_publisher.publish_bundle_completion(
+                        bundle_ref, metadata, recipe.recipe_id
+                    )
+
+                    # Remove pending key
+                    await context.app_config.kv_store.delete(key)
+
+                    logger.debug(
+                        "Processed pending completion",
+                        bid=str(bundle_ref.bid),
+                        recipe_id=recipe.recipe_id,
+                    )
+
+                except Exception as e:
+                    logger.exception(
+                        "Error processing pending completion",
+                        error=str(e),
+                        key=key,
+                        recipe_id=recipe.recipe_id,
+                    )
 
 
-class S3Bundle:
+class S3StorageBundle:
     """S3 bundle for writing resources to S3."""
 
     def __init__(
@@ -196,34 +376,43 @@ class S3Bundle:
                     Path(temp_file.name).unlink()
 
     def _create_s3_key(self, url: str) -> str:
-        """Create an S3 key from a URL."""
+        """Create an S3 key from a URL using BID for time-based organization."""
         # Parse URL
         parsed = urlparse(url)
 
-        # Create a hash of the URL for uniqueness
-        url_hash = hashlib.sha256(url.encode()).hexdigest()[:8]
+        # Use BID for key generation to enable time-based organization
+        # BID contains timestamp information from UUIDv7
+        bid_str = str(self.bundle_ref.bid)
 
-        # Create key with prefix
-        key = f"{self.prefix}/resources/{url_hash}"
+        # Create key with prefix and BID
+        key = f"{self.prefix}/bundles/{bid_str}/resources"
 
-        # Add file extension based on content type
+        # Add filename to ensure uniqueness for multiple resources
         if parsed.path:
-            ext = Path(parsed.path).suffix
-            if ext:
-                key += ext
+            filename = Path(parsed.path).name
+            if filename:
+                # Use the full filename to ensure uniqueness
+                key += f"_{filename}"
+            else:
+                # Fallback: use hash of URL to ensure uniqueness
+                url_hash = hashlib.sha256(url.encode()).hexdigest()[:8]
+                key += f"_{url_hash}"
 
         return key
 
     async def close(self) -> None:
         """Close the bundle and upload metadata."""
-        # Create bundle metadata
-        bundle_key = f"{self.prefix}/bundles/{self.bundle_ref.primary_url.replace('://', '_').replace('/', '_')}.json"
+        # Create bundle metadata using BID for time-based organization
+        bid_str = str(self.bundle_ref.bid)
+        bundle_key = f"{self.prefix}/bundles/{bid_str}/metadata.json"
 
         metadata = {
+            "bid": bid_str,
             "primary_url": self.bundle_ref.primary_url,
             "resources_count": self.bundle_ref.resources_count,
             "storage_key": bundle_key,
             "uploaded_keys": self.uploaded_keys,
+            "meta": self.bundle_ref.meta,
         }
 
         self.s3_client.put_object(  # type: ignore[attr-defined]

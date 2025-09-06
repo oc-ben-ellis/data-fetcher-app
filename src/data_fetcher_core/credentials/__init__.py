@@ -3,12 +3,11 @@
 from .aws import AWSSecretsCredentialProvider
 from .base import CredentialProvider
 from .environment import EnvironmentCredentialProvider
-from .sftp_credentials import SftpCredentials, SftpCredentialsWrapper
+from .factory import create_credential_provider
 
 __all__ = [
     "AWSSecretsCredentialProvider",
     "CredentialProvider",
     "EnvironmentCredentialProvider",
-    "SftpCredentials",
-    "SftpCredentialsWrapper",
+    "create_credential_provider",
 ]

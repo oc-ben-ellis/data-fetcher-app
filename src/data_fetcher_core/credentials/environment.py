@@ -6,10 +6,8 @@ credentials from environment variables, useful for development and testing.
 
 import os
 
-from .base import CredentialProvider
 
-
-class EnvironmentCredentialProvider(CredentialProvider):
+class EnvironmentCredentialProvider:
     """Credential provider that fetches credentials from environment variables."""
 
     def __init__(self, prefix: str = "") -> None:
@@ -28,7 +26,7 @@ class EnvironmentCredentialProvider(CredentialProvider):
         {prefix}{config_name.upper()}_{config_key.upper()}
 
         Args:
-            config_name: Configuration name (e.g., 'us-fl', 'fr-api').
+            config_name: Configuration name (e.g., 'us-fl', 'fr').
             config_key: Credential key (e.g., 'username', 'password', 'host').
 
         Returns:

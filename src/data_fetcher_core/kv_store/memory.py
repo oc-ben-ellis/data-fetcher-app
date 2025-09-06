@@ -1,29 +1,31 @@
-"""In-memory key-value store implementation.
+"""In-memory state management implementation.
 
 This module provides the InMemoryKeyValueStore class for fast, temporary
-storage of key-value pairs in memory, useful for caching and testing.
+storage of application state in memory, useful for caching and testing.
+State is not persisted and will be lost when the application restarts.
 """
 
 import asyncio
 import contextlib
+import fnmatch
 import time
 from datetime import timedelta
 from typing import Any
 
 import structlog
 
-from .base import KeyValueStore
+from .base import BaseKeyValueStore
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
 
 
-class InMemoryKeyValueStore(KeyValueStore):
-    """In-memory key-value store implementation.
+class InMemoryKeyValueStore(BaseKeyValueStore):
+    """In-memory state management implementation.
 
-    This store keeps all data in memory using Python dictionaries. It supports
-    TTL (time-to-live) functionality and range queries. Data is not persisted
-    and will be lost when the application restarts.
+    This store keeps all application state in memory using Python dictionaries.
+    It supports TTL (time-to-live) functionality and range queries for state data.
+    State is not persisted and will be lost when the application restarts.
     """
 
     def __init__(self, **kwargs: object) -> None:
@@ -166,6 +168,25 @@ class InMemoryKeyValueStore(KeyValueStore):
                 result.append((original_key, value))
 
             return result
+
+    async def scan(self, pattern: str) -> list[str]:
+        """Scan for keys matching a pattern.
+
+        Args:
+            pattern: Pattern to match keys against. Supports wildcards.
+
+        Returns:
+            List of keys matching the pattern.
+        """
+        async with self._lock:
+            await self._ensure_cleanup_started()
+            # Convert pattern to fnmatch format
+            fnmatch_pattern = pattern.replace("*", "*")
+            matching_keys = []
+            for key in self._store:
+                if fnmatch.fnmatch(key, fnmatch_pattern):
+                    matching_keys.append(key)
+            return matching_keys
 
     async def close(self) -> None:
         """Close the store and release resources."""

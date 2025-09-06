@@ -60,7 +60,7 @@ repos:
 
       - id: class-naming-check
         name: Check class naming conventions
-        entry: poetry run python scripts/check_class_naming.py
+        entry: poetry run python bin/check_class_naming.py
         language: system
         types: [python]
         pass_filenames: false

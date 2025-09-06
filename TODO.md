@@ -1,4 +1,4 @@
-## General
+## General (going to have to keep doing this over and over)
 
 - Review all code as majority is currently AI generated, suggest starting with tests to ensure expected behaviour is correct.
 - Review documentation to ensure it's accurate, up-to-date, concise and easy to understand
@@ -12,11 +12,7 @@
 
 - Test in playground AWS and against live US_FL SFTP and FR
 
-## Monitoring
-
-- Add some observility so we get metrics we can use to measure performance and add alerting for odd behaviours.
-
-## Configurations
+## Recipes
 
 - Review US_FL to ensure logic matches existing bot
 - Review FR to ensure logic matches existing bot
@@ -29,14 +25,7 @@
 - Update Storage / Building to match agreed upon metadata approach
 - Update Storage / Bundling to match agreed upon S3 structure
 
-## Locators
-
-- Make batch sizes configurable
-- Make batch sizes consistent when multiple locators (i.e. 2 locators should give 10 BundleRefences not 10 BundleReferences each (20))
-- Rename api_generic_bundle_locators to sftp_generic_bundle_locators.py and add Sftp to the class names inside
-
 ## Protocols
-
 - Review SFTP and HTTP protocols to ensure they are re-using/pooling connections correctly and the authentication and rate limiting works when using multiple connections.
 - Add Protocol for WebDriver
 - Add Protocol for POP3 (Can we use this instead of webdriver for reading e-mails/couchdrop?)
@@ -50,23 +39,7 @@
 
 - Discuss retry/reload options for parsers / higher level orchestration in the case of corrupted or bad resources. Perhaps introduce a "command" concept that can be used to modify the persistence using the fetcher (i.e. refresh_bundle command given a company_number or URL to reload, command_processor updates persistence so the bundle will be retried/reloaded on next run)
 
-# ADRs
-
-- Change tests subdirectories to have test_ prefixs as per https://opencorporates.atlassian.net/wiki/spaces/ENGINEERIN/pages/382402565/Platform+ADR+002+003+Baseline+Python+Testing
-
 ## Data Fetcher Application TODOs (from PDF comparison)
-
-## Downstream Notifications (SQS)
-- [ ] Implement an SQS publisher to emit messages upon successful bundle processing
-- [ ] Define the message schema and ensure it includes necessary metadata (fetcher_id, bundle key(s), count, timestamps)
-- [ ] Wire SQS publisher into bundle close/commit points in storage layer
-- [ ] Add configurable SQS queue URL and message attributes via environment variables
-- [ ] Files: `data_fetcher/fetcher.py`, `data_fetcher/storage/*` (new `notifications/sqs_publisher.py`), `data_fetcher/application_configuration`
-
-## CLI Enhancements
-- [ ] Add `--list-configs` or `list` command to print available configuration IDs
-- [ ] Ensure CLI provides clear and concise output for configuration discovery
-- [ ] Files: `data_fetcher/main.py`, `data_fetcher/registry.py`
 
 ## HTML Scraping Enhancements
 - [ ] Implement robust HTML parsing to extract related assets (links, CSS, JS, images)
@@ -75,57 +48,14 @@
 - [ ] Implement de-duplication and bounded crawl depth per request
 - [ ] Files: `data_fetcher/bundle_loaders/http_loader.py`, new `data_fetcher/html/` helper
 
-## FTP Protocol Support
-- [ ] Add `FtpManager` with rate limiting, retries, and connection pooling
-- [ ] Implement matching `FtpLoader` for FTP data fetching
-- [ ] Ensure parity with SFTP features (directory listing, file streaming, pattern filtering)
-- [ ] Files: `data_fetcher/protocols/ftp_manager.py`, `data_fetcher/bundle_loaders/ftp_loader.py`, `data_fetcher/factory.py`
-
-## Checksum/ETag Handling for Storage
-- [ ] Add optional content checksum calculation (sha256) for uploads
-- [ ] Implement ETag handling and store in metadata
-- [ ] Add validation for re-uploads or duplicate detection if configured
-- [ ] Files: `data_fetcher/storage/pipeline_storage.py`, `data_fetcher/storage/file_storage.py`
-
 ## Metrics and Observability
 - [ ] Add counters/timers for key stages (requests queued, processed, bundle writes, retries)
-- [ ] Implement pluggable metrics interface for Prometheus/OTEL
-- [ ] Add metrics hooks to fetcher, loaders, and protocol managers
-- [ ] Files: `data_fetcher/fetcher.py`, `data_fetcher/bundle_loaders/*`, protocol managers
 
-## Configuration Parity and Examples
-- [ ] Ensure examples include both HTTP/API and SFTP configurations
-- [ ] Add FTP configuration example once implemented
-- [ ] Provide config for enabling SQS notifications and checksums
-- [ ] Files: `data_fetcher/configurations/*`, `docs/02_configurations/`
-
-## State Management Enhancements
-- [ ] Add explicit "resume token" in `FetchRunContext`
-- [ ] Add CLI flag to resume from last successful position
-- [ ] Enhance locator state persistence with resume capabilities
-- [ ] Files: `data_fetcher/core.py`, `data_fetcher/bundle_locators/*`, `data_fetcher/main.py`
-
-## Hybrid Approach Sample
-- [ ] Create configuration that composes API and SFTP locators together for single run plan
-- [ ] Document hybrid fetching strategies and provide examples
-- [ ] Files: `data_fetcher/configurations/*`, `data_fetcher/registry.py`
-
-## Retry/Backoff Policy Surfacing
-- [ ] Expose per-config override knobs for HTTP/SFTP retry settings
-- [ ] Add environment variable support for max retries, base delay, jitter
-- [ ] Make retry policies configurable per protocol manager
-- [ ] Files: `data_fetcher/protocols/http_manager.py`, `data_fetcher/protocols/sftp_manager.py`, `data_fetcher/factory.py`
-
-## Documentation Updates
-- [ ] Update docs to include SQS notification schema
-- [ ] Document new CLI list command usage
-- [ ] Add HTML scraper behavior documentation
-- [ ] Document FTP support once implemented
-- [ ] Add checksums enablement instructions
-- [ ] Files: `docs/01_architecture/*`, `docs/05_storage/*`, `docs/02_configurations/*`, `docs/APPLICATION_REQUIREMENTS.md`
-
-## Development Ergonomics
-- [ ] Add example environment for S3/SQS local endpoints (LocalStack)
-- [ ] Demonstrate full local run (capture, store, notify)
-- [ ] Create `.env.example` with all configurable options
-- [ ] Files: `docs/07_deployment/`, `.env.example`, `Makefile`
+## SQS Notifications
+- [x] Implement SQS notification system for bundle completion
+- [x] Add BundleStorageContext for async bundle lifecycle management
+- [x] Update storage interface with new start_bundle/complete pattern
+- [x] Add completion callbacks for loaders and locators
+- [x] Implement pending completion processing for eventual consistency
+- [x] Update documentation for new notification system
+- [x] Make SQS notifications mandatory for PipelineStorage

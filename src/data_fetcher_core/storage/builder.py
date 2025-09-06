@@ -6,6 +6,18 @@ storage instances, including S3 and local file storage with various options.
 
 import os
 
+from data_fetcher_core.notifications import SqsPublisher
+
+
+class SqsQueueUrlRequiredError(Exception):
+    """Raised when SQS queue URL is required but not provided."""
+
+    def __init__(self) -> None:
+        """Initialize the error."""
+        super().__init__(
+            "OC_SQS_QUEUE_URL environment variable is required for PipelineStorage"
+        )
+
 
 class StorageBuilder:
     """Builder for creating storage configurations."""
@@ -17,7 +29,6 @@ class StorageBuilder:
         self._s3_region: str = self._get_default_aws_region()
         self._s3_endpoint_url: str | None = None
         self._file_path: str | None = None
-        self._use_bundler: bool = True
         self._use_unzip: bool = False
 
     def _get_default_aws_region(self) -> str:
@@ -43,19 +54,15 @@ class StorageBuilder:
         self._file_path = path
         return self
 
-    def storage_decorators(
-        self, *, use_unzip: bool = False, use_bundler: bool = True
-    ) -> "StorageBuilder":
+    def storage_decorators(self, *, use_unzip: bool = False) -> "StorageBuilder":
         """Configure storage decorators."""
         self._use_unzip = use_unzip
-        self._use_bundler = use_bundler
         return self
 
     def build(self) -> object:
         """Build the storage configuration."""
         # Import here to avoid circular imports
         from . import (  # noqa: PLC0415
-            BundleResourcesDecorator,
             FileStorage,
             PipelineStorage,
             UnzipResourceDecorator,
@@ -63,9 +70,22 @@ class StorageBuilder:
 
         # Create base storage
         if self._s3_bucket:
-            # Use pipeline storage
+            # Create SQS publisher for PipelineStorage
+            # Get SQS configuration from environment variables
+            sqs_queue_url = os.getenv("OC_SQS_QUEUE_URL")
+            if not sqs_queue_url:
+                raise SqsQueueUrlRequiredError
+
+            sqs_publisher = SqsPublisher(
+                queue_url=sqs_queue_url,
+                region=self._s3_region,
+                endpoint_url=self._s3_endpoint_url,
+            )
+
+            # Use pipeline storage with mandatory SQS publisher
             base_storage: object = PipelineStorage(
                 bucket_name=self._s3_bucket,
+                sqs_publisher=sqs_publisher,
                 prefix=self._s3_prefix,
                 region=self._s3_region,
                 endpoint_url=self._s3_endpoint_url,
@@ -75,16 +95,13 @@ class StorageBuilder:
             base_storage = FileStorage(self._file_path)
         else:
             # Use file storage as fallback
-            base_storage = FileStorage("default_capture")
+            base_storage = FileStorage("tmp/file_storage")
 
         # Apply decorators in order
         storage: object = base_storage
 
         if self._use_unzip:
             storage = UnzipResourceDecorator(storage)
-
-        if self._use_bundler:
-            storage = BundleResourcesDecorator(storage)
 
         return storage
 
@@ -94,34 +111,4 @@ def create_storage_config() -> StorageBuilder:
     return StorageBuilder()
 
 
-class GlobalStorageManager:
-    """Manager for the global storage instance."""
-
-    def __init__(self) -> None:
-        """Initialize the global storage manager."""
-        self._storage: object | None = None
-
-    def set(self, storage_builder: StorageBuilder) -> None:
-        """Set the global storage configuration."""
-        self._storage = storage_builder.build()
-
-    def get(self) -> object:
-        """Get the global storage instance."""
-        if self._storage is None:
-            # Create default storage if none is set
-            self._storage = create_storage_config().build()
-        return self._storage
-
-
-# Global storage manager instance
-_global_storage_manager = GlobalStorageManager()
-
-
-def set_global_storage(storage_builder: StorageBuilder) -> None:
-    """Set the global storage configuration."""
-    _global_storage_manager.set(storage_builder)
-
-
-def get_global_storage() -> object:
-    """Get the global storage instance."""
-    return _global_storage_manager.get()
+# Global storage functions removed - use config_factory.create_app_config() instead

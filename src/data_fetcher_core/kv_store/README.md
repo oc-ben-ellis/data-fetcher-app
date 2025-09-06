@@ -1,16 +1,16 @@
-# Key-Value Store System
+# State Management System
 
-The OC Fetcher key-value store system provides flexible caching and state management capabilities with multiple backend implementations.
+The OC Fetcher state management system provides flexible state persistence capabilities with multiple backend implementations for storing and retrieving application state.
 
 ## Overview
 
-The key-value store system offers:
+The state management system offers:
 
-- **Generic Interface**: Common interface for different storage backends
+- **Generic Interface**: Common interface for different state storage backends
 - **Multiple Implementations**: In-memory (testing) and Redis (production)
 - **Application Configuration**: Automatic setup with optional override
-- **TTL Support**: Automatic expiration of cached data
-- **Range Queries**: Efficient retrieval of key ranges
+- **TTL Support**: Automatic expiration of state data
+- **Range Queries**: Efficient retrieval of state key ranges
 - **Serialization Options**: JSON and pickle support
 - **Async/Await Support**: Fully asynchronous interface
 
@@ -19,41 +19,46 @@ The key-value store system offers:
 ### Basic Usage
 
 ```python
-from data_fetcher_core.kv_store import put, get, delete, exists
+from data_fetcher_core.kv_store import create_store
 
-# The application-wide store is automatically configured when the module is imported
-# Store and retrieve data
-await put("user:123", {"name": "John Doe", "email": "john@example.com"})
-user_data = await get("user:123")
+# Create a store instance
+store = create_store(store_type="memory")
+
+# Store and retrieve state data
+await store.put("user:123", {"name": "John Doe", "email": "john@example.com"})
+user_data = await store.get("user:123")
 print(user_data)  # {"name": "John Doe", "email": "john@example.com"}
 
-# Check if key exists
-if await exists("user:123"):
-    print("User data found")
+# Check if state key exists
+if await store.exists("user:123"):
+    print("User state data found")
 
-# Delete data
-await delete("user:123")
+# Delete state data
+await store.delete("user:123")
 ```
 
 ### Range Operations
 
 ```python
-from data_fetcher_core.kv_store import range_get
+from data_fetcher_core.kv_store import create_store
+
+# Create a store instance
+store = create_store(store_type="memory")
 
 # Store multiple items
 for i in range(10):
-    await put(f"item:{i}", f"value_{i}")
+    await store.put(f"item:{i}", f"value_{i}")
 
 # Get range of items
-results = await range_get("item:3", "item:7")
+results = await store.range_get("item:3", "item:7")
 # Returns: [("item:3", "value_3"), ("item:4", "value_4"), ...]
 
 # Get all items with prefix
-all_items = await range_get("item:")
+all_items = await store.range_get("item:")
 # Returns all items starting with "item:"
 
 # Get limited results
-limited_results = await range_get("item:", limit=5)
+limited_results = await store.range_get("item:", limit=5)
 # Returns first 5 items
 ```
 
@@ -64,10 +69,11 @@ limited_results = await range_get("item:", limit=5)
 Perfect for testing and development:
 
 ```python
-from data_fetcher_core.kv_store import InMemoryKeyValueStore
+from data_fetcher_core.kv_store import create_store
 
 # Create an in-memory store
-store = InMemoryKeyValueStore(
+store = create_store(
+    store_type="memory",
     serializer="json",
     default_ttl=3600,  # 1 hour default TTL
 )
@@ -90,10 +96,11 @@ await store.close()
 Designed for production use:
 
 ```python
-from data_fetcher_core.kv_store import RedisKeyValueStore
+from data_fetcher_core.kv_store import create_store
 
 # Create a Redis store
-store = RedisKeyValueStore(
+store = create_store(
+    store_type="redis",
     host="localhost",
     port=6379,
     password="password",
@@ -140,22 +147,22 @@ await put("permanent_data", "value")
 Choose between JSON and pickle serialization:
 
 ```python
-from data_fetcher_core.kv_store import configure_global_store
+from data_fetcher_core.kv_store import create_store
 
 # JSON serialization (default, human-readable)
-configure_global_store(
+store = create_store(
     store_type="memory",
     serializer="json",
 )
 
 # Pickle serialization (supports more Python types)
-configure_global_store(
+store = create_store(
     store_type="memory",
     serializer="pickle",
 )
 
 # Store complex objects
-await put("complex_data", {
+await store.put("complex_data", {
     "datetime": datetime.now(),
     "set_data": {1, 2, 3},
     "function": lambda x: x * 2,
@@ -175,15 +182,15 @@ async with get_store_context("memory", serializer="json") as store:
     # Store automatically closed when exiting context
 ```
 
-### Direct Store Access
+### Store Management
 
-Access the application-wide store directly:
+Create and manage store instances:
 
 ```python
-from data_fetcher_core.kv_store import get_global_store
+from data_fetcher_core.kv_store import create_store
 
-# Get the application-wide store instance
-store = await get_global_store()
+# Create a store instance
+store = create_store(store_type="memory")
 
 # Use store methods directly
 await store.put("key", "value")
@@ -202,13 +209,18 @@ if hasattr(store, 'get_stats'):
 The application store is automatically configured when the module is imported:
 
 ```python
-# Default configuration (in-memory, JSON, 1 hour TTL)
-# No explicit configuration needed
+# Create store instances as needed
+from data_fetcher_core.kv_store import create_store
 
-# Override for production
-from data_fetcher_core.kv_store import configure_global_store
+# Development (in-memory)
+store = create_store(
+    store_type="memory",
+    serializer="json",
+    default_ttl=3600,
+)
 
-configure_global_store(
+# Production (Redis)
+store = create_store(
     store_type="redis",
     host="redis.example.com",
     port=6379,
@@ -243,14 +255,12 @@ configure_global_store(
 ### Frontier Provider Caching
 
 ```python
-from data_fetcher_core.kv_store import get_global_store
 
 class CachingFrontierProvider:
     def __init__(self, base_url: str):
         self.base_url = base_url
 
     async def get_next_urls(self, ctx):
-        store = await get_global_store()
 
         # Check if we've already processed this recently
         cache_key = f"processed:{self.base_url}"
@@ -264,7 +274,6 @@ class CachingFrontierProvider:
         return [{"url": f"{self.base_url}/page1"}]
 
     async def handle_url_processed(self, request, bundle_refs, ctx):
-        store = await get_global_store()
 
         # Store processing results
         result_key = f"result:{request['url']}"
@@ -278,7 +287,7 @@ class CachingFrontierProvider:
 ### API Response Caching
 
 ```python
-from data_fetcher_core.kv_store import put, get, exists
+# DEPRECATED: Global helper functions removed - use store instance methods directly
 
 async def cached_api_call(url: str, cache_ttl: int = 300):
     """Make an API call with caching."""
@@ -303,7 +312,7 @@ async def cached_api_call(url: str, cache_ttl: int = 300):
 ### Session Management
 
 ```python
-from data_fetcher_core.kv_store import put, get, delete
+# DEPRECATED: Global helper functions removed - use store instance methods directly
 
 async def create_session(user_id: str, session_data: dict):
     """Create a new user session."""
@@ -332,7 +341,7 @@ async def delete_session(session_id: str):
 ### Batch Processing State
 
 ```python
-from data_fetcher_core.kv_store import put, get, range_get
+# DEPRECATED: Global helper functions removed - use store instance methods directly
 
 async def track_batch_progress(batch_id: str, total_items: int):
     """Track progress of a batch processing job."""
@@ -401,11 +410,9 @@ await put("user:123:profile", profile_data)  # No expiration
 Handle store errors gracefully:
 
 ```python
-from data_fetcher_core.kv_store import get_global_store
 
 async def safe_get(key: str, default=None):
     try:
-        store = await get_global_store()
         return await store.get(key, default=default)
     except Exception as e:
         print(f"Error accessing key-value store: {e}")
@@ -427,7 +434,6 @@ user_data = await safe_get("user:123", default={"name": "Unknown"})
 ### Get Store Statistics
 
 ```python
-store = await get_global_store()
 
 # In-memory store stats
 if hasattr(store, 'get_stats'):
@@ -456,15 +462,17 @@ if hasattr(store, 'get_stats'):
 The interface is consistent across implementations:
 
 ```python
-# Development (in-memory - default)
-# No configuration needed, automatically uses in-memory store
+from data_fetcher_core.kv_store import create_store
+
+# Development (in-memory)
+store = create_store(store_type="memory")
 
 # Production (Redis)
-configure_global_store("redis", host="prod-redis.example.com")
+store = create_store(store_type="redis", host="prod-redis.example.com")
 
 # Code remains the same
-await put("key", "value")
-value = await get("key")
+await store.put("key", "value")
+value = await store.get("key")
 ```
 
 ### Data Migration
@@ -493,37 +501,35 @@ except Exception as e:
 
 **Serialization Errors**
 ```python
+from data_fetcher_core.kv_store import create_store
+
 # Use pickle for complex objects
-configure_global_store(serializer="pickle")
+store = create_store(store_type="memory", serializer="pickle")
 
 # Or handle serialization manually
 import json
 data = {"complex": object}
 try:
-    await put("key", data)
+    await store.put("key", data)
 except Exception:
     # Fallback to JSON-safe data
-    await put("key", json.loads(json.dumps(data, default=str)))
+    await store.put("key", json.loads(json.dumps(data, default=str)))
 ```
 
 **TTL Issues**
 ```python
+from data_fetcher_core.kv_store import create_store
+
+store = create_store(store_type="memory")
+
 # Check if TTL is working
-await put("test", "value", ttl=1)
-print(f"Exists: {await exists('test')}")
+await store.put("test", "value", ttl=1)
+print(f"Exists: {await store.exists('test')}")
 await asyncio.sleep(2)
-print(f"Exists after TTL: {await exists('test')}")
+print(f"Exists after TTL: {await store.exists('test')}")
 ```
 
 ## API Reference
-
-### Convenience Functions
-
-- `put(key, value, **kwargs)` - Store a value
-- `get(key, default=None, **kwargs)` - Retrieve a value
-- `delete(key, **kwargs)` - Delete a key-value pair
-- `exists(key, **kwargs)` - Check if key exists
-- `range_get(start_key, end_key=None, limit=None, **kwargs)` - Get range of values
 
 ### Store Methods
 
@@ -534,8 +540,7 @@ print(f"Exists after TTL: {await exists('test')}")
 - `range_get(start_key, end_key=None, limit=None, **kwargs)` - Get range of values
 - `close()` - Close the store and release resources
 
-### Configuration Functions
+### Factory Functions
 
-- `configure_global_store(store_type, **kwargs)` - Configure the application-wide store
-- `get_global_store()` - Get the application-wide store instance
+- `create_store(store_type, **kwargs)` - Create a store instance
 - `get_store_context(store_type, **kwargs)` - Context manager for store instances

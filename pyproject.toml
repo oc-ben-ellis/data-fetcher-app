@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [
     {include = "data_fetcher_app", from = "src"},
     {include = "data_fetcher_core", from = "src"},
-    {include = "data_fetcher_configs", from = "src"},
+    {include = "data_fetcher_recipes", from = "src"},
     {include = "data_fetcher_sftp", from = "src"},
     {include = "data_fetcher_http", from = "src"},
     {include = "data_fetcher_http_api", from = "src"},
@@ -23,9 +23,10 @@ pysftp = "^0.2.9"
 boto3 = "^1.34.0"
 redis = "^5.0.0"
 aiofiles = "^23.0.0"
-structlog = "^23.2.0"
+structlog = "^24.1.0"
 aiohttp = "^3.12.15"
 cairosvg = "^2.8.2"
+openc-python-common = "^1.1.1"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.12.0"
@@ -51,11 +52,17 @@ types-pysftp = "^0.2.17.20250805"
 mkdocs = "^1.6.1"
 mkdocs-material = "^9.6.18"
 mkdocs-mermaid2-plugin = "^1.2.2"
+mkdocs-glightbox = "^0.3.4"
+linkchecker = "^10.6.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+[[tool.poetry.source]]
+name = "ocpy"
+url = "https://open-corporates-089449186373.d.codeartifact.eu-west-2.amazonaws.com/pypi/dev/simple/"
+priority = "supplemental"
 
 [tool.ruff]
 target-version = "py313"
@@ -133,9 +140,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"tests/**/*.py" = ["S101", "S105", "S106", "S110", "S104", "S201", "S603", "S607", "PTH110", "PTH118", "PTH123", "PLR2004", "PLR0912", "PLR0915", "PLR1704", "ANN", "SLF", "BLE", "PLC0415", "TRY003", "TRY300", "TRY301", "T201", "ARG001", "ARG002", "PLW0602", "PLW0603", "PLW1508", "SIM102", "SIM105", "SIM117", "DTZ005", "DTZ011", "PT017"]  # Allow assert, hardcoded passwords, URLs, SQL, subprocess, pathlib, magic values, complexity, annotations, self, blind except, import, exception, print, unused args, global vars, nested ifs, datetime, and pytest rules in test files
+"tests/**/*.py" = ["S101", "S105", "S106", "S108", "S110", "S104", "S201", "S603", "S607", "PTH110", "PTH118", "PTH123", "PLR2004", "PLR0912", "PLR0915", "PLR1704", "ANN", "SLF", "BLE", "PLC0415", "TRY002", "TRY003", "TRY300", "TRY301", "T201", "ARG001", "ARG002", "PLW0602", "PLW0603", "PLW1508", "SIM102", "SIM105", "SIM117", "DTZ005", "DTZ011", "PT017"]  # Allow assert, hardcoded passwords, URLs, SQL, subprocess, pathlib, magic values, complexity, annotations, self, blind except, import, exception, print, unused args, global vars, nested ifs, datetime, and pytest rules in test files
 "mocks/**/*.py" = ["S101", "S105", "S106", "S110", "S104", "S201", "S603", "S607", "PTH110", "PTH118", "PTH123", "PLR2004", "PLR0912", "PLR0915", "PLR1704", "ANN", "SLF", "BLE", "PLC0415", "TRY003", "TRY300", "TRY301", "T201", "ARG001", "ARG002", "PLW0602", "PLW0603", "PLW1508", "SIM102", "SIM105", "SIM117", "DTZ005", "DTZ011", "PT017"]  # Allow assert, hardcoded passwords, URLs, SQL, subprocess, pathlib, magic values, complexity, annotations, self, blind except, import, exception, print, unused args, global vars, nested ifs, datetime, and pytest rules in mock files
-"scripts/**/*.py" = ["PTH123", "TRY300", "BLE001", "SIM102", "PLR0912", "PLR0915", "RUF001", "S110", "PLC0415", "B007", "T201", "S603"]  # Allow pathlib, exception handling, simplification, complexity, unicode, security, import, loop control, print, and subprocess rules in scripts
+"bin/**/*.py" = ["PTH123", "TRY300", "BLE001", "SIM102", "PLR0912", "PLR0915", "RUF001", "S110", "PLC0415", "B007", "T201", "S603"]  # Allow pathlib, exception handling, simplification, complexity, unicode, security, import, loop control, print, and subprocess rules in bin scripts
 "examples/**/*.py" = ["PLC0415", "S110", "BLE001", "S105", "DTZ005", "SIM105", "INP001"]  # Allow import, exception handling, hardcoded passwords, datetime, simplification, and namespace package rules in examples
 
 [tool.ruff.lint.pydocstyle]
@@ -175,6 +182,7 @@ strict_equality = true
 # Exclude directories
 exclude = [
     "tmp",
+    "site",
 ]
 
 # Ignore missing imports for boto3 to reduce verbose output
@@ -198,6 +206,7 @@ addopts = [
     "-n", "auto",
     "--tb=short",
     "-W", "ignore::RuntimeWarning:unittest.mock.*",
+    "--maxfail=5",  # Stop after 5 failures for faster feedback
 ]
 markers = [
     "asyncio: mark test as async",
@@ -209,21 +218,21 @@ markers = [
 [tool.coverage.run]
 data_file = "tmp/.coverage"
 relative_files = true
-source = ["."]
+source = ["./src"]
 omit = [
-    # any whole-file exceptions
+    ["stubs/*", "tests/*", "samples/*", "src/**/demo_*.*"]
 ]
 
 [tool.coverage.report]
-exclude_also = [
-    # pick up pragma: no cover even when it's part of the same comment as a noqa directive
-    "#.* pragma: no cover",
-    # no need to test that unimplemented methods are unimplemented
-    "raise NotImplementedError",
-    # don't try and cover lines which are just an ellipsis
-    "^\\s+\\.\\.\\.$"
-]
 include_namespace_packages = "true"
 fail_under = 100
+exclude_lines = [ 'pragma: no cover', 'raise NotImplementedError', 'if TYPE_CHECKING:', 'if typing.TYPE_CHECKING:', '@overload', '@typing.overload' ]
+
+[tool.coverage.html]
+directory = "tmp/.coverage/html_report/"
 
 [tool.poetry.scripts]
+
+[tool.poetry-git-version-plugin]
+make_alpha_version = true
+alpha_version_format = '{version}.dev{distance}+{commit_hash}'

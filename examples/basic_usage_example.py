@@ -18,56 +18,66 @@ async def basic_usage_example() -> None:
     """Demonstrate basic usage of OC Fetcher."""
     # Import the necessary modules
     from data_fetcher_core.core import FetchPlan, FetchRunContext
-    from data_fetcher_core.registry import get_fetcher
+    from data_fetcher_core.recipebook import get_fetcher
 
-    # List available fetcher configurations
+    # List available fetcher recipes
 
-    # Example 1: Get a fetcher for US Florida SFTP fetcher configuration
+    # Example 1: Get a fetcher for US Florida SFTP fetcher recipe
     try:
         get_fetcher("us-fl")
 
+        # Get the recipe
+        from data_fetcher_core.recipebook import get_recipe_setup_function
+
+        setup_func = get_recipe_setup_function("us-fl")
+        recipe = setup_func()
+
         # Create a basic fetch plan
         run_context = FetchRunContext(run_id="example-us-fl")
-        _ = FetchPlan(requests=[], context=run_context)
+        _ = FetchPlan(recipe=recipe, context=run_context)
 
     except Exception:
         pass
 
-    # Example 2: Get a fetcher for France API fetcher configuration
+    # Example 2: Get a fetcher for France API fetcher recipe
     try:
         get_fetcher("fr")
 
+        # Get the recipe
+        setup_func = get_recipe_setup_function("fr")
+        recipe = setup_func()
+
         # Create a basic fetch plan
         run_context = FetchRunContext(run_id="example-fr")
-        _ = FetchPlan(requests=[], context=run_context)
+        _ = FetchPlan(recipe=recipe, context=run_context)
 
     except Exception:
         pass
 
-    # Example 3: Error handling for invalid configuration
+    # Example 3: Error handling for invalid recipe
     with contextlib.suppress(KeyError):
         get_fetcher("invalid-config")
 
 
-async def configuration_example() -> None:
-    """Demonstrate configuration system usage."""
-    from data_fetcher_core.registry import list_configurations
+async def recipe_example() -> None:
+    """Demonstrate recipe system usage."""
+    from data_fetcher_core.recipebook import list_recipes
 
-    # Show available configurations
-    configs = list_configurations()
+    # Show available recipes
+    recipes = list_recipes()
 
-    # Demonstrate getting configuration setup function
-    from data_fetcher_core.registry import get_configuration_setup_function
+    # Demonstrate getting recipe setup function
+    from data_fetcher_core.recipebook import get_recipe_setup_function
 
-    for config_name in configs:
+    for recipe_name in recipes:
         with contextlib.suppress(Exception):
-            get_configuration_setup_function(config_name)
+            get_recipe_setup_function(recipe_name)
 
 
 async def main() -> None:
     """Run all examples."""
     await basic_usage_example()
-    await configuration_example()
+    await recipe_example()
 
 
 if __name__ == "__main__":

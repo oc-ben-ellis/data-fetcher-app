@@ -2,7 +2,7 @@
 # Cursor agent-specific environment configuration
 # This script sets up environment variables that improve cursor agent experience
 
-export PATH=${PATH}:$(find find /home/vscode/.cursor-server/bin/ -name remote-cli)
+export PATH=${PATH}:$(find /home/vscode/.cursor-server/bin/ -name remote-cli)
 
 if [[ -n "$CURSOR_AGENT" ]]; then
     # Disable paging for all tools to prevent interactive prompts

@@ -7,9 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
-from data_fetcher_core.core import FetchRunContext, RequestMeta
+from data_fetcher_core.core import FetcherRecipe, FetchRunContext, RequestMeta
+from data_fetcher_core.protocol_config import SftpProtocolConfig
 from data_fetcher_core.storage import FileStorage
-from data_fetcher_sftp.sftp_loader import SFTPLoader
+from data_fetcher_sftp.sftp_loader import SftpBundleLoader
 
 
 def create_mock_storage() -> Mock:
@@ -25,43 +26,44 @@ def setup_storage_bundle_mock(mock_storage: Mock) -> AsyncMock:
     # Configure the async context manager methods
     mock_context.__aenter__ = AsyncMock(return_value=mock_bundle)
     mock_context.__aexit__ = AsyncMock(return_value=None)
-    mock_storage.open_bundle.return_value = mock_context
+    mock_storage.start_bundle.return_value = mock_context
     return mock_bundle
 
 
-class TestSFTPLoader:
-    """Test SFTPLoader class."""
+class TestSftpBundleLoader:
+    """Test SftpBundleLoader class."""
 
     @pytest.fixture
-    def mock_sftp_manager(self) -> AsyncMock:
-        """Create a mock SFTP manager."""
-        manager = AsyncMock()
-        # Mock the async method explicitly
-        manager.get_connection = AsyncMock()
-        return manager
+    def mock_sftp_config(self) -> SftpProtocolConfig:
+        """Create a mock SFTP protocol config."""
+        return SftpProtocolConfig(
+            config_name="test_config",
+            connect_timeout=10.0,
+            rate_limit_requests_per_second=5.0,
+        )
 
     @pytest.fixture
-    def loader(self, mock_sftp_manager: AsyncMock) -> SFTPLoader:
+    def loader(self, mock_sftp_config: SftpProtocolConfig) -> SftpBundleLoader:
         """Create a loader instance for testing."""
-        return SFTPLoader(
-            sftp_manager=mock_sftp_manager,
+        return SftpBundleLoader(
+            sftp_config=mock_sftp_config,
             remote_dir="/remote/path",
             filename_pattern="*.txt",
             meta_load_name="test_sftp_loader",
         )
 
     def test_loader_creation(
-        self, loader: SFTPLoader, mock_sftp_manager: AsyncMock
+        self, loader: SftpBundleLoader, mock_sftp_config: SftpProtocolConfig
     ) -> None:
         """Test loader creation."""
-        assert loader.sftp_manager == mock_sftp_manager
+        assert loader.sftp_config == mock_sftp_config
         assert loader.remote_dir == "/remote/path"
         assert loader.filename_pattern == "*.txt"
         assert loader.meta_load_name == "test_sftp_loader"
 
     @pytest.mark.asyncio
     async def test_load_sftp_file(
-        self, loader: SFTPLoader, mock_sftp_manager: AsyncMock
+        self, loader: SftpBundleLoader, mock_sftp_manager: AsyncMock
     ) -> None:
         """Test loading SFTP file."""
         # Mock SFTP manager connection and file operations
@@ -86,15 +88,16 @@ class TestSFTPLoader:
 
         # Create request and context
         request = RequestMeta(url="sftp://example.com/remote/file.txt")
-        ctx = FetchRunContext()
+        ctx = FetchRunContext(run_id="test_run")
+        recipe = FetcherRecipe(recipe_id="test_recipe")
 
         # Mock storage bundle
         mock_storage = Mock()
-        # setup_storage_bundle_mock configures mock_storage.open_bundle but we don't need the returned mock_bundle
+        # setup_storage_bundle_mock configures mock_storage.start_bundle but we don't need the returned mock_bundle
         setup_storage_bundle_mock(mock_storage)
 
         # Load the request
-        bundle_refs = await loader.load(request, mock_storage, ctx)
+        bundle_refs = await loader.load(request, mock_storage, ctx, recipe)
 
         # Verify results
         assert len(bundle_refs) == 1
@@ -108,7 +111,7 @@ class TestSFTPLoader:
 
     @pytest.mark.asyncio
     async def test_load_with_sftp_error(
-        self, loader: SFTPLoader, mock_sftp_manager: AsyncMock
+        self, loader: SftpBundleLoader, mock_sftp_manager: AsyncMock
     ) -> None:
         """Test loading when SFTP manager raises an error."""
         # Mock SFTP manager to raise an exception
@@ -116,15 +119,16 @@ class TestSFTPLoader:
 
         # Create request and context
         request = RequestMeta(url="sftp://example.com/remote/file.txt")
-        ctx = FetchRunContext()
+        ctx = FetchRunContext(run_id="test_run")
+        recipe = FetcherRecipe(recipe_id="test_recipe")
 
         # Mock storage bundle
         mock_storage = Mock()
-        # setup_storage_bundle_mock configures mock_storage.open_bundle but we don't need the returned mock_bundle
+        # setup_storage_bundle_mock configures mock_storage.start_bundle but we don't need the returned mock_bundle
         setup_storage_bundle_mock(mock_storage)
 
         # Load the request - should handle error gracefully
-        bundle_refs = await loader.load(request, mock_storage, ctx)
+        bundle_refs = await loader.load(request, mock_storage, ctx, recipe)
 
         # Should return empty list or handle error appropriately
         assert isinstance(bundle_refs, list)

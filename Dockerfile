@@ -35,4 +35,4 @@ COPY ./ ./
 RUN poetry install
 
 # Default command shows help
-CMD ["poetry", "run", "python", "-m", "data_fetcher.main", "--help"]
+CMD ["poetry", "run", "python", "-m", "data_fetcher_app.main", "--help"]
