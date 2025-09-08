@@ -1,7 +1,11 @@
-.PHONY: help install update test test-verbose test/with-coverage lint format clean build/for-local build/for-deployment push-to-ecr run run-local debug docker-lint pre-commit check all-checks
+SHELL=/bin/bash
+DOCKER=BUILDKIT_PROGRESS=plain docker
+DOCKER_COMPOSE=USER_ID=$$(id -u) GROUP_ID=$$(id -g) BUILDKIT_PROGRESS=plain docker-compose
+GIT_REPOSITORY_NAME=$$(basename `git rev-parse --show-toplevel`)
+GIT_COMMIT_ID=$$(git rev-parse --short HEAD)
 
 # Default parameter values
-AWS_PROFILE ?= default
+AWS_PROFILE ?= oc-management-dev
 DATE ?= $(shell date +%Y%m%d)
 ENV ?= play
 SOURCE_ID ?=
@@ -9,125 +13,315 @@ AWS_REGION = eu-west-2
 AWS_ACCOUNT_ID ?= $(shell aws sts get-caller-identity --query Account --output text --profile $(AWS_PROFILE))
 ECR_REPOSITORY ?= data-fetcher-sftp
 
-# Default target
-.DEFAULT_GOAL := help
+# Set LOCAL mode automatically if in container, unless explicitly overridden
+ifeq ($(USER),vscode)
+	# Dev Container environment (detected by USER=vscode)
+	MODE ?= local
+endif
 
-# Python settings
-PYTHON := python3
-POETRY := poetry
+# Define run commands based on mode
+ifeq ($(MODE), local)
+	RUN=poetry run
+	RUN_NO_DEPS=poetry run
+else
+	# Use docker-compose to run commands in the build-container
+	RUN=$(DOCKER_COMPOSE) run --rm build-container poetry run
+	RUN_NO_DEPS=$(DOCKER_COMPOSE) run --rm build-container poetry run
+endif
 
-# Project settings
-PROJECT_NAME := data-fetcher-sftp
+# Define a function to run commands in the appropriate environment
+define run_in_container
+	@if [ "$(MODE)" = "local" ]; then \
+		poetry run $(1); \
+	else \
+		$(DOCKER_COMPOSE) run --rm build-container poetry run $(1); \
+	fi
+endef
 
-GIT=git
-GIT_REPOSITORY_NAME=$$(basename `$(GIT) rev-parse --show-toplevel`)
-GIT_COMMIT_ID=$$($(GIT) rev-parse --short HEAD)
+# Default pytest arguments for test targets
+PYTEST_ARGS=-v --tb=line
 
+# User-provided arguments (can be overridden from command line)
+ARGS=
 
-# Directories
-SRC_DIR := src
-TEST_DIR := tests
+# Default number of parallel workers for tests (auto-detect CPU cores)
+# Parallel execution can significantly speed up test runs, especially on multi-core systems
+# Use TEST_WORKERS=1 to run tests sequentially if you encounter issues
+TEST_WORKERS ?= auto
 
-check:
-	@echo "Checking project settings..."
-	@echo "Project Name: $(PROJECT_NAME)"
-	@echo "AWS Profile: $(AWS_PROFILE)"
-	@echo "AWS Region: $(AWS_REGION)"
-	@echo "AWS Account ID: $(AWS_ACCOUNT_ID)"
-	@echo "ECR Repository: $(ECR_REPOSITORY)"
-	@echo "Date: $(DATE)"
-	@echo "Environment: $(ENV)"
-	@echo "Source ID: $(SOURCE_ID)"
-	@echo "GIT: $(GIT)"
-	@echo "Git Repository Name: $(GIT_REPOSITORY_NAME)"
-	@echo "Git Commit ID: $(GIT_COMMIT_ID)"
-	@echo "Mode: $(MODE)"
-	@echo "Run Command: $(RUN)"
-	@echo "Run No Deps Command: $(RUN_NO_DEPS)"
-	@echo "SRC_DIR: $(SRC_DIR)"
-	@echo "TEST_DIR: $(TEST_DIR)"
-	@echo "PYTHON: $(PYTHON)"
-	@echo "POETRY: $(POETRY)"
-	@echo "Done."
-
-# Colors for terminal output
-YELLOW := \033[1;33m
-NC := \033[0m # No Color
-
-help: ## Show this help message
-	@echo "$(YELLOW)$(PROJECT_NAME) Makefile$(NC)"
-	@echo "Usage: make [target]"
-	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
-
-install: ## Install dependencies using Poetry
-	@echo "Installing dependencies..."
-	$(POETRY) install
-
-update: ## Update dependencies to their latest versions
-	@echo "Updating dependencies..."
-	$(POETRY) update
-
+.PHONY: all-checks build/for-deployment format lint test test/unit test/integration test/functional test/not-in-parallel test/parallel test/with-coverage test/snapshot-update run run/with-observability
+.PHONY: lint/ruff lint/mypy help examples debug docs docs/open headers pre-commit pre-commit/init pre-commit/run pre-commit/run-all
+.PHONY: setup build-pipeline clean-pipeline
 
 all-checks: format lint test/with-coverage
 
-lint: ## Run linting checks
-	@echo "Running linting checks..."
-	$(POETRY) run black $(SRC_DIR) $(TEST_DIR)
+build/for-deployment:
+	$(DOCKER) build -t "$(GIT_REPOSITORY_NAME):$(GIT_COMMIT_ID)" \
+	--build-arg POETRY_HTTP_BASIC_OCPY_PASSWORD \
+	.
 
-format: ## Format code using black and ruff
-	@echo "Formatting code..."
-	$(POETRY) run black $(SRC_DIR) $(TEST_DIR)
+# Check docker-compose availability and required directories for mounts
+ensure-docker-compose:
+	@if [ "$(MODE)" = "local" ]; then \
+		if ! command -v docker-compose >/dev/null 2>&1; then \
+			echo "Error: docker-compose not found. Please install Docker Compose."; \
+			exit 1; \
+		fi; \
+		MISSING_DIRS=""; \
+		REQUIRED_DIRS="$$HOME/.gnupg $$HOME/.ssh $$HOME/.aws"; \
+		for dir in $$REQUIRED_DIRS; do \
+			if [ ! -d "$$dir" ]; then \
+				MISSING_DIRS="$$MISSING_DIRS $$dir"; \
+			fi; \
+		done; \
+		if [ -n "$$MISSING_DIRS" ]; then \
+			echo ""; \
+			echo "❌ Error: Required directories for docker-compose mounts are missing:"; \
+			for dir in $$MISSING_DIRS; do \
+				echo "   - $$dir"; \
+			done; \
+			echo ""; \
+			echo "🔧 How to resolve:"; \
+			echo "   1. Create the missing directories:"; \
+			for dir in $$MISSING_DIRS; do \
+				echo "      mkdir -p $$dir"; \
+			done; \
+			echo ""; \
+			exit 1; \
+		fi; \
+	fi
 
-build/for-local: ## Build Docker image for local testing
-	@echo "Building Docker image for local testing..."
-	docker build -t "$(GIT_REPOSITORY_NAME):$(GIT_COMMIT_ID)" .
 
-build/for-deployment: ## Build Docker image for deployment (amd64 architecture)
-	@echo "Building Docker image for deployment (amd64 architecture)..."
-	docker buildx build --platform linux/amd64 -t "$(GIT_REPOSITORY_NAME):$(GIT_COMMIT_ID)" .
 
-push-to-ecr-play: build/for-deployment ## Push Docker image to ECR
-	@echo "Pushing Docker image to ECR..."
-	@echo "Authenticating with ECR..."
-	aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-	@echo "Tagging image for ECR..."
-	docker tag "$(GIT_REPOSITORY_NAME):$(GIT_COMMIT_ID)" "$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPOSITORY):$(GIT_COMMIT_ID)"
-	@echo "Pushing image to ECR..."
-	docker push "$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPOSITORY):$(GIT_COMMIT_ID)"
+format: ensure-docker-compose
+	-$(call run_in_container,ruff format .)
+	-$(call run_in_container,ruff check --fix .)
 
-run-local: ## Run the application locally using Poetry (make run-local DATE=YYYYMMDD ENV=play SOURCE_ID=us_florida)
-	@echo "Running application locally with date $(DATE), environment $(ENV), and source ID $(SOURCE_ID)..."
-	$(POETRY) run python $(SRC_DIR)/sftp_to_s3.py $(DATE) $(ENV) $(SOURCE_ID)
+headers: ensure-docker-compose
+	@echo "Adding standard headers to Python files..."
+	$(call run_in_container,python tmp/add_headers.py)
+	@echo "Headers added. Use 'make headers/dry-run' to preview changes."
 
-run: build/for-local ## Run the application in Docker (make run DATE=YYYYMMDD ENV=play SOURCE_ID=us_florida)
-	@echo "Running Docker container with date $(DATE), environment $(ENV), and source ID $(SOURCE_ID)..."
-	@echo "Mounting AWS config from $(HOME)/.aws to /home/appuser/.aws in container"
-	docker run --rm \
-		-v $(HOME)/.aws:/home/appuser/.aws:ro \
-		-e AWS_PROFILE=$(AWS_PROFILE) \
-		-e AWS_SDK_LOAD_CONFIG=1 \
-		$(GIT_REPOSITORY_NAME):$(GIT_COMMIT_ID) $(DATE) $(ENV) $(SOURCE_ID)
+headers/dry-run: ensure-docker-compose
+	@echo "Previewing header changes (dry run)..."
+	$(call run_in_container,python tmp/add_headers.py --dry-run)
 
-test: ## Run tests
-	@echo "Running tests..."
-	$(POETRY) run pytest $(TEST_DIR)
+pre-commit: ensure-docker-compose
+	@echo "Installing pre-commit hooks..."
+	$(call run_in_container,pre-commit install)
+	@echo "Pre-commit hooks installed. They will run automatically on commit."
 
-test-verbose: ## Run tests with verbose output
-	@echo "Running tests with verbose output..."
-	$(POETRY) run pytest -v $(TEST_DIR)
+pre-commit/init: ensure-docker-compose
+	@echo "Initializing pre-commit environments..."
+	$(call run_in_container,pre-commit install-hooks)
+	@echo "Pre-commit environments initialized. First run will be much faster."
 
-test/with-coverage: ## Run tests with coverage report
-	@echo "Running tests with coverage..."
-	$(POETRY) run pytest --cov=$(SRC_DIR) $(TEST_DIR) --cov-report=term-missing
+pre-commit/run: ensure-docker-compose
+	@echo "Running pre-commit on staged files..."
+	$(call run_in_container,pre-commit run)
 
-clean: ## Clean up build artifacts and cache files
-	@echo "Cleaning up..."
-	rm -rf .pytest_cache
-	rm -rf .coverage
-	rm -rf htmlcov
-	rm -rf dist
-	rm -rf build
-	rm -rf *.egg-info
-	find . -type d -name __pycache__ -exec rm -rf {} +
-	find . -type d -name "*.pyc" -delete
+pre-commit/run-all: ensure-docker-compose
+	@echo "Running pre-commit on all files..."
+	$(call run_in_container,pre-commit run --all-files)
+
+lint: lint/ruff lint/mypy
+
+lint/ruff: ensure-docker-compose
+	$(call run_in_container,ruff check .)
+
+lint/mypy: ensure-docker-compose
+	$(call run_in_container,mypy .)
+
+test: test/unit test/integration test/functional
+	@echo "All tests completed successfully"
+
+test/not-in-parallel: ensure-docker-compose
+	$(call run_in_container,pytest $(PYTEST_ARGS))
+
+test/parallel: ensure-docker-compose
+	$(call run_in_container,pytest $(PYTEST_ARGS) -n $(TEST_WORKERS))
+
+test/with-coverage: ensure-docker-compose
+	$(call run_in_container,coverage run -m pytest $(PYTEST_ARGS) -n $(TEST_WORKERS))
+	$(call run_in_container,coverage html --fail-under=0)
+	@echo "Coverage report at file://$(PWD)/tmp/htmlcov/index.html"
+	$(call run_in_container,coverage report)
+
+test/unit: ensure-docker-compose
+	$(call run_in_container,pytest $(PYTEST_ARGS) -n $(TEST_WORKERS) tests/test_unit/)
+
+test/integration: ensure-docker-compose
+	$(call run_in_container,pytest $(PYTEST_ARGS) -n $(TEST_WORKERS) tests/test_integration/)
+
+test/functional: ensure-docker-compose
+	$(call run_in_container,pytest $(PYTEST_ARGS) -n $(TEST_WORKERS) tests/test_functional/)
+
+run: ensure-docker-compose
+ifeq ($(MODE),local)
+	$(RUN) python -m data_fetcher.main $(ARGS)
+else
+	# Use docker-compose to run the app
+	$(DOCKER_COMPOSE) run --rm app-runner poetry run python -m data_fetcher.main $(ARGS)
+endif
+
+run/with-observability:
+ifeq ($(MODE),local)
+	echo $(MODE)
+	$(error $@ not available in MODE=$(MODE))
+else
+	@echo "Running with observability..."
+	$(DOCKER_COMPOSE) run --rm app-runner poetry run python -m data_fetcher.main $(ARGS)
+endif
+
+help:
+	@echo "Available commands:"
+	@echo "  all-checks          - Run format, lint, and tests with coverage"
+	@echo "  build/for-deployment - Build Docker image for deployment"
+	@echo "  format              - Format code with ruff"
+	@echo "  headers             - Add standard headers to Python files"
+	@echo "  pre-commit          - Install pre-commit hooks for automatic checks"
+	@echo "  pre-commit/init     - Initialize pre-commit environments (faster first run)"
+	@echo "  pre-commit/run      - Run pre-commit on staged files"
+	@echo "  pre-commit/run-all  - Run pre-commit on all files"
+	@echo "  lint                - Run all linters"
+	@echo "  test                - Run tests in parallel (default, faster)"
+	@echo "  test/unit           - Run unit tests only"
+	@echo "  test/integration    - Run integration tests only"
+	@echo "  test/functional     - Run functional tests only"
+	@echo "  test/fast           - Run only fast tests (excludes slow tests)"
+	@echo "  test/slow           - Run only slow tests (takes >30 seconds)"
+	@echo "  test/integration-fast - Run fast integration tests only"
+	@echo "  test/integration-slow - Run slow integration tests only"
+	@echo "  test/not-in-parallel - Run tests sequentially (fallback)"
+	@echo "  test/parallel      - Run tests in parallel (explicit)"
+	@echo "  test/with-coverage - Run tests with coverage report (parallel)"
+	@echo "  run                 - Run the fetcher (use ARGS=<fetcher_id>)"
+	@echo "  run/with-observability - Run with observability features"
+	@echo "  docs                - Build HTML documentation from markdown files"
+	@echo "  docs/serve          - Start development server (accessible from host)"
+	@echo "  docs/serve/local    - Start development server locally"
+	@echo "  docs/build          - Build documentation locally"
+	@echo "  docs/clean          - Clean build artifacts"
+	@echo "  docs/open           - Build and open documentation in browser"
+	@echo "  docs/validate       - Validate MkDocs configuration"
+	@echo "  docs/check-links    - Check for broken links"
+	@echo "  docs/deploy         - Deploy to GitHub Pages"
+	@echo "  docs/help           - Show detailed documentation help"
+	@echo "  examples            - Run example scripts"
+	@echo "  debug               - Show environment detection and mode settings"
+	@echo ""
+	@echo "Mode detection:"
+	@echo "  - Automatically detects container environments (Docker, DevContainer, etc.)"
+	@echo "  - Uses LOCAL mode (poetry run) when in containers"
+	@echo "  - Can be overridden with MODE=local or MODE=docker"
+	@echo ""
+	@echo "Usage examples:"
+	@echo "  make run ARGS=us-il"
+	@echo "  make test"
+	@echo "  make test/unit"
+	@echo "  make test/integration"
+	@echo "  make test/functional"
+	@echo "  make build-pipeline"
+	@echo "  make test/not-in-parallel"
+	@echo "  make test/parallel TEST_WORKERS=4"
+	@echo "  make test PYTEST_ARGS='-v -s tests/test_fetcher.py'"
+	@echo "  make MODE=local run ARGS=us-fl"
+	@echo "  make MODE=docker run ARGS=us-fl"
+	@echo ""
+	@echo "Test parallelization:"
+	@echo "  TEST_WORKERS=auto  - Auto-detect CPU cores (default)"
+	@echo "  TEST_WORKERS=4     - Use 4 parallel workers"
+	@echo "  TEST_WORKERS=1     - Run tests sequentially"
+	@echo ""
+	@echo "Argument variables:"
+	@echo "  ARGS               - User arguments for non-test targets (e.g., fetcher IDs)"
+	@echo "  PYTEST_ARGS        - Pytest arguments (default: -v --tb=line, can be overridden)"
+
+examples: ensure-docker-compose
+	$(call run_in_container,python examples/using_config_system.py)
+
+debug:
+	@echo "Environment detection:"
+	@echo "  USER: $(USER)"
+	@echo "  TERM_PROGRAM: $(TERM_PROGRAM)"
+	@echo "  /.dockerenv exists: $$(shell ls /.dockerenv >/dev/null 2>&1 && echo yes || echo no)"
+	@echo ""
+	@echo "Mode settings:"
+	@echo "  MODE: $(MODE)"
+	@echo "  RUN command: $(RUN)"
+	@echo "  RUN_NO_DEPS command: $(RUN_NO_DEPS)"
+	@echo "  DOCKER_COMPOSE command: $(DOCKER_COMPOSE)"
+
+# Documentation targets
+docs: ensure-docker-compose
+	@echo "Building documentation with MkDocs..."
+	$(call run_in_container,mkdocs build)
+
+docs/serve:
+	@echo "Starting MkDocs development server on http://0.0.0.0:8000"
+	@echo "Press Ctrl+C to stop the server"
+	$(call run_in_container,mkdocs serve --dev-addr=0.0.0.0:8000)
+
+docs/serve/local:
+	@echo "Starting MkDocs development server locally on http://127.0.0.1:8000"
+	@echo "Press Ctrl+C to stop the server"
+	$(RUN_NO_DEPS) mkdocs serve --dev-addr=127.0.0.1:8000
+
+docs/build:
+	@echo "Building documentation..."
+	$(RUN_NO_DEPS) mkdocs build
+
+docs/clean:
+	@echo "Cleaning documentation build artifacts..."
+	rm -rf site/
+	rm -rf docs/rendered/
+
+docs/open:
+	@echo "Building and opening documentation in browser..."
+	$(RUN_NO_DEPS) mkdocs build
+	@if command -v xdg-open >/dev/null 2>&1; then \
+		xdg-open site/index.html; \
+	elif command -v open >/dev/null 2>&1; then \
+		open site/index.html; \
+	else \
+		echo "Please open site/index.html in your browser"; \
+	fi
+
+docs/validate:
+	@echo "Validating MkDocs configuration..."
+	$(RUN_NO_DEPS) mkdocs build --strict
+	@echo "✅ Documentation validation passed"
+
+docs/check-links:
+	@echo "Checking for broken links in documentation..."
+	$(RUN_NO_DEPS) mkdocs build
+	@if command -v linkchecker >/dev/null 2>&1; then \
+		linkchecker site/index.html --ignore-url="^http://127.0.0.1" --ignore-url="^http://localhost"; \
+	else \
+		echo "⚠️  linkchecker not installed. Install with: pip install linkchecker"; \
+		echo "   Or use: poetry add --group dev linkchecker"; \
+	fi
+
+docs/deploy:
+	@echo "Deploying documentation to GitHub Pages..."
+	$(RUN_NO_DEPS) mkdocs gh-deploy --force
+
+docs/help:
+	@echo "Documentation targets:"
+	@echo "  docs              - Build documentation (in container)"
+	@echo "  docs/serve        - Start development server (in container, accessible from host)"
+	@echo "  docs/serve/local  - Start development server locally"
+	@echo "  docs/build        - Build documentation locally"
+	@echo "  docs/clean        - Clean build artifacts"
+	@echo "  docs/open         - Build and open in browser"
+	@echo "  docs/validate     - Validate MkDocs configuration"
+	@echo "  docs/check-links  - Check for broken links"
+	@echo "  docs/deploy       - Deploy to GitHub Pages"
+	@echo "  docs/help         - Show this help"
+	@echo ""
+	@echo "Development workflow:"
+	@echo "  1. make docs/serve        - Start development server"
+	@echo "  2. Edit documentation in docs/ directory"
+	@echo "  3. View changes at http://0.0.0.0:8000"
+	@echo "  4. make docs/validate     - Validate before committing"
+	@echo "  5. make docs/deploy       - Deploy to GitHub Pages"

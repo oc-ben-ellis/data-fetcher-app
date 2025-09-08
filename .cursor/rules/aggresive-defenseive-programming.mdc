@@ -1,0 +1,6 @@
+---
+description: Follow aggresive defensive programming for dealing with errors
+globs:
+alwaysApply: true
+---
+Follow an aggresive defensive programming approach where we check for errors early (i.e. check for unexpected values constructors or at the start of functions and raise an error (don't just log a warning, unless it's a possible expectation))

@@ -1,0 +1,81 @@
+{
+    "source": "mockoon:cli:2.5.0",
+    "data": [
+        {
+            "uuid": "fr-env-uuid-0001",
+            "type": "environment",
+            "name": "French SIREN API",
+            "port": 3000,
+            "hostname": "0.0.0.0",
+            "endpointPrefix": "",
+            "cors": true,
+            "routes": [
+                {
+                    "uuid": "health-route-uuid",
+                    "documentation": "Health check",
+                    "method": "get",
+                    "endpoint": "/health",
+                    "responses": [
+                        {
+                            "uuid": "health-resp-uuid",
+                            "statusCode": 200,
+                            "label": "OK",
+                            "headers": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"service\": \"siren_api_mock\",\n  \"status\": \"healthy\",\n  \"timestamp\": \"2025-09-07T10:00:00.000Z\",\n  \"version\": \"1.0.0\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "uuid": "token-route-uuid",
+                    "documentation": "OAuth token endpoint",
+                    "method": "post",
+                    "endpoint": "/token",
+                    "responses": [
+                        {
+                            "uuid": "token-resp-uuid",
+                            "statusCode": 200,
+                            "label": "Token",
+                            "headers": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"access_token\": \"mock_access_token_12345\",\n  \"token_type\": \"Bearer\",\n  \"expires_in\": 3600\n}"
+                        }
+                    ]
+                },
+                {
+                    "uuid": "siren-route-uuid",
+                    "documentation": "SIREN search",
+                    "method": "get",
+                    "endpoint": "/entreprises/sirene/V3.11/siren",
+                    "responses": [
+                        {
+                            "uuid": "siren-resp-uuid",
+                            "statusCode": 200,
+                            "label": "Result",
+                            "headers": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"header\": {\n    \"statut\": 200,\n    \"message\": \"OK\",\n    \"total\": 1,\n    \"debut\": 1,\n    \"nombre\": 1\n  },\n  \"unitesLegales\": [\n    {\n      \"siren\": \"123456789\",\n      \"statutDiffusionUniteLegale\": \"O\",\n      \"dateCreationUniteLegale\": \"2020-01-01\",\n      \"sigleUniteLegale\": \"TEST\",\n      \"denominationUniteLegale\": \"TEST COMPANY\",\n      \"denominationUsuelle1UniteLegale\": \"TEST\",\n      \"categorieJuridiqueUniteLegale\": \"5710\",\n      \"activitePrincipaleUniteLegale\": \"62.01Z\",\n      \"nomenclatureActivitePrincipaleUniteLegale\": \"NAFRev2\",\n      \"caractereEmployeurUniteLegale\": \"O\",\n      \"trancheEffectifsUniteLegale\": \"00\",\n      \"effectifMinUniteLegale\": 0,\n      \"effectifMaxUniteLegale\": 0,\n      \"dateDernierTraitementUniteLegale\": \"2025-09-07T10:00:00\",\n      \"etablissements\": [\n        {\n          \"siren\": \"123456789\",\n          \"siret\": \"12345678900001\",\n          \"dateCreationEtablissement\": \"2020-01-01\",\n          \"codePostalEtablissement\": \"75001\",\n          \"libelleCommuneEtablissement\": \"PARIS 1ER\",\n          \"codeCommuneEtablissement\": \"75101\",\n          \"activitePrincipaleEtablissement\": \"62.01Z\",\n          \"nomenclatureActivitePrincipaleEtablissement\": \"NAFRev2\",\n          \"caractereEmployeurEtablissement\": \"O\",\n          \"trancheEffectifsEtablissement\": \"00\",\n          \"effectifMinEtablissement\": 0,\n          \"effectifMaxEtablissement\": 0,\n          \"dateDernierTraitementEtablissement\": \"2025-09-07T10:00:00\"\n        }\n      ]\n    }\n  ],\n  \"curseurSuivant\": null\n}"
+                        }
+                    ]
+                }
+            ],
+            "rootChildren": [],
+            "tlsOptions": {
+                "enabled": false
+            },
+            "proxyMode": false
+        }
+    ]
+}

@@ -1,0 +1,17 @@
+{
+  "description": "Basic French SIREN API test case",
+  "recipe": "fr",
+  "credentials": {
+    "provider_type": "environment",
+    "consumer_key": "test_consumer_key",
+    "consumer_secret": "test_consumer_secret"
+  },
+  "storage": {
+    "type": "file",
+    "path": "tmp/test_output"
+  },
+  "date_range": {
+    "start_date": "2025-09-07",
+    "end_date": "2025-09-07"
+  }
+}

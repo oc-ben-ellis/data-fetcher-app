@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # Mockoon for French SIREN API
+  mockoon:
+    image: mockoon/cli:latest
+    ports:
+      - "${MOCKOON_PORT:-5001}:3000"
+    volumes:
+      - /workspaces/data-fetcher-sftp/mocks/environments/fr/simple-mockoon-environment.json:/data/mockoon-environment.json
+    command: [ "--data", "/data/mockoon-environment.json", "--port", "3000" ]
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fr_network
+
+  # LocalStack for S3 and AWS services testing
+  localstack:
+    image: localstack/localstack:3.0
+    ports:
+      - "${LOCALSTACK_PORT:-4566}:4566"
+    environment:
+      - SERVICES=s3,secretsmanager
+      - DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - DEBUG=1
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:4566/_localstack/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fr_network
+
+networks:
+  fr_network:
+    driver: bridge

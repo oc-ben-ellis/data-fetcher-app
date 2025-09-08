@@ -3,16 +3,16 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
-      - id: no-commit-to-branch
-        args: [--branch, master]
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
+    - id: no-commit-to-branch
+      args: [--branch, master]
+    - id: trailing-whitespace
+    - id: end-of-file-fixer
 
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.2.0
     hooks:
-      - id: conventional-pre-commit
-        stages: [commit-msg]
+    - id: conventional-pre-commit
+      stages: [commit-msg]
 
   # iac hooks (in accordance with https://opencorporates.atlassian.net/wiki/x/dgAFAg)
   - repo: https://github.com/bridgecrewio/checkov.git
@@ -28,22 +28,40 @@ repos:
   - repo: https://github.com/antonbabenko/pre-commit-terraform
     rev: v1.100.0
     hooks:
-      - id: terraform_docs
-        args:
-          - --hook-config=--path-to-file=README.md
-          - --hook-config=--add-to-existing-file=true
+    - id: terraform_docs
+      args:
+        - --hook-config=--path-to-file=README.md
+        - --hook-config=--add-to-existing-file=true
 
-  # python hooks (in accordance with https://opencorporates.atlassian.net/wiki/x/BQB9DQ)
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.12
+  # Use poetry versions of linters so we keep the versions in sync
+  - repo: local
     hooks:
-      # Run the linter (uses ruff config in pyproject.toml, see [tool.ruff.lint] section)
-      - id: ruff-check
-        args: [--fix]
-      # Run the formatter (uses ruff config in pyproject.toml, see [tool.ruff.format] section)
-      - id: ruff-format
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.17.1
-    hooks:
-      # Run the type checker (using mypy config in pyproject.toml, see [tool.mypy] section)
+      - id: ruff
+        name: ruff
+        entry: poetry run ruff check
+        args: [--fix, --exit-non-zero-on-fix]
+        language: system
+        types: [python]
+        pass_filenames: true
+
       - id: mypy
+        name: mypy
+        entry: poetry run mypy
+        language: system
+        types: [python]
+        pass_filenames: true
+
+      - id: class-naming-check
+        name: Check class naming conventions
+        entry: poetry run python bin/check_class_naming.py
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      # - id: unit-tests
+      #   name: Run unit tests only
+      #   entry: poetry run pytest tests/unit/ -v --tb=short
+      #   language: system
+      #   types: [python]
+      #   pass_filenames: false
+      #   stages: [commit]

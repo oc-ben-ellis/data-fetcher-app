@@ -1,0 +1,6 @@
+---
+description: Running inside dev-container
+globs:
+alwaysApply: true
+---
+We're running inside a dev container so keep in mind we're in a docker-outside-of-docker environment especially when it comes to IP addresses or hostnames such as localhost.

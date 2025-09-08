@@ -1,0 +1,13 @@
+/* Custom logo sizing for MkDocs Material theme */
+
+/* Double the size of the site logo */
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+    height: 2rem !important;
+    width: auto !important;
+}
+
+/* Ensure the logo container can accommodate the larger size */
+.md-header__button.md-logo {
+    padding: 0.2rem 0.4rem !important;
+}

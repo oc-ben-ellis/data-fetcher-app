@@ -1,0 +1,7 @@
+Mock daily data for 20230729_daily_data.txt
+Generated at 2023-07-29T10:00:00
+Sample corporate data content
+This is daily business registration data
+Contains licensing and corporate information
+Company: DEF Inc, License: FL345678, Date: 2023-07-29
+Company: GHI Corp, License: FL901234, Date: 2023-07-29

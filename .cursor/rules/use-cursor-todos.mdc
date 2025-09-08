@@ -1,0 +1,25 @@
+---
+description: Use Cursor TODO feature for tracking work
+globs:
+alwaysApply: true
+---
+When working on tasks or identifying work to be carried out, actively use Cursor's TODO feature to track and organize your development work. This practice delivers:
+
+1. Task Organization: Create TODO comments to mark specific areas requiring attention
+2. Progress Tracking: Use TODO comments to track completed work versus remaining tasks
+3. Code Navigation: Cursor highlights and enables navigation between TODO comments
+4. Team Collaboration: Other developers can easily see planned work and progress
+
+Examples:
+- // TODO: Implement error handling for this function
+- # TODO: Add unit tests for this class
+- /* TODO: Refactor this method to use the new API */
+
+Best Practices:
+- Write specific, actionable TODO descriptions
+- Include context explaining why the TODO exists
+- Maintain consistent TODO comment formatting
+- Remove TODO comments upon completion
+- Add priority levels when appropriate (e.g., TODO(HIGH): Fix critical bug)
+
+This practice enhances code maintainability and ensures all work items receive proper attention during development.

@@ -1,0 +1,61 @@
+{
+  "source": "mockoon:cli:2.5.0",
+  "data": [
+    {
+      "uuid": "fr-env-uuid-0001",
+      "type": "environment",
+      "name": "French SIREN API",
+      "port": 3000,
+      "hostname": "0.0.0.0",
+      "endpointPrefix": "",
+      "cors": true,
+      "routes": [
+        {
+          "uuid": "health-route-uuid",
+          "documentation": "Health check",
+          "method": "get",
+          "endpoint": "/health",
+          "responses": [
+            {
+              "uuid": "health-resp-uuid",
+              "statusCode": 200,
+              "label": "OK",
+              "headers": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\"service\": \"siren_api_mock\", \"status\": \"healthy\"}"
+            }
+          ]
+        },
+        {
+          "uuid": "token-route-uuid",
+          "documentation": "OAuth token endpoint",
+          "method": "post",
+          "endpoint": "/token",
+          "responses": [
+            {
+              "uuid": "token-resp-uuid",
+              "statusCode": 200,
+              "label": "Token",
+              "headers": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\"access_token\": \"mock_access_token_12345\", \"token_type\": \"Bearer\", \"expires_in\": 3600}"
+            }
+          ]
+        }
+      ],
+      "rootChildren": [],
+      "tlsOptions": {
+        "enabled": false
+      },
+      "proxyMode": false
+    }
+  ]
+}

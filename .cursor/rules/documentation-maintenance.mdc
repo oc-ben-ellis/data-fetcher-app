@@ -1,0 +1,184 @@
+---
+description: Documentation Maintenance and Standards
+globs: ["docs/**/*.md", "README.md", "examples/**/*.py"]
+alwaysApply: true
+---
+Documentation Maintenance Rule
+
+Overview
+Always review the documentation structure in the docs/ directory when working with documentation. This rule ensures consistent, high-quality documentation that follows established patterns and MkDocs build system requirements.
+
+Core Requirements
+
+1. Read Documentation Guide First
+- Always read the documentation structure in docs/ directory before making changes
+- Understand the MkDocs build system and how it processes files
+- Follow the established file structure and naming conventions
+
+2. Build System Compliance
+- Use make docs after ANY documentation changes
+- Ensure all changes render correctly in the HTML output
+- Test navigation and links work properly
+- Verify images and diagrams display correctly
+
+3. File Structure Standards
+- Main documentation: Place high-level docs directly in docs/
+- Numbered directories: Use for ordered content (e.g., docs/01_architecture/, docs/02_configurations/)
+- Subdirectories: Use for related content (e.g., docs/architecture/, docs/09_configurations/)
+- README.md files: Include in subdirectories for navigation ordering
+- Assets: Place in docs/assets/ or docs/diagrams/
+- Navigation: Configured in mkdocs.yaml
+
+4. Content Organization
+- Start each section with a clear overview
+- Use consistent heading hierarchy (H1 → H2 → H3)
+- Include working code examples with proper syntax highlighting
+- Cross-reference related content appropriately
+- Keep content concise and focused
+
+5. Code Examples
+- Always verify code examples work with current codebase
+- Use correct API calls (e.g., get_fetcher() not run_fetcher())
+- Include proper error handling in examples
+- Use language-specific code blocks with syntax highlighting
+- Test examples before including them
+
+6. Navigation Structure
+- Update README.md files in subdirectories when adding new files
+- Use numbered lists for file ordering in README.md files
+- Ensure proper cross-references between related content
+- Maintain logical reading order
+
+7. Asset Management
+- Use SVG for diagrams (automatically converted to PNG)
+- Place images in appropriate directories (docs/assets/ or docs/diagrams/)
+- Use descriptive file names
+- Ensure images are web-optimized
+
+8. Link Management
+- Use relative paths for internal links
+- Test all internal links work correctly
+- Update links when files are moved or renamed
+- Use descriptive link text
+
+Specific Guidelines
+
+When Adding New Documentation
+1. Review the docs/ directory structure completely
+2. Choose appropriate location (main docs vs subdirectory)
+3. Follow naming conventions
+4. Update navigation if needed
+5. Include working examples
+6. Run make docs to test
+7. Verify HTML output is correct
+
+When Updating Existing Documentation
+1. Check current content against codebase accuracy
+2. Update examples to match current API
+3. Ensure links still work
+4. Maintain consistent style and tone
+5. Run make docs after changes
+6. Test rendered output
+
+When Fixing Issues
+1. Check docs/12_troubleshooting/troubleshooting_guide.md for common solutions
+2. Verify build system is working (make docs)
+3. Check file paths and naming conventions
+4. Ensure all dependencies are installed
+5. Test navigation and links
+
+Quality Standards
+
+Content Quality
+- Accuracy: All information will be current and correct
+- Completeness: Cover all necessary aspects of the topic
+- Clarity: Write in clear, concise language
+- Consistency: Use consistent terminology throughout
+- Examples: Include working, tested code examples
+
+Technical Quality
+- Build Success: Documentation will build without errors
+- Link Validity: All internal and external links will work
+- Image Display: All images will render correctly
+- Navigation: Navigation will be logical and complete
+- Responsive: HTML output will work on different screen sizes
+
+Maintenance Quality
+- Version Control: Include both source and rendered files
+- Regular Updates: Keep documentation current with code changes
+- Review Process: Review changes before committing
+- Testing: Test all examples and links
+- Feedback: Incorporate user feedback and suggestions
+
+Common Mistakes to Avoid
+
+Do This Instead
+- Always review the docs/ directory structure first
+- Test all code examples before including them
+- Follow established file structure
+- Run make docs after every change
+- Verify all links work correctly
+- Update navigation when adding files
+- Keep content concise and focused
+- Use consistent markdown formatting
+
+Verification Checklist
+
+Before committing documentation changes, verify:
+
+- Reviewed docs/ directory structure
+- Followed file structure guidelines
+- Used correct API calls in examples
+- Updated navigation if needed
+- Ran make docs successfully
+- Checked HTML output in browser
+- Verified all links work
+- Tested code examples
+- Used consistent formatting
+- Maintained logical reading order
+
+Build Commands
+
+# Build documentation
+make docs
+
+# Build and open in browser
+make docs/open
+
+# Start development server
+make docs/serve
+
+# Validate MkDocs configuration
+make docs/validate
+
+# Check for broken links
+make docs/check-links
+
+# Clean build artifacts
+make docs/clean
+
+Resources
+
+- Documentation Structure: docs/ directory
+- MkDocs Configuration: mkdocs.yaml
+- Troubleshooting: docs/12_troubleshooting/troubleshooting_guide.md
+- Examples: examples/ directory
+- Rendered Output: site/ directory
+
+Current Documentation Structure:
+- docs/01_architecture/ - Architecture documentation
+- docs/02_configurations/ - Configuration guides
+- docs/03_application_configuration/ - App configuration
+- docs/04_state_management/ - State management (formerly persistence)
+- docs/05_storage/ - Storage documentation
+- docs/06_testing/ - Testing guides
+- docs/07_deployment/ - Deployment guides
+- docs/08_user_guide/ - User guides
+- docs/09_configurations/ - Detailed configurations
+- docs/10_contributing/ - Contributing guides
+- docs/11_references/ - Reference materials
+- docs/12_troubleshooting/ - Troubleshooting guides
+- docs/architecture/ - Detailed architecture docs
+- docs/adr/ - Architecture Decision Records
+
+Remember: Good documentation is as important as good code. Always follow the established patterns and maintain high quality standards.

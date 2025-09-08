@@ -1,0 +1,13 @@
+[default]
+cli_pager =
+cli_auto_prompt = off
+cli_timestamp_format = iso8601
+cli_follow_urlparam = false
+cli_pager_use_bat = false
+
+[profile default]
+cli_pager =
+cli_auto_prompt = off
+cli_timestamp_format = iso8601
+cli_follow_urlparam = false
+cli_pager_use_bat = false

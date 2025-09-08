@@ -1,46 +1,38 @@
-# Use an official Python image
-FROM python:3.13-slim
+#checkov:skip=CKV_DOCKER_2: See adr 0003-checkov-suppresions.md
+FROM --platform=linux/amd64 python:3.13-alpine3.22
 
-# Set environment variables for Poetry
-ENV POETRY_VERSION=1.8.2 \
-    POETRY_VIRTUALENVS_CREATE=false \
-    PYTHONUNBUFFERED=1
+RUN apt-get update && apt-get install -y curl cargo libffi-dev libpq-dev gcc && rm -rf /var/lib/apt/lists/*
 
-# Install system dependencies and Poetry
-RUN apt-get update && apt-get install -y curl \
-    && curl -sSL https://install.python-poetry.org | python3 - \
-    && ln -s /root/.local/bin/poetry /usr/local/bin/poetry \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+RUN pip install poetry
 
-# Create a non-root user
-RUN groupadd --gid 1001 appuser && \
-    useradd --uid 1001 --gid appuser --create-home appuser
+# move poetry cache outside root's home directory
+# so virtualenvs are available to all users
+RUN mkdir -p "/opt/poetry-cache"
+ENV POETRY_CACHE_DIR=/opt/poetry-cache
 
-# Set the working directory
-WORKDIR /app
-
-# Copy only poetry files first for caching
-COPY pyproject.toml poetry.lock* /app/
-
-# Install dependencies
-RUN poetry install --no-root
-
-# Copy source code
-COPY src/ /app/src/
-COPY config/ /config/
-
-RUN ls -lrta /config
-
-# Change ownership of the working directory to the non-root user
-RUN chown -R appuser:appuser /app /config
-
-# Switch to the non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN chgrp appuser "/opt/poetry-cache" && chmod g+w "/opt/poetry-cache"
 USER appuser
 
-# Add healthcheck to verify Python environment and dependencies
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import sys, boto3, paramiko, yaml, tenacity; sys.exit(0)"
+WORKDIR "/code"
 
-# Set entrypoint to run the Python script
-ENTRYPOINT ["python", "src/sftp_to_s3.py"]
+# placeholders for CodeArtifact repository credentials
+ARG POETRY_HTTP_BASIC_OCPY_USERNAME="x"
+ARG POETRY_HTTP_BASIC_OCPY_PASSWORD="x"
+
+# Set environment variables for Poetry authentication
+ENV POETRY_HTTP_BASIC_OCPY_USERNAME=${POETRY_HTTP_BASIC_OCPY_USERNAME}
+ENV POETRY_HTTP_BASIC_OCPY_PASSWORD=${POETRY_HTTP_BASIC_OCPY_PASSWORD}
+
+# install a base layer with our dependencies as these will change less frequently
+COPY pyproject.toml poetry.lock ./
+RUN poetry install --no-root --no-ansi --no-interaction
+
+# copy over our actual code
+COPY ./ ./
+
+# poetry install again to get the actual application
+RUN poetry install
+
+# Default command shows help
+CMD ["poetry", "run", "python", "-m", "data_fetcher_app.main", "--help"]

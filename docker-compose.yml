@@ -1,0 +1,88 @@
+services:
+  # Stage 1: DevContainer that builds the application Docker image
+  devcontainer-builder:
+    image: mcr.microsoft.com/devcontainers/python:3.11
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.aws:/home/vscode/.aws:ro
+      - ${HOME}/.ssh:/home/vscode/.ssh:ro
+      - ${HOME}/.gnupg:/home/vscode/.gnupg:ro
+    working_dir: /workspace
+    command: >
+      bash -c "
+        echo 'Installing Docker CLI...' &&
+        apt-get update && apt-get install -y docker.io &&
+        echo 'Building application Docker image from Dockerfile...' &&
+        docker build -t data-fetcher-sftp:latest --build-arg POETRY_HTTP_BASIC_OCPY_PASSWORD=$${POETRY_HTTP_BASIC_OCPY_PASSWORD:-x} . &&
+        echo 'DevContainer build completed successfully!' &&
+        docker images | grep data-fetcher-sftp
+      "
+    environment:
+      - DOCKER_BUILDKIT=1
+      - BUILDKIT_PROGRESS=plain
+    networks:
+      - build-network
+
+  # Stage 2: Build container that depends on the devcontainer and uses the built application image
+  build-container:
+    image: data-fetcher-sftp:latest
+    depends_on:
+      - devcontainer-builder
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+      - poetry-cache:/opt/poetry-cache
+      - ${HOME}/.aws:/home/vscode/.aws:ro
+      - ${HOME}/.ssh:/home/vscode/.ssh:ro
+      - ${HOME}/.gnupg:/home/vscode/.gnupg:ro
+    working_dir: /workspace
+    command: >
+      bash -c "
+        echo 'Build container started - using application image built by devcontainer' &&
+        echo 'Running additional build steps...' &&
+        # Add any additional build steps here
+        echo 'Running tests...' &&
+        poetry run pytest -v --tb=line -n auto &&
+        echo 'Running linting...' &&
+        poetry run ruff check . &&
+        poetry run mypy . &&
+        echo 'Build container completed successfully!'
+      "
+    environment:
+      - DOCKER_BUILDKIT=1
+      - BUILDKIT_PROGRESS=plain
+    networks:
+      - build-network
+
+  # Stage 3: Application runner using the actual application Docker image
+  app-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - build-container
+    volumes:
+      - .:/code
+      - poetry-cache:/opt/poetry-cache
+      - ${HOME}/.aws:/home/vscode/.aws:ro
+      - ${HOME}/.ssh:/home/vscode/.ssh:ro
+      - ${HOME}/.gnupg:/home/vscode/.gnupg:ro
+    environment:
+      - PYTHONPATH=/code
+      - MODE=local
+    working_dir: /code
+    command: [ "poetry", "run", "python", "-m", "data_fetcher.main", "--help" ]
+    networks:
+      - build-network
+    profiles:
+      - interactive
+      - run-app
+
+volumes:
+  poetry-cache:
+
+
+networks:
+  build-network:
+    driver: bridge

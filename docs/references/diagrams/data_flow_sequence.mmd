@@ -1,0 +1,40 @@
+sequenceDiagram
+    participant User
+    participant Fetcher
+    participant Provider as Bundle Locator
+    participant Queue as Request Queue
+    participant Manager as Protocol Manager
+    participant Loader as Bundle Loader
+    participant Storage as Storage Layer
+    participant External as External Source
+
+    User->>Fetcher: Start Fetch Operation
+    Fetcher->>Provider: get_next_urls()
+    Provider-->>Fetcher: List[RequestMeta]
+    Fetcher->>Queue: Add requests to queue
+
+    loop For each worker
+        Fetcher->>Queue: Get next request
+        Queue-->>Fetcher: RequestMeta
+
+        Fetcher->>Manager: Check rate limits & scheduling
+        Manager-->>Fetcher: Allow/Deny
+
+        alt Request allowed
+            Fetcher->>Loader: load(request, storage, ctx)
+            Loader->>External: Fetch data
+            External-->>Loader: Stream response
+            Loader->>Storage: Stream to storage
+            Storage-->>Loader: BundleRefs
+            Loader-->>Fetcher: BundleRefs
+
+            Fetcher->>Provider: handle_url_processed(request, bundle_refs)
+        end
+
+        alt Queue empty
+            Fetcher->>Provider: get_next_urls()
+            Provider-->>Fetcher: New requests or empty
+        end
+    end
+
+    Fetcher-->>User: Fetch complete

@@ -1,0 +1,33 @@
+{
+    "description": "Sample input metadata for French SIREN API test",
+    "api_endpoints": [
+        "/token",
+        "/entreprises/sirene/V3.11/siren"
+    ],
+    "expected_responses": {
+        "token": {
+            "access_token": "mock_access_token_12345",
+            "token_type": "Bearer",
+            "expires_in": 3600
+        },
+        "siren": {
+            "header": {
+                "statut": 200,
+                "message": "OK",
+                "total": 1,
+                "debut": 1,
+                "nombre": 1
+            },
+            "unitesLegales": [
+                {
+                    "siren": "123456789",
+                    "denominationUniteLegale": "TEST COMPANY"
+                }
+            ]
+        }
+    },
+    "date_range": {
+        "start_date": "2025-09-07",
+        "end_date": "2025-09-07"
+    }
+}
