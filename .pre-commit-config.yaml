@@ -16,7 +16,7 @@ repos:
 
   # iac hooks (in accordance with https://opencorporates.atlassian.net/wiki/x/dgAFAg)
   - repo: https://github.com/bridgecrewio/checkov.git
-    rev: 3.2.467
+    rev: 3.2.469
     hooks:
       - id: checkov
 
@@ -35,7 +35,7 @@ repos:
 
   # python hooks (in accordance with https://opencorporates.atlassian.net/wiki/x/BQB9DQ)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.11
+    rev: v0.12.12
     hooks:
       # Run the linter (uses ruff config in pyproject.toml, see [tool.ruff.lint] section)
       - id: ruff-check
