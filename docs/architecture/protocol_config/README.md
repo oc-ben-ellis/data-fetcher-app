@@ -359,4 +359,8 @@ loader = create_tracking_http_bundle_loader(
 - **[Orchestration](../orchestration/README.md)** - How ProtocolConfig integrates with the orchestration system
 - **[Recipes](../recipes/README.md)** - How to use ProtocolConfig in recipe configurations
 - **[Factory Functions](../../references/factory_functions.md)** - Complete reference for factory functions
-- **[Authentication](../../references/authentication.md)** - Authentication mechanisms and credential providers
+- **Authentication mechanisms and credential providers**: see
+  - [Creating a Recipe – Authentication](../../configurations/creating_a_recipe.md#4-authentication)
+  - [FR API – Authentication](../../configurations/fr_api.md#authentication)
+  - [Terminology – Authentication Terms](../../references/terminology.md#authentication-terms)
+  - [Troubleshooting – Authentication Issues](../../troubleshooting/troubleshooting_guide.md#authentication-issues)

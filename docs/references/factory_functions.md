@@ -450,5 +450,9 @@ loader = create_tracking_http_bundle_loader(
 ## Related Documentation
 
 - **[ProtocolConfig Architecture](../architecture/protocol_config/README.md)** - Detailed ProtocolConfig architecture
-- **[Creating a Configuration](../configurations/creating_configuration.md)** - How to create custom recipes
-- **[Authentication](../references/authentication.md)** - Authentication mechanisms and credential providers
+- **[Creating a Recipe](../configurations/creating_a_recipe.md)** - How to create custom recipes
+- **Authentication mechanisms and credential providers**: see
+  - [Creating a Recipe – Authentication](../configurations/creating_a_recipe.md#4-authentication)
+  - [FR API – Authentication](../configurations/fr_api.md#authentication)
+  - [Terminology – Authentication Terms](./terminology.md#authentication-terms)
+  - [Troubleshooting – Authentication Issues](../troubleshooting/troubleshooting_guide.md#authentication-issues)

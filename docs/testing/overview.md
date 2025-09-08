@@ -240,7 +240,7 @@ For more details on the retry system, see [Retry Consolidation Summary](../refer
 - **[Mock Services](mock_services.md)** - Mock services and test fixtures
 - **[Mock Environments](mock_environments/README.md)** - Mock environment setup and usage
 - **[Debugging Tests](debugging_tests.md)** - Debugging and troubleshooting
-- **[Fetcher Recipes](../configurations/creating_configuration.md)** - Testing custom fetcher recipes
+- **Fetcher Recipes** - Testing custom fetcher recipes
 - **[User Guide](../user_guide/getting_started.md)** - Basic usage and testing
 - **[Deployment Guide](../deployment/overview.md)** - Production testing and validation
 

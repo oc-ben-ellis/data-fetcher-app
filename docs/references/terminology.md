@@ -4,6 +4,14 @@ This document defines key terms and concepts used throughout the Data Fetcher fr
 
 ## Core Concepts
 
+### Bundle ID (BID)
+
+A **Bundle ID (BID)** is the unique, time-ordered identifier assigned to each bundle. See the detailed architecture and usage in [Bundle ID (BID) Architecture](../architecture/bid/README.md).
+
+### Run ID
+
+A **Run ID** uniquely identifies each execution of the fetcher (includes recipe id and timestamp). See [Run ID Architecture](../architecture/run_id/README.md).
+
 ### Bundle
 
 A **Bundle** is a collection of related data resources that are fetched and stored together as a unit. Bundles provide:

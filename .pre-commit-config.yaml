@@ -58,6 +58,13 @@ repos:
         types: [python]
         pass_filenames: false
 
+      - id: docs-generate-and-check-links
+        name: Generate docs and check links
+        entry: bash -lc 'rm -rf site && bin/techdocs-build-docker.sh && test -f site/index.html && linkchecker site/index.html --ignore-url="^http://127.0.0.1" --ignore-url="^http://localhost"'
+        language: system
+        pass_filenames: false
+        stages: [commit]
+
       # - id: unit-tests
       #   name: Run unit tests only
       #   entry: poetry run pytest tests/unit/ -v --tb=short
