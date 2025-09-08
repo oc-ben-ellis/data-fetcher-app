@@ -1,5 +1,5 @@
 #checkov:skip=CKV_DOCKER_2: See adr 0003-checkov-suppresions.md
-FROM --platform=linux/amd64 python:3.13-slim
+FROM --platform=linux/amd64 python:3.13-alpine3.22
 
 RUN apt-get update && apt-get install -y curl cargo libffi-dev libpq-dev gcc && rm -rf /var/lib/apt/lists/*
 

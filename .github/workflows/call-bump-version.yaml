@@ -21,7 +21,7 @@ on:
     paths:
       - "**/*.tf"
       - "!infra/**"
-      - "data_fetcher/**/*.py"
+      - "src/**/*.py"
       - "!docs/**"
   workflow_dispatch:
 

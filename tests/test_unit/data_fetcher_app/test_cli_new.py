@@ -7,7 +7,7 @@ that uses openc_python_common instead of Click.
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from data_fetcher_app.main import (  # type: ignore[import-untyped]
+from data_fetcher_app.main import (
     generate_run_id,
     health_command,
     list_command,
