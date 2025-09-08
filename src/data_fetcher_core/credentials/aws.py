@@ -44,8 +44,14 @@ class AWSSecretsCredentialProvider:
         if cache_key in self._secrets_cache:
             return self._secrets_cache[cache_key]
 
-        # Create Secrets Manager client
-        session = boto3.session.Session()
+        # Create Secrets Manager client, respecting AWS profile overrides
+        profile_name = os.getenv(
+            "OC_CREDENTIAL_PROVIDER_AWS_PROFILE", os.getenv("AWS_PROFILE")
+        )
+        if profile_name:
+            session = boto3.session.Session(profile_name=profile_name)
+        else:
+            session = boto3.session.Session()
         client_kwargs = {"service_name": "secretsmanager", "region_name": self.region}
         if self.endpoint_url:
             client_kwargs["endpoint_url"] = self.endpoint_url

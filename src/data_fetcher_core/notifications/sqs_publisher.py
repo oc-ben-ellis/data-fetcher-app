@@ -46,7 +46,15 @@ class SqsPublisher:
         if self.region is None:
             self.region = os.getenv("AWS_REGION", "eu-west-2")
 
-        # Create SQS client
+        # Create SQS client (respect AWS profile overrides)
+        profile_name = os.getenv(
+            "OC_STORAGE_PIPELINE_AWS_PROFILE", os.getenv("AWS_PROFILE")
+        )
+        session = (
+            boto3.session.Session(profile_name=profile_name)
+            if profile_name
+            else boto3.session.Session()
+        )
         if self.endpoint_url:
             # For LocalStack, we need to set these credentials
             aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
@@ -55,7 +63,7 @@ class SqsPublisher:
             if not aws_access_key_id or not aws_secret_access_key:
                 raise LocalStackCredentialsError
 
-            self.sqs_client = boto3.client(
+            self.sqs_client = session.client(
                 "sqs",
                 region_name=self.region,
                 endpoint_url=self.endpoint_url,
@@ -63,7 +71,7 @@ class SqsPublisher:
                 aws_secret_access_key=aws_secret_access_key,
             )
         else:
-            self.sqs_client = boto3.client("sqs", region_name=self.region)
+            self.sqs_client = session.client("sqs", region_name=self.region)
 
     async def publish_bundle_completion(
         self, bundle_ref: "BundleRef", metadata: dict[str, Any], recipe_id: str

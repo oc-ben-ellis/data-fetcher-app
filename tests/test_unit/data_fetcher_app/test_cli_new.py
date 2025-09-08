@@ -145,6 +145,26 @@ class TestRunCommand:
         mock_config.kvstore = "memory"
         mock_config.log_level = "INFO"
         mock_config.dev_mode = False
+        # Ensure optional attributes are None to avoid MagicMock leaking into env/kwargs
+        mock_config.aws_profile = None
+        mock_config.credentials_aws_profile = None
+        mock_config.credentials_aws_region = None
+        mock_config.credentials_aws_endpoint_url = None
+        mock_config.credentials_env_prefix = None
+        mock_config.kvstore_serializer = None
+        mock_config.kvstore_default_ttl = None
+        mock_config.kvstore_redis_host = None
+        mock_config.kvstore_redis_port = None
+        mock_config.kvstore_redis_db = None
+        mock_config.kvstore_redis_password = None
+        mock_config.kvstore_redis_key_prefix = None
+        mock_config.storage_pipeline_aws_profile = None
+        mock_config.storage_s3_bucket = None
+        mock_config.storage_s3_prefix = None
+        mock_config.storage_s3_region = None
+        mock_config.storage_s3_endpoint_url = None
+        mock_config.storage_file_path = None
+        mock_config.storage_use_unzip = None
         mock_create_config.return_value = mock_config
 
         # Test the command
@@ -177,6 +197,25 @@ class TestRunCommand:
         mock_config.kvstore = "redis"
         mock_config.log_level = "DEBUG"
         mock_config.dev_mode = True
+        mock_config.aws_profile = None
+        mock_config.credentials_aws_profile = None
+        mock_config.credentials_aws_region = None
+        mock_config.credentials_aws_endpoint_url = None
+        mock_config.credentials_env_prefix = None
+        mock_config.kvstore_serializer = None
+        mock_config.kvstore_default_ttl = None
+        mock_config.kvstore_redis_host = None
+        mock_config.kvstore_redis_port = None
+        mock_config.kvstore_redis_db = None
+        mock_config.kvstore_redis_password = None
+        mock_config.kvstore_redis_key_prefix = None
+        mock_config.storage_pipeline_aws_profile = None
+        mock_config.storage_s3_bucket = None
+        mock_config.storage_s3_prefix = None
+        mock_config.storage_s3_region = None
+        mock_config.storage_s3_endpoint_url = None
+        mock_config.storage_file_path = None
+        mock_config.storage_use_unzip = None
         mock_create_config.return_value = mock_config
 
         # Test the command with options
