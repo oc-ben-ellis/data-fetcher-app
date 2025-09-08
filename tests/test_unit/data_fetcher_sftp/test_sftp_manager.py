@@ -24,6 +24,7 @@ class TestSftpManager:
         credentials.host = "test-host"
         credentials.username = "test-user"
         credentials.password = "test-pass"
+        credentials.port = 22
         return credentials
 
     @pytest.fixture
@@ -48,6 +49,7 @@ class TestSftpManager:
     def _create_mock_config(self) -> MagicMock:
         """Create a mock SftpProtocolConfig with proper attributes."""
         mock_config = MagicMock()
+        mock_config.config_name = "test_config"
         mock_config.max_retries = 3
         mock_config.connect_timeout = 20.0
         mock_config.rate_limit_requests_per_second = 5.0
@@ -89,14 +91,15 @@ class TestSftpManager:
         mock_credentials_provider = self._create_mock_credentials_provider(
             mock_credentials
         )
+        # Ensure provider has update_credential_provider used by pool
+        mock_credentials_provider.update_credential_provider = MagicMock()
 
         with patch("pysftp.Connection") as mock_connection:
             mock_conn_instance = MagicMock()
             mock_connection.return_value = mock_conn_instance
 
-            conn = await sftp_manager.get_connection(  # type: ignore[attr-defined]
-                mock_config, mock_app_config, mock_credentials_provider
-            )
+            pool = sftp_manager._get_or_create_pool(mock_config)
+            conn = await pool.get_connection(mock_app_config, mock_credentials_provider)
 
             assert conn == mock_conn_instance
             mock_connection.assert_called_once()
@@ -113,16 +116,17 @@ class TestSftpManager:
         mock_credentials_provider = self._create_mock_credentials_provider(
             mock_credentials
         )
+        mock_credentials_provider.update_credential_provider = MagicMock()
 
         with patch("pysftp.Connection") as mock_connection:
             mock_conn_instance = MagicMock()
             mock_connection.return_value = mock_conn_instance
 
             # Set up connection
-            await sftp_manager_with_retries.get_connection(  # type: ignore[attr-defined]
-                config=mock_config,
-                app_config=mock_app_config,
-                credentials_provider=mock_credentials_provider,
+            pool = sftp_manager_with_retries._get_or_create_pool(mock_config)
+            await pool.get_connection(
+                mock_app_config,
+                mock_credentials_provider,
             )
 
             # Mock close to succeed
@@ -144,6 +148,7 @@ class TestSftpManager:
         mock_credentials_provider = self._create_mock_credentials_provider(
             mock_credentials
         )
+        mock_credentials_provider.update_credential_provider = MagicMock()
 
         with patch("pysftp.Connection") as mock_connection:
             mock_conn_instance = MagicMock()
@@ -152,8 +157,8 @@ class TestSftpManager:
             # Mock pwd access to succeed
             mock_conn_instance.pwd = "test_path"
 
-            result = await sftp_manager_with_retries.test_connection(  # type: ignore[attr-defined]
-                config=mock_config,
+            pool = sftp_manager_with_retries._get_or_create_pool(mock_config)
+            result = await pool.test_connection(
                 app_config=mock_app_config,
                 credentials_provider=mock_credentials_provider,
             )
@@ -172,13 +177,14 @@ class TestSftpManager:
         mock_credentials_provider = self._create_mock_credentials_provider(
             mock_credentials
         )
+        mock_credentials_provider.update_credential_provider = MagicMock()
 
         with patch("pysftp.Connection") as mock_connection:
             # Mock connection creation to always fail
             mock_connection.side_effect = Exception("Connection failed")
 
-            result = await sftp_manager_with_retries.test_connection(  # type: ignore[attr-defined]
-                config=mock_config,
+            pool = sftp_manager_with_retries._get_or_create_pool(mock_config)
+            result = await pool.test_connection(
                 app_config=mock_app_config,
                 credentials_provider=mock_credentials_provider,
             )

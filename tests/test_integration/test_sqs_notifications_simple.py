@@ -40,7 +40,10 @@ class TestSqsNotificationsSimple:
     @pytest.mark.asyncio
     async def test_sqs_publisher_creation_and_usage(self) -> None:
         """Test SQS publisher creation and basic usage."""
-        with patch("boto3.client") as mock_boto_client:
+        with patch("boto3.session.Session") as mock_boto_session:
+            mock_session = Mock()
+            mock_boto_session.return_value = mock_session
+            mock_boto_client = mock_session.client
             mock_sqs_client = Mock()
             mock_boto_client.return_value = mock_sqs_client
 
@@ -63,7 +66,10 @@ class TestSqsNotificationsSimple:
         self, bundle_ref: BundleRef, recipe: FetcherRecipe
     ) -> None:
         """Test SQS publisher with bundle completion notification."""
-        with patch("boto3.client") as mock_boto_client:
+        with patch("boto3.session.Session") as mock_boto_session:
+            mock_session = Mock()
+            mock_boto_session.return_value = mock_session
+            mock_boto_client = mock_session.client
             mock_sqs_client = Mock()
             mock_boto_client.return_value = mock_sqs_client
 
@@ -255,7 +261,10 @@ class TestSqsNotificationsSimple:
             os.environ,
             {"AWS_ACCESS_KEY_ID": "test_key", "AWS_SECRET_ACCESS_KEY": "test_secret"},
         ):
-            with patch("boto3.client") as mock_boto_client:
+            with patch("boto3.session.Session") as mock_boto_session:
+                mock_session = Mock()
+                mock_boto_session.return_value = mock_session
+                mock_boto_client = mock_session.client
                 mock_sqs_client = Mock()
                 mock_boto_client.return_value = mock_sqs_client
 

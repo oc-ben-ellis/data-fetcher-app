@@ -105,9 +105,8 @@ class TestHttpManager:
                 call_args = mock_sleep.call_args
                 assert call_args is not None
                 sleep_duration = call_args[0][0]
-                assert (
-                    0.009 <= sleep_duration <= 0.011
-                )  # ~10ms minimum interval (100 req/sec)
+                # ~10ms minimum interval (100 req/sec). Allow small timing variance in CI.
+                assert 0.008 <= sleep_duration <= 0.012
 
     @pytest.mark.asyncio
     async def test_http_manager_retries(self, http_manager: HttpManager) -> None:

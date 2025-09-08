@@ -12,8 +12,8 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 from wsgiref.simple_server import make_server
 
-import structlog  # type: ignore[import-not-found]
-from openc_python_common.observability import (  # type: ignore[import-not-found]
+import structlog
+from openc_python_common.observability import (
     configure_logging,
     log_bind,
     observe_around,
