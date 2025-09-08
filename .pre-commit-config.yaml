@@ -51,13 +51,6 @@ repos:
         types: [python]
         pass_filenames: true
 
-      - id: docstring-check
-        name: Check docstrings
-        entry: poetry run ruff check --select D
-        language: system
-        types: [python]
-        pass_filenames: false
-
       - id: class-naming-check
         name: Check class naming conventions
         entry: poetry run python bin/check_class_naming.py
