@@ -340,7 +340,7 @@ Run IDs provide a foundation for future enhancements:
 
 ## Related Documentation
 
-- [Bundle ID (BID) Architecture](bid/README.md) - Bundle-level identification and relationship with Run IDs
+- [Bundle ID (BID) Architecture](../bid/README.md) - Bundle-level identification and relationship with Run IDs
 - [Logging Development Guide](../../contributing/logging_development.md) - Run ID integration in logging
-- [Orchestration Architecture](orchestration/README.md) - How run IDs flow through the system
+- [Orchestration Architecture](../orchestration/README.md) - How run IDs flow through the system
 - [User Guide - Command Line Usage](../../user_guide/command_line_usage.md) - Run ID in CLI usage

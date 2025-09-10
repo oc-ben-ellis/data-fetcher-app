@@ -80,6 +80,7 @@ def generate_run_id(recipe_id: str) -> str:
     return f"fetcher_{recipe_id}_{timestamp}"
 
 
+# ruff: noqa: PLR0912, PLR0915
 def run_command(args: list[str] | None = None) -> None:
     """Run a data fetcher with the specified recipe.
 
@@ -118,6 +119,59 @@ def run_command(args: list[str] | None = None) -> None:
         # Configure logging
         configure_logging(log_level=config.log_level, dev_mode=config.dev_mode)
 
+        # Map CLI config fields to factory kwargs, only including provided values
+        factory_kwargs: dict[str, Any] = {}
+
+        # Global AWS profile default propagated via env var if set
+        if config.aws_profile is not None:
+            os.environ["AWS_PROFILE"] = config.aws_profile
+
+        # Credentials provider
+        if config.credentials_aws_profile is not None:
+            os.environ["OC_CREDENTIAL_PROVIDER_AWS_PROFILE"] = (
+                config.credentials_aws_profile
+            )
+        if config.credentials_aws_region is not None:
+            factory_kwargs["aws_region"] = config.credentials_aws_region
+        if config.credentials_aws_endpoint_url is not None:
+            factory_kwargs["aws_endpoint_url"] = config.credentials_aws_endpoint_url
+        if config.credentials_env_prefix is not None:
+            factory_kwargs["env_prefix"] = config.credentials_env_prefix
+
+        # KV store
+        if config.kvstore_serializer is not None:
+            factory_kwargs["serializer"] = config.kvstore_serializer
+        if config.kvstore_default_ttl is not None:
+            factory_kwargs["default_ttl"] = config.kvstore_default_ttl
+        if config.kvstore_redis_host is not None:
+            factory_kwargs["redis_host"] = config.kvstore_redis_host
+        if config.kvstore_redis_port is not None:
+            factory_kwargs["redis_port"] = config.kvstore_redis_port
+        if config.kvstore_redis_db is not None:
+            factory_kwargs["redis_db"] = config.kvstore_redis_db
+        if config.kvstore_redis_password is not None:
+            factory_kwargs["redis_password"] = config.kvstore_redis_password
+        if config.kvstore_redis_key_prefix is not None:
+            factory_kwargs["redis_key_prefix"] = config.kvstore_redis_key_prefix
+
+        # Storage
+        if config.storage_pipeline_aws_profile is not None:
+            os.environ["OC_STORAGE_PIPELINE_AWS_PROFILE"] = (
+                config.storage_pipeline_aws_profile
+            )
+        if config.storage_s3_bucket is not None:
+            factory_kwargs["s3_bucket"] = config.storage_s3_bucket
+        if config.storage_s3_prefix is not None:
+            factory_kwargs["s3_prefix"] = config.storage_s3_prefix
+        if config.storage_s3_region is not None:
+            factory_kwargs["s3_region"] = config.storage_s3_region
+        if config.storage_s3_endpoint_url is not None:
+            factory_kwargs["s3_endpoint_url"] = config.storage_s3_endpoint_url
+        if config.storage_file_path is not None:
+            factory_kwargs["file_path"] = config.storage_file_path
+        if config.storage_use_unzip is not None:
+            factory_kwargs["use_unzip"] = config.storage_use_unzip
+
         # Store the arguments for the async main function
         args_dict = {
             "config_name": config.recipe_id,
@@ -125,6 +179,7 @@ def run_command(args: list[str] | None = None) -> None:
             "storage": config.storage,
             "kvstore": config.kvstore,
             "run_id": run_id,
+            "factory_kwargs": factory_kwargs,
         }
 
         # Run the async main function
@@ -297,6 +352,7 @@ async def main_async(args: dict[str, Any]) -> None:
                 storage_type=args["storage"],
                 kv_store_type=args["kvstore"],
                 config_id=final_config_name,
+                **cast("dict[str, Any]", args.get("factory_kwargs", {})),
             )
 
         try:

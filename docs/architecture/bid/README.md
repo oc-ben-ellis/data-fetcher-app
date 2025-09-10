@@ -272,7 +272,7 @@ logger.info(
 
 ## Related Documentation
 
-- [Run ID Architecture](run_id/README.md) - Execution identification and tracing system
-- [Storage Architecture](storage/README.md) - How storage uses BIDs for organization
-- [Loaders Architecture](loaders/README.md) - How loaders generate and use BIDs
+- [Run ID Architecture](../run_id/README.md) - Execution identification and tracing system
+- [Storage Architecture](../storage/README.md) - How storage uses BIDs for organization
+- [Loaders Architecture](../loaders/README.md) - How loaders generate and use BIDs
 - [Logging Development Guide](../../contributing/logging_development.md) - BID integration in logging

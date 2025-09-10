@@ -20,18 +20,34 @@ def create_mock_storage() -> Mock:
 
 def setup_storage_bundle_mock(mock_storage: Mock) -> AsyncMock:
     """Set up the storage bundle mock properly."""
-    mock_bundle = AsyncMock()
-    # Create a proper async context manager mock
-    mock_context = AsyncMock()
-    # Configure the async context manager methods
-    mock_context.__aenter__ = AsyncMock(return_value=mock_bundle)
-    mock_context.__aexit__ = AsyncMock(return_value=None)
-    mock_storage.start_bundle.return_value = mock_context
-    return mock_bundle
+    mock_bundle_context = AsyncMock()
+    mock_bundle_context.add_resource = AsyncMock()
+    mock_bundle_context.complete = AsyncMock()
+    # start_bundle is awaited and returns the bundle context directly
+    mock_storage.start_bundle = AsyncMock(return_value=mock_bundle_context)
+    return mock_bundle_context
 
 
 class TestSftpBundleLoader:
     """Test SftpBundleLoader class."""
+
+    @pytest.fixture
+    def mock_sftp_manager(self, monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+        """Provide a patched SftpManager instance used inside the loader."""
+        mgr = AsyncMock()
+        mgr.stat = AsyncMock()
+        mgr.listdir = AsyncMock(return_value=[])
+        # open() is awaited and returns a sync context manager
+        file_ctx = MagicMock()
+        file_ctx.__enter__.return_value = MagicMock()
+        file_ctx.__exit__.return_value = None
+        mgr.open = AsyncMock(return_value=file_ctx)
+
+        # Patch constructor to return our mock manager
+        monkeypatch.setattr(
+            "data_fetcher_sftp.sftp_loader.SftpManager", lambda: mgr, raising=True
+        )
+        return mgr
 
     @pytest.fixture
     def mock_sftp_config(self) -> SftpProtocolConfig:
@@ -66,25 +82,18 @@ class TestSftpBundleLoader:
         self, loader: SftpBundleLoader, mock_sftp_manager: AsyncMock
     ) -> None:
         """Test loading SFTP file."""
-        # Mock SFTP manager connection and file operations
-        mock_conn = Mock()  # Use regular Mock for SFTP connection (synchronous methods)
-        # Since get_connection is async, we need to return the mock directly
-        mock_sftp_manager.get_connection.return_value = mock_conn
-
-        # Mock file stat (not a directory) - stat is synchronous in pysftp
+        # Mock file stat (not a directory)
         mock_stat = Mock()
         mock_stat.st_mode = 0o644  # Regular file
         mock_stat.st_size = 1024
         mock_stat.st_mtime = 1234567890
-        mock_conn.stat.return_value = mock_stat
+        mock_sftp_manager.stat.return_value = mock_stat
 
         # Mock file stream
         mock_file = Mock()
         mock_file.read.return_value = b"file content"
-        mock_context = MagicMock()
-        mock_context.__enter__.return_value = mock_file
-        mock_context.__exit__.return_value = None
-        mock_conn.open.return_value = mock_context
+        # Ensure the context manager yields our file-like
+        mock_sftp_manager.open.return_value.__enter__.return_value = mock_file
 
         # Create request and context
         request = RequestMeta(url="sftp://example.com/remote/file.txt")
@@ -106,16 +115,17 @@ class TestSftpBundleLoader:
             == "sftp:///remote/path/example.com/remote/file.txt"
         )
 
-        # Verify SFTP manager was called
-        mock_sftp_manager.get_connection.assert_called_once()
+        # Verify SFTP manager was used at least once for stat and open
+        assert mock_sftp_manager.stat.call_count >= 1
+        assert mock_sftp_manager.open.await_count == 1
 
     @pytest.mark.asyncio
     async def test_load_with_sftp_error(
         self, loader: SftpBundleLoader, mock_sftp_manager: AsyncMock
     ) -> None:
         """Test loading when SFTP manager raises an error."""
-        # Mock SFTP manager to raise an exception
-        mock_sftp_manager.get_connection.side_effect = Exception("SFTP error")
+        # Mock SFTP manager to raise an exception on stat
+        mock_sftp_manager.stat.side_effect = Exception("SFTP error")
 
         # Create request and context
         request = RequestMeta(url="sftp://example.com/remote/file.txt")

@@ -88,5 +88,5 @@ The ComplexPaginationHttpBundleLocator is used in the `fr` configuration to:
 ## Related Components
 
 - **[TrackingHttpBundleLoader](tracking_api_loader.md)** - Handles HTTP requests
-- **[FR - France API](../../../fr_api.md)** - Complete configuration using this locator
-- **[Creating a Configuration](../../../creating_configuration.md)** - How to create custom locators
+- **FR - France API** - Complete configuration using this locator
+- **Creating a Recipe** - How to create custom locators

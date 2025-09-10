@@ -67,7 +67,15 @@ class PipelineStorage:
         self.s3_client: Any = None
         self._active_bundles: dict[str, Any] = {}
 
-        # Create S3 client with optional custom endpoint
+        # Create S3 client with optional custom endpoint and profile
+        profile_name = os.getenv(
+            "OC_STORAGE_PIPELINE_AWS_PROFILE", os.getenv("AWS_PROFILE")
+        )
+        session = (
+            boto3.session.Session(profile_name=profile_name)
+            if profile_name
+            else boto3.session.Session()
+        )
         if self.endpoint_url:
             # For LocalStack, we need to set these credentials
             aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
@@ -76,7 +84,7 @@ class PipelineStorage:
             if not aws_access_key_id or not aws_secret_access_key:
                 raise MissingAWSCredentialsError
 
-            self.s3_client = boto3.client(
+            self.s3_client = session.client(
                 "s3",
                 region_name=self.region,
                 endpoint_url=self.endpoint_url,
@@ -84,7 +92,7 @@ class PipelineStorage:
                 aws_secret_access_key=aws_secret_access_key,
             )
         else:
-            self.s3_client = boto3.client("s3", region_name=self.region)
+            self.s3_client = session.client("s3", region_name=self.region)
 
     # New interface methods
     async def start_bundle(
@@ -325,7 +333,14 @@ class S3StorageBundle:
             getattr(self.s3_client, "meta", None), "region_name", None
         )
 
-        session = boto3.session.Session()
+        profile_name = os.getenv(
+            "OC_STORAGE_PIPELINE_AWS_PROFILE", os.getenv("AWS_PROFILE")
+        )
+        session = (
+            boto3.session.Session(profile_name=profile_name)
+            if profile_name
+            else boto3.session.Session()
+        )
 
         # Get AWS credentials - require them when using custom endpoint
         aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")

@@ -253,23 +253,25 @@ debug:
 	@echo "  DOCKER_COMPOSE command: $(DOCKER_COMPOSE)"
 
 # Documentation targets
-docs: ensure-docker-compose
-	@echo "Building documentation with MkDocs..."
-	$(call run_in_container,mkdocs build)
+docs:
+	@echo "Building documentation with TechDocs Docker (no bind mounts)..."
+	rm -rf site
+	bin/techdocs-build-docker.sh
 
 docs/serve:
-	@echo "Starting MkDocs development server on http://0.0.0.0:8000"
+	@echo "Starting TechDocs (mkdocs serve) via Docker on http://localhost:8000"
 	@echo "Press Ctrl+C to stop the server"
-	$(call run_in_container,mkdocs serve --dev-addr=0.0.0.0:8000)
+	bin/techdocs-build-docker.sh --serve --port 8000
 
 docs/serve/local:
-	@echo "Starting MkDocs development server locally on http://127.0.0.1:8000"
+	@echo "Starting TechDocs (mkdocs serve) via Docker on http://127.0.0.1:8000"
 	@echo "Press Ctrl+C to stop the server"
-	$(RUN_NO_DEPS) mkdocs serve --dev-addr=127.0.0.1:8000
+	bin/techdocs-build-docker.sh --serve --port 8000
 
 docs/build:
-	@echo "Building documentation..."
-	$(RUN_NO_DEPS) mkdocs build
+	@echo "Building documentation with TechDocs Docker..."
+	rm -rf site
+	bin/techdocs-build-docker.sh
 
 docs/clean:
 	@echo "Cleaning documentation build artifacts..."
@@ -278,7 +280,8 @@ docs/clean:
 
 docs/open:
 	@echo "Building and opening documentation in browser..."
-	$(RUN_NO_DEPS) mkdocs build
+	rm -rf site
+	bin/techdocs-build-docker.sh
 	@if command -v xdg-open >/dev/null 2>&1; then \
 		xdg-open site/index.html; \
 	elif command -v open >/dev/null 2>&1; then \
@@ -288,22 +291,30 @@ docs/open:
 	fi
 
 docs/validate:
-	@echo "Validating MkDocs configuration..."
-	$(RUN_NO_DEPS) mkdocs build --strict
+	@echo "Validating MkDocs configuration (strict) via TechDocs Docker..."
+	rm -rf site
+	bin/techdocs-build-docker.sh
+	@test -f site/index.html
 	@echo "✅ Documentation validation passed"
 
 docs/check-links:
 	@echo "Checking for broken links in documentation..."
-	$(RUN_NO_DEPS) mkdocs build
+	rm -rf site
+	bin/techdocs-build-docker.sh
 	@if command -v linkchecker >/dev/null 2>&1; then \
 		linkchecker site/index.html --ignore-url="^http://127.0.0.1" --ignore-url="^http://localhost"; \
 	else \
 		echo "⚠️  linkchecker not installed. Install with: pip install linkchecker"; \
 		echo "   Or use: poetry add --group dev linkchecker"; \
+		exit 1; \
 	fi
 
 docs/deploy:
 	@echo "Deploying documentation to GitHub Pages..."
+	# Build with TechDocs Docker first to validate
+	rm -rf site
+	bin/techdocs-build-docker.sh
+	# Use mkdocs to publish to gh-pages branch
 	$(RUN_NO_DEPS) mkdocs gh-deploy --force
 
 docs/help:

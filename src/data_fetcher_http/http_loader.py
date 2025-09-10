@@ -5,7 +5,12 @@ from typing import TYPE_CHECKING, Union, cast
 
 import structlog
 
-from data_fetcher_core.core import BundleRef, FetchRunContext, RequestMeta
+from data_fetcher_core.core import (
+    BundleRef,
+    FetcherRecipe,
+    FetchRunContext,
+    RequestMeta,
+)
 from data_fetcher_core.protocol_config import HttpProtocolConfig
 from data_fetcher_http.http_manager import HttpManager
 
@@ -37,6 +42,7 @@ class StreamingHttpBundleLoader:
         request: RequestMeta,
         storage: Storage | None,
         ctx: FetchRunContext,
+        recipe: FetcherRecipe,
     ) -> list[BundleRef]:
         """Load data from HTTP endpoint with streaming support.
 
@@ -44,6 +50,7 @@ class StreamingHttpBundleLoader:
             request: The request to process
             storage: Storage backend for saving data
             ctx: Fetch run context
+            recipe: The fetcher recipe configuration
 
         Returns:
             List of bundle references
@@ -76,7 +83,7 @@ class StreamingHttpBundleLoader:
             # Stream to storage
             if storage:
                 bid_logger.debug("STREAMING_HTTP_RESPONSE_TO_STORAGE", url=request.url)
-                bundle_context = await storage.start_bundle(bundle_ref, ctx.recipe)  # type: ignore[attr-defined]
+                bundle_context = await storage.start_bundle(bundle_ref, recipe)
                 # BundleStorageContext doesn't support async with, so we use it directly
                 bundle = bundle_context
 

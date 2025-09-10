@@ -368,18 +368,12 @@ def localstack_container() -> DockerContainer:
 
         container.start()
 
-        # Wait for localstack to be ready
-        wait_for_logs(container, "Ready.")
-
-        # Optimized health check with faster timeout
+        # Actively poll the S3 endpoint instead of waiting for specific logs.
         import time
 
-        # Quick health check instead of long sleep
-        max_attempts = 10  # Reduced from 30+ seconds to 10 attempts
+        max_attempts = 60  # up to ~60 seconds
         for attempt in range(max_attempts):
             try:
-                # Test S3 service directly with a simple connection
-                # Use container host IP for Docker-in-Docker environments
                 host_ip = container.get_container_host_ip()
                 s3_client = boto3.client(
                     "s3",
@@ -388,18 +382,17 @@ def localstack_container() -> DockerContainer:
                     aws_secret_access_key="test",
                     region_name="us-east-1",
                 )
-                # Quick test - list buckets (should work even if empty)
                 s3_client.list_buckets()
                 print("LocalStack S3 service is ready")
                 break
             except Exception as e:
                 if attempt < max_attempts - 1:
-                    time.sleep(0.5)  # Reduced from 1 second to 0.5 seconds
+                    time.sleep(1.0)
                 else:
                     print(
                         f"Warning: LocalStack S3 not ready after {max_attempts} attempts: {e}"
                     )
-                    # Don't fail the test, just continue with a warning
+                    # Proceed and let test decide how to handle connectivity
 
         yield container
 
@@ -588,34 +581,56 @@ def parallel_containers() -> Generator[tuple[DockerContainer, DockerContainer]]:
     try:
         start_containers_parallel(containers_to_start)
 
-        # Wait for services to be ready
+        # Wait for services to be ready by polling endpoints instead of log matching
         print("Waiting for services to be ready...")
-        wait_for_logs(localstack_container, "Ready.")
-        wait_for_logs(redis_container, "Ready to accept connections")
-
-        # Wait a bit more for all services to be fully ready
         import time
 
-        time.sleep(2)
+        # Poll LocalStack Secrets Manager
+        host_ip = localstack_container.get_container_host_ip()
+        max_attempts = 60
+        for attempt in range(max_attempts):
+            try:
+                test_client = boto3.client(
+                    "secretsmanager",
+                    endpoint_url=f"http://{host_ip}:{localstack_container.get_exposed_port(4566)}",
+                    aws_access_key_id="test",
+                    aws_secret_access_key="test",
+                    region_name="us-east-1",
+                )
+                test_client.list_secrets()
+                print("Secrets Manager service is ready")
+                break
+            except Exception as e:
+                if attempt < max_attempts - 1:
+                    time.sleep(1.0)
+                else:
+                    print(f"Warning: Secrets Manager not ready: {e}")
 
-        # Test if Secrets Manager is ready
+        # Poll Redis by attempting a ping
         try:
-            # Use container host IP for Docker-in-Docker environments
-            host_ip = localstack_container.get_container_host_ip()
-            test_client = boto3.client(
-                "secretsmanager",
-                endpoint_url=f"http://{host_ip}:{localstack_container.get_exposed_port(4566)}",
-                aws_access_key_id="test",
-                aws_secret_access_key="test",
-                region_name="us-east-1",
-            )
-            # Try to list secrets to verify the service is ready
-            test_client.list_secrets()
-            print("Secrets Manager service is ready")
-        except Exception as e:
-            print(f"Warning: Secrets Manager not ready yet: {e}")
-            # Wait a bit more
-            time.sleep(10)
+            import redis
+
+            host_ip_redis = redis_container.get_container_host_ip()
+            max_attempts = 30
+            for attempt in range(max_attempts):
+                try:
+                    test_client = redis.Redis(
+                        host=host_ip_redis,
+                        port=redis_container.get_exposed_port(6379),
+                        db=0,
+                        socket_connect_timeout=1,
+                    )
+                    test_client.ping()
+                    print("Redis is ready and responding")
+                    break
+                except Exception:
+                    if attempt < max_attempts - 1:
+                        time.sleep(1.0)
+                    else:
+                        print("Warning: Redis not responding to ping")
+        except Exception:
+            # If redis lib not available, continue; tests will fail if Redis is required
+            pass
 
         yield localstack_container, redis_container
 

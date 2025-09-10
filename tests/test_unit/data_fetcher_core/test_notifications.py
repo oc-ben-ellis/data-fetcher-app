@@ -296,7 +296,10 @@ class TestSqsPublisher:
 
     def test_sqs_publisher_initialization_with_credentials(self) -> None:
         """Test SqsPublisher initialization with AWS credentials."""
-        with patch("boto3.client") as mock_boto_client:
+        with patch("boto3.session.Session") as mock_boto_session:
+            mock_session = Mock()
+            mock_boto_session.return_value = mock_session
+            mock_boto_client = mock_session.client
             mock_client = Mock()
             mock_boto_client.return_value = mock_client
 
@@ -311,7 +314,7 @@ class TestSqsPublisher:
     def test_sqs_publisher_initialization_with_endpoint(self) -> None:
         """Test SqsPublisher initialization with custom endpoint."""
         with (
-            patch("boto3.client") as mock_boto_client,
+            patch("boto3.session.Session") as mock_boto_session,
             patch.dict(
                 os.environ,
                 {
@@ -320,6 +323,9 @@ class TestSqsPublisher:
                 },
             ),
         ):
+            mock_session = Mock()
+            mock_boto_session.return_value = mock_session
+            mock_boto_client = mock_session.client
             mock_client = Mock()
             mock_boto_client.return_value = mock_client
 

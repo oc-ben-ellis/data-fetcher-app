@@ -218,7 +218,9 @@ def main() -> None:
     if all_violations:
         print("Class naming convention violations found:")
         for file_path, line_num, class_name, suggestion in all_violations:
-            print(f"  {file_path}:{line_num}: Class '{class_name}' should be '{suggestion}'")
+            print(
+                f"  {file_path}:{line_num}: Class '{class_name}' should be '{suggestion}'"
+            )
         print()
         print("Please rename the classes to follow PascalCase conventions.")
         sys.exit(1)

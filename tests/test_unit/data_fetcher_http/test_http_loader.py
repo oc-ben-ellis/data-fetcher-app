@@ -22,8 +22,12 @@ def create_mock_storage() -> Mock:
 def setup_storage_bundle_mock(mock_storage: Mock) -> AsyncMock:
     """Set up the storage bundle mock properly."""
     mock_bundle = AsyncMock()
-    # Set up start_bundle to return the bundle directly (not as context manager)
-    mock_storage.start_bundle = AsyncMock(return_value=mock_bundle)
+    # Configure start_bundle as an async context manager returning mock_bundle
+    mock_storage.start_bundle = AsyncMock()
+    # The returned object from start_bundle should act as an async context manager
+    start_bundle_cm = mock_storage.start_bundle.return_value
+    start_bundle_cm.__aenter__ = AsyncMock(return_value=mock_bundle)
+    start_bundle_cm.__aexit__ = AsyncMock(return_value=None)
     return mock_bundle
 
 
@@ -95,7 +99,7 @@ class TestStreamingHttpBundleLoader:
         setup_storage_bundle_mock(mock_storage)
 
         # Load the request
-        bundle_refs = await loader.load(request, mock_storage, ctx)
+        bundle_refs = await loader.load(request, mock_storage, ctx, Mock())
 
         # Verify results
         assert len(bundle_refs) == 1
@@ -134,7 +138,7 @@ class TestStreamingHttpBundleLoader:
         setup_storage_bundle_mock(mock_storage)
 
         # Load the request
-        await loader.load(request, mock_storage, ctx)
+        await loader.load(request, mock_storage, ctx, Mock())
 
         # Verify headers were passed correctly
         call_args = mock_http_manager.request.call_args
@@ -166,7 +170,7 @@ class TestStreamingHttpBundleLoader:
         setup_storage_bundle_mock(mock_storage)
 
         # Load the request
-        bundle_refs = await loader.load(request, mock_storage, ctx)
+        bundle_refs = await loader.load(request, mock_storage, ctx, Mock())
 
         # Should still return bundle refs even for error responses
         assert len(bundle_refs) == 1
@@ -189,7 +193,7 @@ class TestStreamingHttpBundleLoader:
         setup_storage_bundle_mock(mock_storage)
 
         # Load the request - should handle error gracefully
-        bundle_refs = await loader.load(request, mock_storage, ctx)
+        bundle_refs = await loader.load(request, mock_storage, ctx, Mock())
 
         # Should return empty list or handle error appropriately
         assert isinstance(bundle_refs, list)

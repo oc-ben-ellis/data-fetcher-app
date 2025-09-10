@@ -49,5 +49,5 @@ The TrackingHttpBundleLoader is used in the `fr` configuration to handle all HTT
 ## Related Components
 
 - **[ComplexPaginationHttpBundleLocator](complex_pagination_bundle_locator.md)** - Handles URL generation and pagination
-- **[FR - France API](../../../fr_api.md)** - Complete configuration using this loader
-- **[Creating a Configuration](../../../creating_configuration.md)** - How to create custom loaders
+- **FR - France API** - Complete configuration using this loader
+- **Creating a Recipe** - How to create custom loaders
