@@ -234,7 +234,7 @@ class PipelineStorage:
             return
 
         logger.info(
-            "Processing pending completions",
+            "PROCESSING_PENDING_COMPLETIONS",
             recipe_id=recipe.recipe_id,
             pending_count=len(pending_keys),
         )
@@ -303,6 +303,14 @@ class S3StorageBundle:
         """Write a resource to S3 using S3 Transfer Manager for streaming."""
         key = self._create_s3_key(url)
 
+        logger.info(
+            "S3_UPLOAD_STARTING",
+            s3_bucket=self.bucket_name,
+            s3_key=key,
+            url=url,
+            content_type=content_type,
+            bundle_id=str(self.bundle_ref.bid)
+        )
         # Create transfer manager with streaming config
         # Note: The actual transfer configuration is handled by S3Transfer, not Config
         transfer_config = Config(
@@ -357,7 +365,7 @@ class S3StorageBundle:
             aws_secret_access_key=aws_secret_access_key,
             config=transfer_config,
         )
-        # Create transfer manager
+
         transfer = S3Transfer(transfer_s3_client)
 
         # Create a temporary file for streaming
@@ -399,19 +407,16 @@ class S3StorageBundle:
         # BID contains timestamp information from UUIDv7
         bid_str = str(self.bundle_ref.bid)
 
-        # Create key with prefix and BID
-        key = f"{self.prefix}/bundles/{bid_str}/resources"
+        key = f"{self.prefix}/{bid_str}" if self.prefix else bid_str
 
-        # Add filename to ensure uniqueness for multiple resources
         if parsed.path:
             filename = Path(parsed.path).name
             if filename:
-                # Use the full filename to ensure uniqueness
-                key += f"_{filename}"
+                key += f"/{filename}"
             else:
                 # Fallback: use hash of URL to ensure uniqueness
                 url_hash = hashlib.sha256(url.encode()).hexdigest()[:8]
-                key += f"_{url_hash}"
+                key += f"/{url_hash}"
 
         return key
 

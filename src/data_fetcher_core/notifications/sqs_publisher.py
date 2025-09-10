@@ -115,7 +115,7 @@ class SqsPublisher:
             )
 
             logger.info(
-                "Bundle completion notification sent to SQS",
+                "BUNDLE_COMPLETION_NOTIFICATION_SENT_TO_SQS",
                 bundle_id=str(bundle_ref.bid),
                 recipe_id=recipe_id,
                 message_id=response.get("MessageId"),
@@ -124,7 +124,7 @@ class SqsPublisher:
 
         except Exception as e:
             logger.exception(
-                "Failed to send bundle completion notification to SQS",
+                "FAILED_TO_SEND_BUNDLE_COMPLETION_NOTIFICATION_TO_SQS",
                 bundle_id=str(bundle_ref.bid),
                 recipe_id=recipe_id,
                 queue_url=self.queue_url,

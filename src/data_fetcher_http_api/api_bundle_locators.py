@@ -241,7 +241,7 @@ class PaginationHttpBundleLocator:
 
             self._initialized = True
             logger.info(
-                "Initialized API provider",
+                "API_PROVIDER_INITIALIZED",
                 date_start=start_date,
                 date_end=end_date,
                 base_url=self.base_url,
@@ -249,7 +249,7 @@ class PaginationHttpBundleLocator:
 
         except Exception as e:
             logger.exception(
-                "Error initializing API provider", base_url=self.base_url, error=str(e)
+                "ERROR_INITIALIZING_API_PROVIDER", base_url=self.base_url, error=str(e)
             )
             raise
 

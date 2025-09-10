@@ -87,7 +87,7 @@ class OAuthAuthenticationMechanism:
 
             if not consumer_key or not consumer_secret:
                 logger.exception(
-                    "Missing OAuth credentials", config_name=self.config_name
+                    "MISSING_OAUTH_CREDENTIALS", config_name=self.config_name
                 )
                 return
 
@@ -118,19 +118,19 @@ class OAuthAuthenticationMechanism:
                     )
 
                     logger.info(
-                        "Successfully obtained OAuth access token",
+                        "SUCCESSFULLY_OBTAINED_OAUTH_ACCESS_TOKEN",
                         config_name=self.config_name,
                     )
                 else:
                     logger.exception(
-                        "Failed to obtain OAuth token",
+                        "FAILED_TO_OBTAIN_OAUTH_TOKEN",
                         config_name=self.config_name,
                         status_code=response.status_code,
                     )
 
         except Exception as e:
             logger.exception(
-                "Error fetching OAuth token",
+                "ERROR_FETCHING_OAUTH_TOKEN",
                 config_name=self.config_name,
                 error=str(e),
             )
