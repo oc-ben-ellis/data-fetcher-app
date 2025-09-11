@@ -9,6 +9,7 @@ import threading
 from dataclasses import dataclass
 
 import structlog
+from openc_python_common.observability.log_util import observe_around
 
 from data_fetcher_core.core import (
     FetcherRecipe,
@@ -100,7 +101,7 @@ class Fetcher:
             and hasattr(run_ctx.app_config.storage, "on_run_start")
         ):
             logger.info(
-                "Calling storage on_run_start hook",
+                "CALLING_STORAGE_ON_RUN_START_HOOK",
                 storage_type=type(run_ctx.app_config.storage).__name__,
             )
             await run_ctx.app_config.storage.on_run_start(run_ctx, plan.recipe)
@@ -152,6 +153,7 @@ class Fetcher:
                     run_ctx,
                     processed_count_lock,
                     errors_lock,
+                    locator_completion_flag,
                 )
             )
             workers.append(worker)
@@ -301,6 +303,7 @@ class Fetcher:
         run_ctx: FetchRunContext,
         processed_count_lock: threading.Lock,
         errors_lock: threading.Lock,
+        completion_flag: asyncio.Event,
     ) -> None:
         """Worker process that handles requests from the queue.
 
@@ -314,9 +317,10 @@ class Fetcher:
             run_ctx: The fetch run context for this execution
             processed_count_lock: Thread lock for accessing processed count
             errors_lock: Thread lock for accessing error list
+            completion_flag: Event to signal when no more work will be added
         """
         worker_logger = logger.bind(worker_id=worker_id)
-        worker_logger.debug("WORKER_STARTED")
+        worker_logger.info("WORKER_STARTED", worker_id=worker_id)
         initial_size = await queue.size()
         worker_logger.info("WORKER_STARTED_WITH_QUEUE_SIZE", queue_size=initial_size)
 
@@ -325,9 +329,13 @@ class Fetcher:
                 # Get next request from persistent queue
                 requests = await queue.dequeue(max_items=1)
                 if not requests:
-                    # No more work available
-                    worker_logger.debug("NO_MORE_REQUESTS_WORKER_EXITING")
-                    break
+                    # If no work and locators are done, exit
+                    if completion_flag.is_set():
+                        worker_logger.info("NO_MORE_REQUESTS_WORKER_EXITING", worker_id=worker_id)
+                        break
+                    # Wait a bit for more work to arrive
+                    await asyncio.sleep(0.1)
+                    continue
 
                 req = requests[0]
 
@@ -341,26 +349,25 @@ class Fetcher:
                     continue
 
                 # Process the request
-                worker_logger.debug("REQUEST_PROCESSING", url=req.url)
-                await self._process_request(
-                    req, recipe, run_ctx, processed_count_lock, errors_lock
-                )
+                with observe_around(worker_logger, "WORKER_PROCESS_URL", url=req.url, worker_id=worker_id):
+                    await self._process_request(
+                        req, recipe, run_ctx, processed_count_lock, errors_lock
+                    )
 
             except Exception as e:
-                # Log error with appropriate level and continue
                 if isinstance(e, ConfigurationError | FatalError):
                     worker_logger.exception(
                         "WORKER_FATAL_ERROR",
-                        error=str(e),
                         error_type=type(e).__name__,
                         worker_id=worker_id,
+                        url=getattr(req, 'url', 'unknown'),  # Safe attribute access
                     )
                 else:
-                    worker_logger.warning(
+                    worker_logger.exception(
                         "WORKER_ERROR",
-                        error=str(e),
                         error_type=type(e).__name__,
                         worker_id=worker_id,
+                        url=getattr(req, 'url', 'unknown'),  # Safe attribute access
                     )
 
         worker_logger.debug("WORKER_COMPLETED")

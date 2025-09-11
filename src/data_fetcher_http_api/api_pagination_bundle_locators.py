@@ -307,7 +307,7 @@ class ComplexPaginationHttpBundleLocator:
 
             self._initialized = True
             logger.info(
-                "Initialized complex pagination provider",
+                "INITIALIZED_COMPLEX_PAGINATION_PROVIDER",
                 date_start=start_date,
                 date_end=end_date,
                 base_url=self.base_url,
@@ -315,7 +315,7 @@ class ComplexPaginationHttpBundleLocator:
 
         except Exception as e:
             logger.exception(
-                "Error initializing complex pagination provider",
+                "ERROR_INITIALIZING_COMPLEX_PAGINATION_PROVIDER",
                 base_url=self.base_url,
                 error=str(e),
             )

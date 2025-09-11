@@ -146,21 +146,42 @@ class DirectorySftpBundleLocator:
 
     async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
         """Get the next batch of SFTP URLs to process."""
+        logger.info("GET_NEXT_URLS_STARTING", initialized=self._initialized)
+
         if not self._initialized:
             await self._load_persistence_state(ctx)
             if not self._initialized:
                 await self._initialize(ctx)
 
+        logger.info(
+            "FILE_QUEUE_STATUS",
+            file_queue_size=len(self._file_queue),
+            processed_files_size=len(self._processed_files),
+            processed_files_contents=list(self._processed_files)
+        )
+
         urls: list[RequestMeta] = []
         BATCH_SIZE = 10  # noqa: N806
         while self._file_queue and len(urls) < BATCH_SIZE:  # Batch size
             if self.max_files and len(self._processed_files) >= self.max_files:
+                logger.info("MAX_FILES_LIMIT_HIT", max_files=self.max_files)
                 break
 
             file_path = self._file_queue.pop(0)
+            logger.info("FILE_POPPED_FROM_QUEUE", file_path=file_path)
+
             if file_path not in self._processed_files:
+                logger.info("NEW_FILE_ADDED_TO_PROCESSING", file_path=file_path)
                 urls.append(RequestMeta(url=f"sftp://{file_path}"))
                 self._processed_files.add(file_path)
+            else:
+                logger.info("ALREADY_PROCESSED_FILE_SKIPPED", file_path=file_path)
+
+        logger.info(
+            "RETURNING_URLS_FOR_PROCESSING",
+            url_count=len(urls),
+            urls=[u.url for u in urls]
+        )
 
         # Save state after generating URLs
         await self._save_persistence_state(ctx)
@@ -231,7 +252,7 @@ class DirectorySftpBundleLocator:
 
             self._initialized = True
             logger.info(
-                "Initialized directory provider",
+                "DIRECTORY_PROVIDER_INITIALIZED",
                 file_count=len(self._file_queue),
                 directory=self.remote_dir,
             )

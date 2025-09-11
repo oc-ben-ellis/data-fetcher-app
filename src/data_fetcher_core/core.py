@@ -393,6 +393,7 @@ class FetcherRecipeBuilder:
         """Initialize the fetcher recipe builder."""
         self._bundle_loader: object = None
         self._bundle_locators: list[Any] = []
+        self._recipe_id: str = ""
 
     def use_bundle_loader(
         self, bundle_loader_instance: object
@@ -408,13 +409,18 @@ class FetcherRecipeBuilder:
         self._bundle_locators.append(bundle_locator_instance)
         return self
 
+    def with_recipe_id(self, recipe_id: str) -> "FetcherRecipeBuilder":
+        """Set the recipe ID."""
+        self._recipe_id = recipe_id
+        return self
+
     def build(self) -> FetcherRecipe:
         """Build the fetcher configuration."""
         if not self._bundle_loader:
             raise ValueError("Bundle loader required")  # noqa: TRY003
 
         return FetcherRecipe(
-            recipe_id="",  # Will be set by the recipe setup function
+            recipe_id=self._recipe_id,
             bundle_locators=self._bundle_locators,
             bundle_loader=self._bundle_loader,
         )

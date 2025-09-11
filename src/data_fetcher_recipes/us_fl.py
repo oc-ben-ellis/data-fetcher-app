@@ -40,11 +40,13 @@ def _create_us_fl_daily_file_filter(start_date: str) -> Callable[[str], bool]:
                     and len(date_str) == DATE_LENGTH
                     and date_str >= start_date
                 ):
+                    logger.info("FILE_PASSED_DATE_FILTER", filename=filename, date_str=date_str)
                     return True
+                return False
         except Exception as e:
             # If we can't parse the date, process the file
             logger.exception(
-                "Error parsing date in filename, skipping file",
+                "ERROR_PARSING_DATE_IN_FILENAME_SKIPPING_FILE",
                 error=str(e),
                 filename=filename,
                 start_date=start_date,
@@ -100,12 +102,12 @@ def _setup_us_fl_sftp_fetcher() -> FetcherRecipe:
     # Build configuration
     return (
         create_fetcher_config()
+        .with_recipe_id("us-fl")
         .use_bundle_loader(loader)
         .add_bundle_locator(daily_provider)
         .add_bundle_locator(quarterly_provider)
         .build()
     )
-
 
 # Register the recipe
 register_recipe("us-fl", _setup_us_fl_sftp_fetcher)
