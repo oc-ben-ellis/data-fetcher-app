@@ -16,7 +16,7 @@ repos:
 
   # iac hooks (in accordance with https://opencorporates.atlassian.net/wiki/x/dgAFAg)
   - repo: https://github.com/bridgecrewio/checkov.git
-    rev: 3.2.469
+    rev: 3.2.471
     hooks:
       - id: checkov
 
@@ -63,7 +63,7 @@ repos:
         entry: bash -lc 'rm -rf site && bin/techdocs-build-docker.sh && test -f site/index.html && linkchecker site/index.html --ignore-url="^http://127.0.0.1" --ignore-url="^http://localhost"'
         language: system
         pass_filenames: false
-        stages: [commit]
+        stages: [pre-commit]
 
       # - id: unit-tests
       #   name: Run unit tests only
