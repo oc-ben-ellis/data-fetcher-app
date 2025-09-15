@@ -1,6 +1,0 @@
----
-description: RTFM
-globs:
-alwaysApply: true
----
-Read all the README.MD files in the project and the *.md files in docs directory and its subdirectories to understand the project architecture and how to perform common tasks.

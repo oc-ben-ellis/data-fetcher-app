@@ -30,32 +30,9 @@
 - Add Protocol for WebDriver
 - Add Protocol for POP3 (Can we use this instead of webdriver for reading e-mails/couchdrop?)
 
-## Persistence
+## Retry Logic / Failure handling
 
-- Review Persistence logic and agree approach (Elasticache/DynamoDB/Aurora/sqlite3?) - Keep costs in mind as some of my estimates are in the $10,000's per month.
-- Discuss / Agree migration strategy for sqlite3 -> Redis/DynamoDB/Aurora if required
-
-## Commands
-
-- Discuss retry/reload options for parsers / higher level orchestration in the case of corrupted or bad resources. Perhaps introduce a "command" concept that can be used to modify the persistence using the fetcher (i.e. refresh_bundle command given a company_number or URL to reload, command_processor updates persistence so the bundle will be retried/reloaded on next run)
-
-## Data Fetcher Application TODOs (from PDF comparison)
-
-## HTML Scraping Enhancements
-- [ ] Implement robust HTML parsing to extract related assets (links, CSS, JS, images)
-- [ ] Replace stubbed `_extract_related_urls` with actual HTML parsing logic
-- [ ] Add robots.txt respect and rate limiting for related resource discovery
-- [ ] Implement de-duplication and bounded crawl depth per request
-- [ ] Files: `data_fetcher/bundle_loaders/http_loader.py`, new `data_fetcher/html/` helper
+- Review this and update as needed
 
 ## Metrics and Observability
 - [ ] Add counters/timers for key stages (requests queued, processed, bundle writes, retries)
-
-## SQS Notifications
-- [x] Implement SQS notification system for bundle completion
-- [x] Add BundleStorageContext for async bundle lifecycle management
-- [x] Update storage interface with new start_bundle/complete pattern
-- [x] Add completion callbacks for loaders and locators
-- [x] Implement pending completion processing for eventual consistency
-- [x] Update documentation for new notification system
-- [x] Make SQS notifications mandatory for PipelineStorage

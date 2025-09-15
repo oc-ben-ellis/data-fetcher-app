@@ -1,0 +1,7 @@
+Mock daily data for 20240101_daily_data.txt
+Generated at 2024-01-01T10:00:00
+Sample corporate data content
+This is daily business registration data
+Contains licensing and corporate information
+Company: JKL LLC, License: FL567890, Date: 2024-01-01
+Company: MNO Corp, License: FL123789, Date: 2024-01-01

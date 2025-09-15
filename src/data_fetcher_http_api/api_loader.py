@@ -8,11 +8,11 @@ import structlog
 
 from data_fetcher_core.core import (
     BundleRef,
-    FetcherRecipe,
+    DataRegistryFetcherConfig,
     FetchRunContext,
     RequestMeta,
 )
-from data_fetcher_core.protocol_config import HttpProtocolConfig
+from data_fetcher_http.http_config import HttpProtocolConfig
 from data_fetcher_http.http_manager import HttpManager
 
 
@@ -26,10 +26,11 @@ class StorageRequiredError(Exception):
 
 if TYPE_CHECKING:
     from data_fetcher_core.storage.file_storage import FileStorage
-    from data_fetcher_core.storage.pipeline_storage import PipelineStorage
+    from data_fetcher_core.storage.pipeline_bus_storage import DataPipelineBusStorage
+    from data_fetcher_core.storage.s3_storage import S3Storage
 
 # Type alias for storage classes
-Storage = Union["FileStorage", "PipelineStorage"]
+Storage = Union["FileStorage", "S3Storage", "DataPipelineBusStorage"]
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -39,6 +40,7 @@ logger = structlog.get_logger(__name__)
 class HttpBundleLoader:
     """Generic API loader for HTTP-based APIs."""
 
+    http_manager: HttpManager
     http_config: HttpProtocolConfig
     meta_load_name: str = "api_loader"
     follow_redirects: bool = True
@@ -50,7 +52,7 @@ class HttpBundleLoader:
         request: RequestMeta,
         storage: Storage,
         ctx: FetchRunContext,
-        recipe: FetcherRecipe,
+        recipe: DataRegistryFetcherConfig,
     ) -> list[BundleRef]:
         """Load data from API endpoint using BundleStorageContext.
 
@@ -69,24 +71,23 @@ class HttpBundleLoader:
         try:
             logger.debug(
                 "LOADING_API_REQUEST",
-                url=request.url,
+                url=request["url"],
                 meta_load_name=self.meta_load_name,
             )
 
             # Make HTTP request (authentication is handled by HttpManager)
-            http_manager = HttpManager()
-            response = await http_manager.request(
+            response = await self.http_manager.request(
                 self.http_config,
-                ctx.app_config,  # type: ignore[arg-type]
+                ctx.app_config,
                 "GET",
-                request.url,
-                headers=request.headers,
+                request["url"],
+                headers=request.get("headers", {}),
                 follow_redirects=self.follow_redirects,
             )
 
             logger.debug(
                 "RECEIVED_HTTP_RESPONSE",
-                url=request.url,
+                url=request["url"],
                 status_code=response.status_code,
                 content_type=response.headers.get("content-type"),
                 content_length=response.headers.get("content-length"),
@@ -105,7 +106,7 @@ class HttpBundleLoader:
 
             # Create bundle reference
             bundle_ref = BundleRef(
-                primary_url=request.url,
+                primary_url=request["url"],
                 resources_count=1,
                 meta={
                     "status_code": response.status_code,
@@ -118,7 +119,7 @@ class HttpBundleLoader:
             bid_logger = logger.bind(bid=str(bundle_ref.bid))
 
             # Use new BundleStorageContext interface
-            bid_logger.debug("STREAMING_RESPONSE_TO_STORAGE", url=request.url)
+            bid_logger.debug("STREAMING_RESPONSE_TO_STORAGE", url=request["url"])
 
             # 1. Start bundle and get context
             bundle_context = await storage.start_bundle(bundle_ref, recipe)
@@ -126,9 +127,12 @@ class HttpBundleLoader:
             try:
                 # 2. Add primary resource
                 await bundle_context.add_resource(
-                    url=request.url,
-                    content_type=response.headers.get("content-type"),
-                    status_code=response.status_code,
+                    resource_name=request["url"],
+                    metadata={
+                        "url": request["url"],
+                        "content_type": response.headers.get("content-type"),
+                        "status_code": response.status_code,
+                    },
                     stream=cast("AsyncGenerator[bytes]", response.aiter_bytes()),
                 )
 
@@ -142,17 +146,19 @@ class HttpBundleLoader:
                 bid_logger.exception("Error in bundle processing", error=str(e))
                 raise
 
-            bid_logger.debug("SUCCESSFULLY_STREAMED_TO_STORAGE", url=request.url)
+            bid_logger.debug("SUCCESSFULLY_STREAMED_TO_STORAGE", url=request["url"])
 
             bid_logger.info(
                 "API_REQUEST_LOADED_SUCCESSFULLY",
-                url=request.url,
+                url=request["url"],
                 status_code=response.status_code,
                 bundle_ref=bundle_ref,
             )
 
         except Exception as e:
-            logger.exception("REQUEST_LOADING_ERROR", url=request.url, error=str(e))
+            logger.exception(
+                "REQUEST_LOADING_ERROR", url=request.get("url", "unknown"), error=str(e)
+            )
             return []
         else:
             return [bundle_ref]

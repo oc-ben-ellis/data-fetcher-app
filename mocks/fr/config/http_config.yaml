@@ -1,0 +1,10 @@
+timeout: 120.0
+rate_limit_requests_per_second: 2.0
+max_retries: 5
+default_headers:
+  User-Agent: "OCFetcher/1.0"
+  Accept: "application/json"
+authentication_mechanism:
+  type: oauth
+  token_url: https://api.insee.fr/token
+  config_name: fr

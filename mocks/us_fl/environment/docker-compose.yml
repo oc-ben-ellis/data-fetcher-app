@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # SFTP server for US FL testing
+  sftp-server:
+    image: atmoz/sftp:alpine
+    ports:
+      - "${SFTP_PORT:-2222}:22"
+    volumes:
+      - ./data:/home/test/data
+    command: test:test:1001:1001:data
+    environment:
+      - SFTP_USERS=test:test:1001:1001:data
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "22" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - us_fl_network
+
+  # Note: LocalStack is managed by the test harness; not started here to avoid port conflicts
+
+networks:
+  us_fl_network:
+    driver: bridge

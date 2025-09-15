@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 from yarl import URL
 
-from data_fetcher_core.core import RequestMeta
+# RequestMeta is dict-like in current implementation; use dicts in tests
 from data_fetcher_core.exceptions import ConfigurationError
 from data_fetcher_core.kv_store import KeyValueStore, create_kv_store
 from data_fetcher_core.queue import (
@@ -71,13 +71,13 @@ class TestRequestMetaSerializer:
         serializer = RequestMetaSerializer()
 
         # Create a RequestMeta object
-        request = RequestMeta(
-            url=str(URL("https://example.com")),
-            depth=1,
-            referer=str(URL("https://referer.com")),
-            headers={"User-Agent": "test"},
-            flags={"test_flag": True},
-        )
+        request = {
+            "url": str(URL("https://example.com")),
+            "depth": 1,
+            "referer": str(URL("https://referer.com")),
+            "headers": {"User-Agent": "test"},
+            "flags": {"test_flag": True},
+        }
 
         # Serialize
         serialized = serializer.dumps(request)
@@ -85,29 +85,29 @@ class TestRequestMetaSerializer:
 
         # Deserialize
         deserialized = serializer.loads(serialized)
-        assert isinstance(deserialized, RequestMeta)
-        assert str(deserialized.url) == "https://example.com"
-        assert deserialized.depth == 1
-        assert str(deserialized.referer) == "https://referer.com"
-        assert deserialized.headers == {"User-Agent": "test"}
-        assert deserialized.flags == {"test_flag": True}
+        assert isinstance(deserialized, dict)
+        assert str(deserialized["url"]) == "https://example.com"
+        assert deserialized["depth"] == 1
+        assert str(deserialized["referer"]) == "https://referer.com"
+        assert deserialized["headers"] == {"User-Agent": "test"}
+        assert deserialized["flags"] == {"test_flag": True}
 
     def test_request_meta_with_minimal_fields(self) -> None:
         """Test RequestMeta serialization with minimal fields."""
         serializer = RequestMetaSerializer()
 
         # Create a minimal RequestMeta object
-        request = RequestMeta(url=str(URL("https://example.com")))
+        request = {"url": str(URL("https://example.com"))}
 
         # Serialize and deserialize
         serialized = serializer.dumps(request)
         deserialized = serializer.loads(serialized)
 
-        assert str(deserialized.url) == "https://example.com"
-        assert deserialized.depth == 0  # default value
-        assert deserialized.referer is None
-        assert deserialized.headers == {}
-        assert deserialized.flags == {}
+        assert str(deserialized["url"]) == "https://example.com"
+        assert deserialized["depth"] == 0  # default value
+        assert deserialized["referer"] is None
+        assert deserialized["headers"] == {}
+        assert deserialized["flags"] == {}
 
 
 class TestKVStoreQueue:
@@ -134,7 +134,7 @@ class TestKVStoreQueue:
         assert await queue.size() == 0
 
         # Create test request
-        request = RequestMeta(url=str(URL("https://example.com")))
+        request = {"url": str(URL("https://example.com"))}
 
         # Test enqueue
         enqueued = await queue.enqueue([request])
@@ -144,22 +144,20 @@ class TestKVStoreQueue:
         # Test peek
         peeked = await queue.peek()
         assert len(peeked) == 1
-        assert str(peeked[0].url) == "https://example.com"  # type: ignore[attr-defined]
+        assert str(peeked[0]["url"]) == "https://example.com"
         assert await queue.size() == 1  # Size should not change
 
         # Test dequeue
         dequeued = await queue.dequeue()
         assert len(dequeued) == 1
-        assert str(dequeued[0].url) == "https://example.com"  # type: ignore[attr-defined]
+        assert str(dequeued[0]["url"]) == "https://example.com"
         assert await queue.size() == 0
 
     @pytest.mark.asyncio
     async def test_multiple_items(self, queue: KVStoreQueue) -> None:
         """Test queue operations with multiple items."""
         # Create multiple requests
-        requests = [
-            RequestMeta(url=str(URL(f"https://example.com/{i}"))) for i in range(5)
-        ]
+        requests = [{"url": str(URL(f"https://example.com/{i}"))} for i in range(5)]
 
         # Test enqueue multiple items
         enqueued = await queue.enqueue(requests)
@@ -196,7 +194,7 @@ class TestKVStoreQueue:
         """Test queue clear operation."""
         # Add some items
         requests = [
-            RequestMeta(url=str(URL(f"https://example.com/{i}"))) for i in range(3)
+            {"url": str(URL(f"https://example.com/{i}"))} for i in range(3)
         ]
         await queue.enqueue(requests)
         assert await queue.size() == 3
@@ -225,13 +223,13 @@ class TestKVStoreQueue:
         )
 
         # Add items to queue1
-        request1 = RequestMeta(url=str(URL("https://queue1.com")))
+        request1 = {"url": str(URL("https://queue1.com"))}
         await queue1.enqueue([request1])
         assert await queue1.size() == 1
         assert await queue2.size() == 0
 
         # Add items to queue2
-        request2 = RequestMeta(url=str(URL("https://queue2.com")))
+        request2 = {"url": str(URL("https://queue2.com"))}
         await queue2.enqueue([request2])
         assert await queue1.size() == 1
         assert await queue2.size() == 1
@@ -239,7 +237,7 @@ class TestKVStoreQueue:
         # Dequeue from queue1
         dequeued1 = await queue1.dequeue()
         assert len(dequeued1) == 1
-        assert str(dequeued1[0].url) == "https://queue1.com"  # type: ignore[attr-defined]
+        assert str(dequeued1[0]["url"]) == "https://queue1.com"
         assert await queue1.size() == 0
         assert await queue2.size() == 1  # queue2 should be unaffected
 
@@ -247,9 +245,7 @@ class TestKVStoreQueue:
     async def test_concurrent_operations(self, queue: KVStoreQueue) -> None:
         """Test concurrent queue operations."""
         # Create multiple requests
-        requests = [
-            RequestMeta(url=str(URL(f"https://example.com/{i}"))) for i in range(10)
-        ]
+        requests = [{"url": str(URL(f"https://example.com/{i}"))} for i in range(10)]
 
         # Enqueue all items concurrently
         await queue.enqueue(requests)
@@ -292,7 +288,7 @@ class TestKVStoreQueue:
         await queue.close()
 
         # Operations should still work after close (kv_store handles its own cleanup)
-        request = RequestMeta(url=str(URL("https://example.com")))
+        request = {"url": str(URL("https://example.com"))}
         await queue.enqueue([request])
         assert await queue.size() == 1
 

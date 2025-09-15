@@ -1,8 +1,11 @@
 SHELL=/bin/bash
 DOCKER=BUILDKIT_PROGRESS=plain docker
-DOCKER_COMPOSE=USER_ID=$$(id -u) GROUP_ID=$$(id -g) BUILDKIT_PROGRESS=plain docker-compose
+DOCKER_COMPOSE=USER_ID=$$(id -u) GROUP_ID=$$(id -g) BUILDKIT_PROGRESS=plain docker compose
 GIT_REPOSITORY_NAME=$$(basename `git rev-parse --show-toplevel`)
 GIT_COMMIT_ID=$$(git rev-parse --short HEAD)
+
+# Allocate a TTY for colorful output when stdout is a terminal
+TTY_FLAG:=$(shell if [ -t 1 ]; then echo ; else echo -t; fi)
 
 # Default parameter values
 AWS_PROFILE ?= oc-management-dev
@@ -24,9 +27,9 @@ ifeq ($(MODE), local)
 	RUN=poetry run
 	RUN_NO_DEPS=poetry run
 else
-	# Use docker-compose to run commands in the build-container
-	RUN=$(DOCKER_COMPOSE) run --rm build-container poetry run
-	RUN_NO_DEPS=$(DOCKER_COMPOSE) run --rm build-container poetry run
+	# Reuse an already running dev-container; otherwise start it, then exec
+	RUN=$(DOCKER_COMPOSE) exec $(TTY_FLAG) dev-container poetry run
+	RUN_NO_DEPS=$(DOCKER_COMPOSE) exec $(TTY_FLAG) dev-container poetry run
 endif
 
 # Define a function to run commands in the appropriate environment
@@ -34,7 +37,7 @@ define run_in_container
 	@if [ "$(MODE)" = "local" ]; then \
 		poetry run $(1); \
 	else \
-		$(DOCKER_COMPOSE) run --rm build-container poetry run $(1); \
+		$(DOCKER_COMPOSE) exec $(TTY_FLAG) dev-container poetry run $(1); \
 	fi
 endef
 
@@ -60,11 +63,11 @@ build/for-deployment:
 	--build-arg POETRY_HTTP_BASIC_OCPY_PASSWORD \
 	.
 
-# Check docker-compose availability and required directories for mounts
+# Check docker-compose availability, mounts, ensure devcontainer running and ready
 ensure-docker-compose:
-	@if [ "$(MODE)" = "local" ]; then \
-		if ! command -v docker-compose >/dev/null 2>&1; then \
-			echo "Error: docker-compose not found. Please install Docker Compose."; \
+	@if [ "$(MODE)" != "local" ]; then \
+		if ! docker compose version >/dev/null 2>&1; then \
+			echo "Error: docker compose (v2) not found. Please install Docker Desktop or docker-compose-plugin."; \
 			exit 1; \
 		fi; \
 		MISSING_DIRS=""; \
@@ -89,6 +92,15 @@ ensure-docker-compose:
 			echo ""; \
 			exit 1; \
 		fi; \
+		ID=`$(DOCKER_COMPOSE) ps -q dev-container || true`; \
+		if [ -z "$$ID" ]; then \
+			echo "Starting dev-container..."; \
+			$(DOCKER_COMPOSE) up -d dev-container; \
+		else \
+			echo "Reusing running dev-container $$ID"; \
+		fi; \
+		echo "Ensuring dev-container has dependencies installed..."; \
+		$(DOCKER_COMPOSE) exec $(TTY_FLAG) dev-container bash -lc 'poetry run ruff --version >/dev/null 2>&1 || poetry install --no-root'; \
 	fi
 
 
@@ -317,6 +329,7 @@ docs/deploy:
 	# Use mkdocs to publish to gh-pages branch
 	$(RUN_NO_DEPS) mkdocs gh-deploy --force
 
+
 docs/help:
 	@echo "Documentation targets:"
 	@echo "  docs              - Build documentation (in container)"
@@ -330,9 +343,22 @@ docs/help:
 	@echo "  docs/deploy       - Deploy to GitHub Pages"
 	@echo "  docs/help         - Show this help"
 	@echo ""
+	@echo "Test environment:"
+	@echo "  test-env-up        - Start local test environment (localstack, redis, buckets, queues)"
+	@echo "  test-env-down      - Stop local test environment"
 	@echo "Development workflow:"
 	@echo "  1. make docs/serve        - Start development server"
 	@echo "  2. Edit documentation in docs/ directory"
 	@echo "  3. View changes at http://0.0.0.0:8000"
 	@echo "  4. make docs/validate     - Validate before committing"
 	@echo "  5. make docs/deploy       - Deploy to GitHub Pages"
+
+.PHONY: test-env-up test-env-down
+
+test-env-up:
+	@echo "Starting local test environment..."
+	bash scripts/test-env-up.sh
+
+test-env-down:
+	@echo "Stopping local test environment..."
+	bash scripts/test-env-down.sh

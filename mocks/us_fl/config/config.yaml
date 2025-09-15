@@ -1,0 +1,36 @@
+data_source_id: us_fl
+
+loader:
+  sftp_loader:
+    meta_load_name: us_fl_sftp_loader
+    sftp_config: us_fl
+
+locators:
+  - sftp_directory:
+      sftp_config: us_fl
+      remote_dir: doc/cor
+      filename_pattern: '*.txt'
+      max_files: null
+      file_filter:
+        type: date_filter
+        start_date: '20230728'
+        date_pattern: YYYYMMDD
+      sort_key: mtime
+      sort_reverse: true
+      state_management_prefix: us_fl_daily_provider
+  - sftp_file:
+      sftp_config: us_fl
+      file_paths:
+        - doc/Quarterly/Cor/cordata.zip
+      state_management_prefix: us_fl_quarterly_provider
+fetcher_settings:
+  concurrency: 1
+  target_queue_size: 100
+  rate_limit:
+    requests_per_second: 2.0
+  timeouts:
+    connect_timeout: 20.0
+    read_timeout: 300.0
+protocols:
+  sftp:
+    us_fl: sftp_config.yaml

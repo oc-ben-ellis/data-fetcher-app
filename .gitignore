@@ -215,3 +215,10 @@ cython_debug/
 
 # GPG key configuration (user-specific)
 .gpg_key
+
+# ignore cursor files
+.cursor
+.cursorrules
+
+# ignore pipeline config cache
+.pipeline-config/

@@ -9,10 +9,12 @@ import atexit
 import os
 import signal
 import subprocess
+import sys
 import tempfile
 import uuid
 from collections.abc import AsyncGenerator, Coroutine, Generator
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any
 
 import boto3
@@ -24,7 +26,31 @@ from testcontainers.core.waiting_utils import (  # type: ignore[import-untyped]
     wait_for_logs,
 )
 
+# Ensure `src` is on the import path for local test runs
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_SRC_PATH = _PROJECT_ROOT / "src"
+if str(_SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(_SRC_PATH))
+
 from data_fetcher_core.core import BundleRef
+import data_fetcher_core.retry as _retry_mod  # noqa: F401  # type: ignore[unused-import]
+
+# Legacy import path shim for modules moved/renamed
+import types as _types
+import data_fetcher_core.retry as _retry_module  # type: ignore
+
+sys.modules.setdefault("data_fetcher_core.utils.retry", _retry_module)
+
+# Provide minimal protocol_config with HttpProtocolConfig for http api strategies
+if "data_fetcher_core.protocol_config" not in sys.modules:
+    _proto_mod = _types.ModuleType("data_fetcher_core.protocol_config")
+
+    class HttpProtocolConfig:  # type: ignore[too-many-instance-attributes]
+        def __init__(self, **kwargs: object) -> None:
+            self.params = kwargs
+
+    _proto_mod.HttpProtocolConfig = HttpProtocolConfig
+    sys.modules["data_fetcher_core.protocol_config"] = _proto_mod
 
 """Pytest configuration and shared fixtures for OC Fetcher tests."""
 

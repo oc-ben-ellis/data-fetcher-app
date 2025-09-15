@@ -4,7 +4,7 @@ This module provides factory functions to create and configure HTTP
 components including protocol configurations and managers.
 """
 
-from data_fetcher_core.protocol_config import HttpProtocolConfig
+from data_fetcher_http.http_config import HttpProtocolConfig
 from data_fetcher_http.http_manager import HttpManager
 from data_fetcher_sftp.authentication import AuthenticationMechanism
 

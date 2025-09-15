@@ -54,3 +54,6 @@ tmp/
 htmlcov/
 .coverage
 *.log
+
+# Exclude local pipeline config cache from image/build context
+.pipeline-config/

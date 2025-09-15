@@ -1,7 +1,7 @@
 """Command-line interface and main entry point.
 
 This module provides the main CLI interface for running fetchers, including
-argument parsing, recipe loading, and execution orchestration.
+argument parsing, configuration loading, and execution orchestration.
 """
 # ruff: noqa: T201
 
@@ -12,29 +12,30 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 from wsgiref.simple_server import make_server
 
+from data_fetcher_http.http_manager import HttpManager
+from data_fetcher_sftp.sftp_manager import SftpManager
 import structlog
+
+# Recipe-based system has been replaced with YAML configuration
+from oc_pipeline_bus.config import DataPipelineConfig
 from openc_python_common.observability import (
-    configure_logging,
     log_bind,
     observe_around,
 )
+from data_fetcher_core.logging import configure_logging, LoggingLevel, LoggingHandler, ConsoleMode
 
-# Import recipes to ensure they are registered
-import data_fetcher_recipes  # noqa: F401
-from data_fetcher_app.cli_config import (
+# Recipes have been moved to YAML configuration system
+from data_fetcher_app.app_config import (
+    FetcherConfig,
+    create_fetcher_app_config,
     create_health_config,
-    create_list_config,
     create_run_config,
 )
 from data_fetcher_app.health import create_health_app
-from data_fetcher_core.config_factory import FetcherConfig, create_fetcher_config
-from data_fetcher_core.core import FetchPlan, FetchRunContext
+from data_fetcher_core.core import DataRegistryFetcherConfig, FetchPlan, FetchRunContext
 from data_fetcher_core.fetcher import Fetcher
-from data_fetcher_core.recipebook import (
-    get_fetcher,
-    get_recipe_setup_function,
-    list_recipes,
-)
+from data_fetcher_app.app_config import FetcherConfig
+from data_fetcher_core.strategy_registration import create_strategy_registry
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -45,46 +46,34 @@ config_name = os.getenv("OC_CONFIG_ID")
 
 
 def configure_application_credential_provider(
-    fetcher: Fetcher, app_config: FetcherConfig
+    _fetcher: Fetcher, _app_config: FetcherConfig
 ) -> None:
-    """Configure credential provider for the fetcher based on app_config.
-
-    This function updates the fetcher's credential provider configuration
-    based on the application configuration.
-
-    Args:
-        fetcher: The fetcher instance to configure.
-        app_config: The application configuration containing credential settings.
-    """
-    # DEPRECATED: This function is a placeholder and should be removed
-    # Credential provider configuration is now handled directly in get_fetcher()
-    # through the app_config parameter. The fetcher and its components receive
-    # the credential provider through proper dependency injection.
-    # Do not implement this function - remove it instead.
+    """Deprecated: credential provider is injected via app_config. No-op."""
+    return
 
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
 
 
-def generate_run_id(recipe_id: str) -> str:
-    """Generate a unique run ID combining recipe_id and timestamp.
+def generate_run_id(config_id: str) -> str:
+    """Generate a unique run ID combining config_id and timestamp.
 
     Args:
-        recipe_id: The recipe identifier.
+        config_id: The configuration identifier.
 
     Returns:
-        A unique run ID in the format: fetcher_{recipe_id}_{timestamp}
+        A unique run ID in the format: fetcher_{config_id}_{timestamp}
     """
     timestamp = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
-    return f"fetcher_{recipe_id}_{timestamp}"
+    return f"fetcher_{config_id}_{timestamp}"
 
 
-# ruff: noqa: PLR0912, PLR0915
+# ruff: noqa: PLR0912
 def run_command(args: list[str] | None = None) -> None:
-    """Run a data fetcher with the specified recipe.
+    """Run a data fetcher with the specified configuration.
 
-    This command executes a data fetcher using the provided recipe ID.
+    This command executes a data fetcher using the provided configuration ID.
     The fetcher will process data according to its configured rules and output
     the results to the specified destination.
 
@@ -92,132 +81,136 @@ def run_command(args: list[str] | None = None) -> None:
         args: Command line arguments. If None, uses sys.argv.
     """
 
-    def _raise_recipe_id_required() -> None:
-        """Raise ValueError for missing recipe_id."""
-        msg = "recipe_id is required"
+    def _raise_data_registry_id_required() -> None:
+        """Raise ValueError for missing data_registry_id."""
+        msg = "data_registry_id is required. Either specify --data-registry-id or set OC_DATA_PIPELINE_DATA_REGISTRY_ID environment variable"
         print(f"Error: {msg}")
         raise ValueError(msg)
 
     try:
-        # Extract recipe_id from positional arguments
-        if not args:
-            _raise_recipe_id_required()
+        # Parse command line arguments
+        config = create_run_config(args)
 
-        # At this point, args is guaranteed to be a non-empty list
-        assert args is not None  # noqa: S101
-        recipe_id = args[0]
-        remaining_args = args[1:]
+        # Validate configuration
+        if config.data_registry_id is not None and config.stage is None:
+            print("Error: --stage is required when --data-registry-id is specified")
+            sys.exit(1)
 
-        # Set the recipe_id as an environment variable for the config
-        os.environ["DATA_FETCHER_APP_RECIPE_ID"] = recipe_id
+        if config.data_registry_id is not None and config.step is None:
+            print("Error: --step is required when --data-registry-id is specified")
+            sys.exit(1)
 
-        config = create_run_config(remaining_args)
+        if (
+            config.data_registry_id is not None
+            or config.stage is not None
+            or config.step is not None
+        ) and config.config_dir is None:
+            print(
+                "Error: --config-dir is required when --data-registry-id or --stage or --step is specified"
+            )
+            sys.exit(1)
+
+        # Determine the data registry ID to use
+        data_registry_id = config.data_registry_id
+        if data_registry_id is None:
+            # Try to get from environment variable
+            data_registry_id = os.environ.get("OC_DATA_PIPELINE_DATA_REGISTRY_ID")
+            if not data_registry_id:
+                _raise_data_registry_id_required()
+
+        # Set environment variables for pipeline config if specified
+        if config.data_registry_id is not None:
+            os.environ["OC_DATA_PIPELINE_DATA_REGISTRY_ID"] = config.data_registry_id
+        if config.stage is not None:
+            os.environ["OC_DATA_PIPELINE_STAGE"] = config.stage
+        if config.step is not None:
+            os.environ["OC_DATA_PIPELINE_STEP"] = config.step
 
         # Generate run_id
-        run_id = generate_run_id(config.recipe_id)
+        run_id = generate_run_id(str(data_registry_id))
 
         # Configure logging
-        configure_logging(log_level=config.log_level, dev_mode=config.dev_mode)
+        configure_logging(
+            logging_level=LoggingLevel(config.log_level.upper()),
+            package_log_levels={},
+            logging_handler=LoggingHandler.TEXT,
+            console_mode=ConsoleMode.FORCE if config.dev_mode else ConsoleMode.AUTO,
+        )
 
-        # Map CLI config fields to factory kwargs, only including provided values
+        # Map CLI config fields to env/factory kwargs, only including provided values
         factory_kwargs: dict[str, Any] = {}
 
-        # Global AWS profile default propagated via env var if set
-        if config.aws_profile is not None:
-            os.environ["AWS_PROFILE"] = config.aws_profile
+        # Environment overrides
+        env_overrides = {
+            "aws_profile": "AWS_PROFILE",
+            "storage_pipeline_aws_profile": "OC_STORAGE_PIPELINE_AWS_PROFILE",
+            "credentials_aws_profile": "OC_CREDENTIAL_PROVIDER_AWS_PROFILE",
+        }
+        for field, env_name in env_overrides.items():
+            value = getattr(config, field, None)
+            if value is not None:
+                os.environ[env_name] = value
 
-        # Credentials provider
-        if config.credentials_aws_profile is not None:
-            os.environ["OC_CREDENTIAL_PROVIDER_AWS_PROFILE"] = (
-                config.credentials_aws_profile
-            )
-        if config.credentials_aws_region is not None:
-            factory_kwargs["aws_region"] = config.credentials_aws_region
-        if config.credentials_aws_endpoint_url is not None:
-            factory_kwargs["aws_endpoint_url"] = config.credentials_aws_endpoint_url
-        if config.credentials_env_prefix is not None:
-            factory_kwargs["env_prefix"] = config.credentials_env_prefix
-
-        # KV store
-        if config.kvstore_serializer is not None:
-            factory_kwargs["serializer"] = config.kvstore_serializer
-        if config.kvstore_default_ttl is not None:
-            factory_kwargs["default_ttl"] = config.kvstore_default_ttl
-        if config.kvstore_redis_host is not None:
-            factory_kwargs["redis_host"] = config.kvstore_redis_host
-        if config.kvstore_redis_port is not None:
-            factory_kwargs["redis_port"] = config.kvstore_redis_port
-        if config.kvstore_redis_db is not None:
-            factory_kwargs["redis_db"] = config.kvstore_redis_db
-        if config.kvstore_redis_password is not None:
-            factory_kwargs["redis_password"] = config.kvstore_redis_password
-        if config.kvstore_redis_key_prefix is not None:
-            factory_kwargs["redis_key_prefix"] = config.kvstore_redis_key_prefix
-
-        # Storage
-        if config.storage_pipeline_aws_profile is not None:
-            os.environ["OC_STORAGE_PIPELINE_AWS_PROFILE"] = (
-                config.storage_pipeline_aws_profile
-            )
-        if config.storage_s3_bucket is not None:
-            factory_kwargs["s3_bucket"] = config.storage_s3_bucket
-        if config.storage_s3_prefix is not None:
-            factory_kwargs["s3_prefix"] = config.storage_s3_prefix
-        if config.storage_s3_region is not None:
-            factory_kwargs["s3_region"] = config.storage_s3_region
-        if config.storage_s3_endpoint_url is not None:
-            factory_kwargs["s3_endpoint_url"] = config.storage_s3_endpoint_url
-        if config.storage_file_path is not None:
-            factory_kwargs["file_path"] = config.storage_file_path
-        if config.storage_use_unzip is not None:
-            factory_kwargs["use_unzip"] = config.storage_use_unzip
+        # Factory kwargs mapping
+        field_map = {
+            # credentials
+            "credentials_aws_region": "aws_region",
+            "credentials_aws_endpoint_url": "aws_endpoint_url",
+            "credentials_env_prefix": "env_prefix",
+            # kvstore
+            "kvstore_serializer": "serializer",
+            "kvstore_default_ttl": "default_ttl",
+            "kvstore_redis_host": "redis_host",
+            "kvstore_redis_port": "redis_port",
+            "kvstore_redis_db": "redis_db",
+            "kvstore_redis_password": "redis_password",
+            "kvstore_redis_key_prefix": "redis_key_prefix",
+            # storage
+            "storage_s3_bucket": "s3_bucket",
+            "storage_s3_prefix": "s3_prefix",
+            "storage_s3_region": "s3_region",
+            "storage_s3_endpoint_url": "s3_endpoint_url",
+            "storage_file_path": "file_path",
+            "storage_use_unzip": "use_unzip",
+            "storage_use_tar_gz": "use_tar_gz",
+        }
+        for src, dst in field_map.items():
+            val = getattr(config, src, None)
+            if val is not None:
+                factory_kwargs[dst] = val
 
         # Store the arguments for the async main function
         args_dict = {
-            "config_name": config.recipe_id,
+            "config_name": data_registry_id,
             "credentials_provider": config.credentials_provider,
             "storage": config.storage,
             "kvstore": config.kvstore,
             "run_id": run_id,
             "factory_kwargs": factory_kwargs,
+            "config_dir": config.config_dir,
+            "data_registry_id": data_registry_id,
+            "stage": config.stage,
+            "step": config.step,
         }
 
-        # Run the async main function
-        asyncio.run(main_async(args_dict))
+        # Run the async main function with robust error handling
+        try:
+            asyncio.run(main_async(args_dict))
+        except KeyboardInterrupt:
+            logger.info("RUN_CANCELLED_BY_USER")
+            sys.exit(130)
+        except KeyError as e:
+            # Config-related errors (e.g., missing strategy IDs)
+            logger.exception("RUN_COMMAND_CONFIG_ERROR", error=str(e))
+            sys.exit(2)
+        except Exception as e:
+            # Catch-all to ensure errors are logged and correct exit code returned
+            logger.exception("RUN_COMMAND_ERROR", error=str(e))
+            sys.exit(1)
 
     except Exception as e:
-        logger.exception("RUN_COMMAND_ERROR", error=str(e))
-        sys.exit(1)
-
-
-def list_command(args: list[str] | None = None) -> None:
-    """List all available fetcher recipes.
-
-    This command displays all registered fetcher recipes that can be used
-    with the 'run' command. Each recipe includes a unique identifier and
-    description of what data source it fetches from.
-
-    Args:
-        args: Command line arguments. If None, uses sys.argv.
-    """
-    try:
-        config = create_list_config(args)
-
-        # Configure logging
-        configure_logging(log_level=config.log_level, dev_mode=config.dev_mode)
-
-        recipes = list_recipes()
-        if not recipes:
-            print("No fetcher recipes are available.")
-            return
-
-        print("Available fetcher recipes:")
-        for recipe_id in sorted(recipes):
-            print(f"  {recipe_id}")
-        print(f"Total: {len(recipes)} recipe(s)")
-
-    except (ValueError, ImportError, OSError) as e:
-        print(f"Error: {e!s}")
+        # Fail-fast for setup/argument parsing issues
+        logger.exception("RUN_STARTUP_ERROR", error=str(e))
         sys.exit(1)
 
 
@@ -233,7 +226,12 @@ def health_command(args: list[str] | None = None) -> None:
         config = create_health_config(args)
 
         # Configure logging
-        configure_logging(log_level=config.log_level, dev_mode=config.dev_mode)
+        configure_logging(
+            logging_level=LoggingLevel(config.log_level.upper()),
+            package_log_levels={},
+            logging_handler=LoggingHandler.TEXT,
+            console_mode=ConsoleMode.FORCE if config.dev_mode else ConsoleMode.AUTO,
+        )
 
         # Create health check app
         app = create_health_app()
@@ -272,13 +270,15 @@ Usage:
     python -m data_fetcher_app.main <command> [options]
 
 Commands:
-    run <recipe_id>     Run a data fetcher with the specified recipe
-    list               List all available fetcher recipes
-    health             Start a health check server
-    --help, -h         Show this help message
-    --version, -v      Show version information
+    run                     Run a data fetcher (uses environment variables for config)
+    health                  Start a health check server
+    --help, -h              Show this help message
+    --version, -v           Show version information
 
 Options for run command:
+    --data-registry-id <id>     Data registry ID (e.g., us_fl). If not specified, uses OC_DATA_PIPELINE_DATA_REGISTRY_ID env var
+    --stage <stage>             Pipeline stage (e.g., raw). Required if --data-registry-id is specified
+    --config-dir <path>         Local directory containing YAML configuration files. Required if --data-registry-id or --stage is specified
     --credentials-provider <type>  Credential provider type (aws, env)
     --storage <type>              Storage type (s3, file)
     --kvstore <type>              Key-value store type (redis, memory)
@@ -286,9 +286,14 @@ Options for run command:
     --dev-mode                    Enable development mode
 
 Examples:
-    python -m data_fetcher_app.main run fr
-    python -m data_fetcher_app.main run us-fl --credentials-provider env --storage file
-    python -m data_fetcher_app.main list
+    # Using environment variables (recommended)
+    export OC_DATA_PIPELINE_DATA_REGISTRY_ID=us_fl
+    export OC_DATA_PIPELINE_STAGE=raw
+    python -m data_fetcher_app.main run
+
+    # Using command line arguments (all three required together)
+    python -m data_fetcher_app.main run --data-registry-id us-fl --stage raw --config-dir ./mocks/us_fl/config
+    python -m data_fetcher_app.main run --data-registry-id us-fl --stage raw --config-dir ./mocks/us_fl/config --storage file
     python -m data_fetcher_app.main health --port 8080
 """
     print(help_text)
@@ -304,98 +309,110 @@ def main() -> None:
     command = sys.argv[1]
     args = sys.argv[2:] if len(sys.argv) > min_args else []
 
-    if command == "run":
-        if not args:
-            show_help()
-            sys.exit(1)
-        run_command(args)
-    elif command == "list":
-        list_command(args)
-    elif command == "health":
-        health_command(args)
-    elif command in ["--help", "-h", "help"]:
-        show_help()
-        sys.exit(0)
-    elif command in ["--version", "-v", "version"]:
-        print("data-fetcher-app, version 0.1.0")
-        sys.exit(0)
-    else:
+    dispatch = {
+        "run": lambda: run_command(args),
+        "health": lambda: health_command(args),
+        "--help": show_help,
+        "-h": show_help,
+        "help": show_help,
+        "--version": lambda: print("data-fetcher-app, version 0.1.0"),
+        "-v": lambda: print("data-fetcher-app, version 0.1.0"),
+        "version": lambda: print("data-fetcher-app, version 0.1.0"),
+    }
+    handler = dispatch.get(command)
+    if handler is None:
         show_help()
         sys.exit(1)
+    handler()  # type: ignore[no-untyped-call]
+    sys.exit(0)
 
 
 async def main_async(args: dict[str, Any]) -> None:
     """Main entry point for the fetcher application."""
     # Get config_name and run_id from arguments
-    final_config_name = args["config_name"]
+    data_registry_id = args["config_name"]
     run_id = args["run_id"]
 
     # Bind run_id and config_id to context for all subsequent logs
-    with log_bind(run_id=run_id, config_id=final_config_name):
+    with log_bind(run_id=run_id, data_registry_id=data_registry_id):
         # Log storage and kvstore configuration
         logger.info(
-            "STORAGE_MECHANISM_SELECTED",
+            "APP_CONFIG_SETTINGS_SELECTED",
             storage_type=args["storage"],
             kvstore_type=args["kvstore"],
             credentials_provider_type=args["credentials_provider"],
         )
 
-        # Map CLI credential provider types to config factory types
-        credential_type_mapping = {"aws": "aws", "env": "environment"}
-
         # Create fetcher configuration with CLI arguments
-        with observe_around(logger, "CREATE_FETCHER_CONFIG"):
-            app_config = await create_fetcher_config(
-                credentials_provider_type=credential_type_mapping.get(
-                    args["credentials_provider"], args["credentials_provider"]
-                ),
+        with observe_around(logger, "CREATE_FETCHER_APP_CONFIG"):
+            app_config = await create_fetcher_app_config(
+                data_registry_id=data_registry_id,
+                credentials_provider_type=args["credentials_provider"],
                 storage_type=args["storage"],
                 kv_store_type=args["kvstore"],
-                config_id=final_config_name,
                 **cast("dict[str, Any]", args.get("factory_kwargs", {})),
             )
 
         try:
+            plan = None
             with observe_around(logger, "INITIALIZE_FETCHER"):
-                logger.info("FETCHER_INITIALIZING", config_id=final_config_name)
-                fetcher = get_fetcher(final_config_name, app_config)
+                logger.info("FETCHER_INITIALIZING", data_registry_id=data_registry_id)
 
-                # Configure credential provider for the fetcher
-                configure_application_credential_provider(fetcher, app_config)
+                # Use YAML configuration (configuration system)
+                config_dir = args.get("config_dir")
+                stage = args.get("stage", "raw")
+                step = args.get("step")
 
-            # Create a basic fetch plan with run_id in context
-            run_context = FetchRunContext(run_id=run_id, app_config=app_config)
+                logger.info(
+                    "USING_YAML_CONFIG",
+                    data_registry_id=data_registry_id,
+                    config_dir=config_dir,
+                    stage=stage,
+                    step=step,
+                )
 
-            # Get the recipe for this configuration
-            setup_func = get_recipe_setup_function(final_config_name)
-            recipe = setup_func()
+                # Load YAML fetcher configuration directly via DataPipelineConfig
+                sftp_manager = SftpManager()
+                http_manager = HttpManager()
+                strategy_registry = create_strategy_registry(sftp_manager=sftp_manager, http_manager=http_manager)
+                pipeline_config = DataPipelineConfig(
+                    strategy_registry=strategy_registry,
+                    local_config_dir=config_dir,
+                )
 
-            plan = FetchPlan(
-                recipe=recipe,
-                context=run_context,
-            )
+                yaml_config = pipeline_config.load_config(
+                    DataRegistryFetcherConfig,
+                    data_registry_id=data_registry_id,
+                    step=step,
+                )
+
+                fetcher = Fetcher()
+
+                # Create a basic fetch plan with run_id in context
+                plan = FetchPlan(
+                    config=yaml_config,
+                    context=FetchRunContext(run_id=run_id, app_config=app_config),
+                )
 
             # Run the fetcher
             with observe_around(logger, "FETCH_OPERATION"):
-                logger.info("FETCH_OPERATION_STARTING", config_id=final_config_name)
                 result = await fetcher.run(plan)
                 logger.info(
                     "FETCH_OPERATION_COMPLETED",
-                    config_id=final_config_name,
+                    data_registry_id=data_registry_id,
                     result=str(result),
                 )
 
         except KeyError:
             logger.exception(
-                "UNKNOWN_RECIPE_ERROR",
-                config_id=final_config_name,
-                available_recipes=list_recipes(),
+                "UNKNOWN_CONFIG_ERROR",
+                data_registry_id=data_registry_id,
             )
             raise
         except Exception as e:
             logger.exception(
                 "FETCHER_RUN_ERROR",
-                config_id=final_config_name,
+                data_registry_id=data_registry_id,
                 error=str(e),
             )
             raise

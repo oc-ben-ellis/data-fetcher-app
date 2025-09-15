@@ -33,24 +33,31 @@ class TestFileStorage:
     @pytest.fixture
     def bundle_ref(self) -> BundleRef:
         """Create a test bundle reference."""
-        return BundleRef(
-            primary_url="https://example.com",
-            resources_count=1,
-            storage_key="test_bundle",
-            meta={"test": "data"},
+        return BundleRef.from_dict(
+            {
+                "bid": "bid:v1:test_registry:20240115103000:abc12345",
+                "meta": {
+                    "primary_url": "https://example.com",
+                    "resources_count": 1,
+                    "storage_key": "test_bundle",
+                    "test": "data",
+                },
+            }
         )
 
     @pytest.fixture
     def bundle_ref_with_custom_bid(self) -> BundleRef:
         """Create a test bundle reference with custom BID."""
-        from data_fetcher_core.core import BID
-
-        return BundleRef(
-            primary_url="https://example.com",
-            resources_count=1,
-            bid=BID("test-bundle-id-12345"),
-            storage_key="test_bundle",
-            meta={"test": "data"},
+        return BundleRef.from_dict(
+            {
+                "bid": "bid:v1:test_registry:20240115103000:abc12345",
+                "meta": {
+                    "primary_url": "https://example.com",
+                    "resources_count": 1,
+                    "storage_key": "test_bundle",
+                    "test": "data",
+                },
+            }
         )
 
     def test_storage_creation(self, storage: FileStorage, temp_dir: str) -> None:
@@ -64,14 +71,14 @@ class TestFileStorage:
         self, storage: FileStorage, bundle_ref: BundleRef
     ) -> None:
         """Test starting a bundle."""
-        from data_fetcher_core.core import FetcherRecipe
+        from data_fetcher_core.core import DataRegistryFetcherConfig
 
-        recipe = FetcherRecipe(recipe_id="test", bundle_loader=None, bundle_locators=[])
+        config = DataRegistryFetcherConfig(loader={"dummy": {}}, locators=[])
 
-        context = await storage.start_bundle(bundle_ref, recipe)
+        context = await storage.start_bundle(bundle_ref, config)
         assert context is not None
         assert context.bundle_ref == bundle_ref
-        assert context.recipe == recipe
+        assert context.recipe == config
 
         await context.complete({"test": "metadata"})
 
@@ -80,11 +87,11 @@ class TestFileStorage:
         self, storage: FileStorage, bundle_ref_with_custom_bid: BundleRef
     ) -> None:
         """Test that storage uses BID for directory naming."""
-        from data_fetcher_core.core import FetcherRecipe
+        from data_fetcher_core.core import DataRegistryFetcherConfig
 
-        recipe = FetcherRecipe(recipe_id="test", bundle_loader=None, bundle_locators=[])
+        config = DataRegistryFetcherConfig(loader={"dummy": {}}, locators=[])
 
-        context = await storage.start_bundle(bundle_ref_with_custom_bid, recipe)
+        context = await storage.start_bundle(bundle_ref_with_custom_bid, config)
 
         # The bundle directory should be named using the BID
         expected_dir_name = f"bundle_{bundle_ref_with_custom_bid.bid}"
@@ -92,9 +99,12 @@ class TestFileStorage:
 
         # The directory should exist after adding a resource
         await context.add_resource(
-            url="https://example.com/test.html",
-            content_type="text/html",
-            status_code=200,
+            resource_name="https://example.com/test.html",
+            metadata={
+                "url": "https://example.com/test.html",
+                "content_type": "text/html",
+                "status_code": 200,
+            },
             stream=self.create_test_stream(b"<html>Test</html>"),
         )
 
@@ -107,16 +117,19 @@ class TestFileStorage:
         self, storage: FileStorage, bundle_ref: BundleRef
     ) -> None:
         """Test writing a resource to a bundle."""
-        from data_fetcher_core.core import FetcherRecipe
+        from data_fetcher_core.core import DataRegistryFetcherConfig
 
-        recipe = FetcherRecipe(recipe_id="test", bundle_loader=None, bundle_locators=[])
+        config = DataRegistryFetcherConfig(loader={"dummy": {}}, locators=[])
 
-        context = await storage.start_bundle(bundle_ref, recipe)
+        context = await storage.start_bundle(bundle_ref, config)
 
         await context.add_resource(
-            url="https://example.com/page.html",
-            content_type="text/html",
-            status_code=200,
+            resource_name="https://example.com/page.html",
+            metadata={
+                "url": "https://example.com/page.html",
+                "content_type": "text/html",
+                "status_code": 200,
+            },
             stream=TestStorageDecorators.create_test_stream(
                 b"<html><body>Test content</body></html>"
             ),
@@ -140,17 +153,20 @@ class TestFileStorage:
         self, storage: FileStorage, bundle_ref: BundleRef
     ) -> None:
         """Test writing multiple resources to a bundle."""
-        from data_fetcher_core.core import FetcherRecipe
+        from data_fetcher_core.core import DataRegistryFetcherConfig
 
-        recipe = FetcherRecipe(recipe_id="test", bundle_loader=None, bundle_locators=[])
+        config = DataRegistryFetcherConfig(loader={"dummy": {}}, locators=[])
 
-        context = await storage.start_bundle(bundle_ref, recipe)
+        context = await storage.start_bundle(bundle_ref, config)
 
         # Write first resource
         await context.add_resource(
-            url="https://example.com/page1.html",
-            content_type="text/html",
-            status_code=200,
+            resource_name="https://example.com/page1.html",
+            metadata={
+                "url": "https://example.com/page1.html",
+                "content_type": "text/html",
+                "status_code": 200,
+            },
             stream=TestStorageDecorators.create_test_stream(
                 b"<html><body>Test content</body></html>"
             ),
@@ -158,9 +174,12 @@ class TestFileStorage:
 
         # Write second resource
         await context.add_resource(
-            url="https://example.com/page2.html",
-            content_type="text/html",
-            status_code=200,
+            resource_name="https://example.com/page2.html",
+            metadata={
+                "url": "https://example.com/page2.html",
+                "content_type": "text/html",
+                "status_code": 200,
+            },
             stream=TestStorageDecorators.create_test_stream(
                 b"<html><body>Test content</body></html>"
             ),
@@ -189,16 +208,19 @@ class TestFileStorage:
         self, storage: FileStorage, bundle_ref: BundleRef
     ) -> None:
         """Test writing a resource with metadata."""
-        from data_fetcher_core.core import FetcherRecipe
+        from data_fetcher_core.core import DataRegistryFetcherConfig
 
-        recipe = FetcherRecipe(recipe_id="test", bundle_loader=None, bundle_locators=[])
+        config = DataRegistryFetcherConfig(loader={"dummy": {}}, locators=[])
 
-        context = await storage.start_bundle(bundle_ref, recipe)
+        context = await storage.start_bundle(bundle_ref, config)
 
         await context.add_resource(
-            url="https://example.com/data.json",
-            content_type="application/json",
-            status_code=200,
+            resource_name="https://example.com/data.json",
+            metadata={
+                "url": "https://example.com/data.json",
+                "content_type": "application/json",
+                "status_code": 200,
+            },
             stream=TestStorageDecorators.create_test_stream(b'{"key": "value"}'),
         )
 
@@ -246,11 +268,16 @@ class TestStorageDecorators:
     @pytest.fixture
     def bundle_ref(self) -> BundleRef:
         """Create a test bundle reference."""
-        return BundleRef(
-            primary_url="https://example.com",
-            resources_count=1,
-            storage_key="test_bundle",
-            meta={"test": "data"},
+        return BundleRef.from_dict(
+            {
+                "bid": "bid:v1:test_registry:20240115103000:abc12345",
+                "meta": {
+                    "primary_url": "https://example.com",
+                    "resources_count": 1,
+                    "storage_key": "test_bundle",
+                    "test": "data",
+                },
+            }
         )
 
     @pytest.mark.asyncio
@@ -258,7 +285,7 @@ class TestStorageDecorators:
         self, base_storage: FileStorage, bundle_ref: BundleRef
     ) -> None:
         """Test UnzipResourceDecorator decompresses gzipped content."""
-        from data_fetcher_core.core import FetcherRecipe
+        from data_fetcher_core.core import DataRegistryFetcherConfig
 
         original_content = b"<html><body>Test content</body></html>"
         gzipped_content = gzip.compress(original_content)
@@ -266,16 +293,19 @@ class TestStorageDecorators:
         # Create storage with unzip decorator
         unzip_storage = UnzipResourceDecorator(base_storage)
 
-        # Create a minimal recipe for testing
-        recipe = FetcherRecipe(recipe_id="test", bundle_loader=None, bundle_locators=[])
+        # Create a minimal config for testing
+        config = DataRegistryFetcherConfig(loader={"dummy": {}}, locators=[])
 
         # Use the new start_bundle interface
-        context = await unzip_storage.start_bundle(bundle_ref, recipe)
+        context = await unzip_storage.start_bundle(bundle_ref, config)
 
         await context.add_resource(
-            url="https://example.com/page.html.gz",
-            content_type="text/html",
-            status_code=200,
+            resource_name="https://example.com/page.html.gz",
+            metadata={
+                "url": "https://example.com/page.html.gz",
+                "content_type": "text/html",
+                "status_code": 200,
+            },
             stream=self.create_test_stream(gzipped_content),
         )
 
@@ -308,7 +338,7 @@ class TestStorageDecorators:
         self, base_storage: FileStorage, bundle_ref: BundleRef
     ) -> None:
         """Test decorator error handling with corrupted content."""
-        from data_fetcher_core.core import FetcherRecipe
+        from data_fetcher_core.core import DataRegistryFetcherConfig
 
         # Create corrupted gzip content
         corrupted_content = b"<html>This is not gzipped</html>"
@@ -316,17 +346,20 @@ class TestStorageDecorators:
         # Create storage with unzip decorator
         unzip_storage = UnzipResourceDecorator(base_storage)
 
-        # Create a minimal recipe for testing
-        recipe = FetcherRecipe(recipe_id="test", bundle_loader=None, bundle_locators=[])
+        # Create a minimal config for testing
+        config = DataRegistryFetcherConfig(loader={"dummy": {}}, locators=[])
 
         # Use the new start_bundle interface
-        context = await unzip_storage.start_bundle(bundle_ref, recipe)
+        context = await unzip_storage.start_bundle(bundle_ref, config)
 
         # This should handle the error gracefully
         await context.add_resource(
-            url="https://example.com/page.html.gz",
-            content_type="text/html",
-            status_code=200,
+            resource_name="https://example.com/page.html.gz",
+            metadata={
+                "url": "https://example.com/page.html.gz",
+                "content_type": "text/html",
+                "status_code": 200,
+            },
             stream=self.create_test_stream(corrupted_content),
         )
 

@@ -71,7 +71,7 @@ def create_credential_provider(
         return AWSSecretsCredentialProvider(
             region=aws_region, endpoint_url=aws_endpoint_url
         )
-    if provider_type == "environment":
+    if provider_type in {"environment", "env"}:
         # Environment variable provider
         if env_prefix is None:
             env_prefix = os.getenv(

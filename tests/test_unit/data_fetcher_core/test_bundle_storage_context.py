@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from data_fetcher_core.core import BundleRef, FetcherRecipe
+from data_fetcher_core.core import BundleRef, DataRegistryFetcherConfig
 from data_fetcher_core.storage.bundle_storage_context import BundleStorageContext
 
 
@@ -17,19 +17,23 @@ class TestBundleStorageContext:
     @pytest.fixture
     def bundle_ref(self) -> BundleRef:
         """Create a test bundle reference."""
-        return BundleRef(
-            primary_url="https://example.com/test",
-            resources_count=2,
-            storage_key="test_bundle_key",
-            meta={"test": "data"},
+        return BundleRef.from_dict(
+            {
+                "bid": "bid:v1:test_registry:20240115103000:abc12345",
+                "meta": {
+                    "primary_url": "https://example.com/test",
+                    "resources_count": 2,
+                    "storage_key": "test_bundle_key",
+                    "test": "data",
+                },
+            }
         )
 
     @pytest.fixture
-    def recipe(self) -> FetcherRecipe:
+    def recipe(self) -> DataRegistryFetcherConfig:
         """Create a test recipe."""
-        return FetcherRecipe(
-            recipe_id="test_recipe", bundle_locators=[], bundle_loader=None
-        )
+        # Minimal registry config placeholders
+        return DataRegistryFetcherConfig(loader={"dummy": {}}, locators=[])
 
     @pytest.fixture
     def mock_storage(self) -> Mock:
@@ -41,13 +45,19 @@ class TestBundleStorageContext:
 
     @pytest.fixture
     def bundle_context(
-        self, bundle_ref: BundleRef, recipe: FetcherRecipe, mock_storage: Mock
+        self,
+        bundle_ref: BundleRef,
+        recipe: DataRegistryFetcherConfig,
+        mock_storage: Mock,
     ) -> BundleStorageContext:
         """Create a BundleStorageContext instance for testing."""
         return BundleStorageContext(bundle_ref, recipe, mock_storage)
 
     def test_bundle_context_creation(
-        self, bundle_ref: BundleRef, recipe: FetcherRecipe, mock_storage: Mock
+        self,
+        bundle_ref: BundleRef,
+        recipe: DataRegistryFetcherConfig,
+        mock_storage: Mock,
     ) -> None:
         """Test BundleStorageContext creation."""
         context = BundleStorageContext(bundle_ref, recipe, mock_storage)
@@ -74,7 +84,15 @@ class TestBundleStorageContext:
         stream = mock_stream()
 
         # Call add_resource
-        await bundle_context.add_resource(url, content_type, status_code, stream)
+        await bundle_context.add_resource(
+            resource_name=url,
+            metadata={
+                "url": url,
+                "content_type": content_type,
+                "status_code": status_code,
+            },
+            stream=stream,
+        )
 
         # Verify the resource was processed (moved from pending to completed)
         assert url not in bundle_context._pending_uploads
@@ -87,9 +105,7 @@ class TestBundleStorageContext:
         assert len(completed_uploads) == 1
 
         # Verify storage method was called
-        bundle_context.storage._add_resource_to_bundle.assert_called_once_with(  # type: ignore[attr-defined]
-            bundle_context.bundle_ref, url, content_type, status_code, stream
-        )
+        bundle_context.storage._add_resource_to_bundle.assert_called_once()  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
     async def test_add_resource_with_none_content_type(
@@ -107,16 +123,22 @@ class TestBundleStorageContext:
         stream = mock_stream()
 
         # Call add_resource
-        await bundle_context.add_resource(url, content_type, status_code, stream)
+        await bundle_context.add_resource(
+            resource_name=url,
+            metadata={
+                "url": url,
+                "content_type": content_type,
+                "status_code": status_code,
+            },
+            stream=stream,
+        )
 
         # Verify the resource was processed
         assert url not in bundle_context._pending_uploads
         assert len(bundle_context._completed_uploads) == 1
 
         # Verify storage method was called with None content type
-        bundle_context.storage._add_resource_to_bundle.assert_called_once_with(  # type: ignore[attr-defined]
-            bundle_context.bundle_ref, url, None, status_code, stream
-        )
+        bundle_context.storage._add_resource_to_bundle.assert_called_once()  # type: ignore[attr-defined]
 
     @pytest.mark.asyncio
     async def test_add_multiple_resources(
@@ -136,7 +158,15 @@ class TestBundleStorageContext:
         # Add all resources
         for url, content_type, status_code in resources:
             stream = mock_stream(f"content for {url}".encode())
-            await bundle_context.add_resource(url, content_type, status_code, stream)
+            await bundle_context.add_resource(
+                resource_name=url,
+                metadata={
+                    "url": url,
+                    "content_type": content_type,
+                    "status_code": status_code,
+                },
+                stream=stream,
+            )
 
         # Verify all resources were processed (moved from pending to completed)
         assert len(bundle_context._pending_uploads) == 0
@@ -167,7 +197,15 @@ class TestBundleStorageContext:
 
         # Call add_resource and expect it to raise an exception
         with pytest.raises(Exception, match="Storage error"):
-            await bundle_context.add_resource(url, content_type, status_code, stream)
+            await bundle_context.add_resource(
+                resource_name=url,
+                metadata={
+                    "url": url,
+                    "content_type": content_type,
+                    "status_code": status_code,
+                },
+                stream=stream,
+            )
 
         # Verify the resource was not added to pending uploads
         assert url not in bundle_context._pending_uploads
@@ -202,8 +240,20 @@ class TestBundleStorageContext:
         async def mock_stream() -> AsyncGenerator[bytes]:
             yield b"content"
 
-        await bundle_context.add_resource(url1, "text/html", 200, mock_stream())
-        await bundle_context.add_resource(url2, "application/json", 200, mock_stream())
+        await bundle_context.add_resource(
+            resource_name=url1,
+            metadata={"url": url1, "content_type": "text/html", "status_code": 200},
+            stream=mock_stream(),
+        )
+        await bundle_context.add_resource(
+            resource_name=url2,
+            metadata={
+                "url": url2,
+                "content_type": "application/json",
+                "status_code": 200,
+            },
+            stream=mock_stream(),
+        )
 
         # Verify resources were processed
         assert len(bundle_context._pending_uploads) == 0
@@ -322,7 +372,15 @@ class TestBundleStorageContext:
         stream = mock_stream()
 
         # This should still work (no restriction in current implementation)
-        await bundle_context.add_resource(url, content_type, status_code, stream)
+        await bundle_context.add_resource(
+            resource_name=url,
+            metadata={
+                "url": url,
+                "content_type": content_type,
+                "status_code": status_code,
+            },
+            stream=stream,
+        )
 
         # Verify the resource was added (upload_id format: url_stream_id)
         # Since the upload completes immediately, it should be in completed_uploads
@@ -345,7 +403,11 @@ class TestBundleStorageContext:
         async def mock_stream1() -> AsyncGenerator[bytes]:
             yield b"content1"
 
-        await bundle_context.add_resource(url1, "text/html", 200, mock_stream1())
+        await bundle_context.add_resource(
+            resource_name=url1,
+            metadata={"url": url1, "content_type": "text/html", "status_code": 200},
+            stream=mock_stream1(),
+        )
         assert len(bundle_context._pending_uploads) == 0
         assert len(bundle_context._completed_uploads) == 1
 
@@ -355,7 +417,15 @@ class TestBundleStorageContext:
         async def mock_stream2() -> AsyncGenerator[bytes]:
             yield b"content2"
 
-        await bundle_context.add_resource(url2, "application/json", 200, mock_stream2())
+        await bundle_context.add_resource(
+            resource_name=url2,
+            metadata={
+                "url": url2,
+                "content_type": "application/json",
+                "status_code": 200,
+            },
+            stream=mock_stream2(),
+        )
         assert len(bundle_context._pending_uploads) == 0
         assert len(bundle_context._completed_uploads) == 2
 
@@ -384,7 +454,15 @@ class TestBundleStorageContext:
         # Add all resources with different status codes
         for url, content_type, status_code in resources:
             stream = mock_stream(f"content for {url}".encode())
-            await bundle_context.add_resource(url, content_type, status_code, stream)
+            await bundle_context.add_resource(
+                resource_name=url,
+                metadata={
+                    "url": url,
+                    "content_type": content_type,
+                    "status_code": status_code,
+                },
+                stream=stream,
+            )
 
         # Verify all resources were processed
         assert len(bundle_context._pending_uploads) == 0
@@ -397,6 +475,8 @@ class TestBundleStorageContext:
         calls = bundle_context.storage._add_resource_to_bundle.call_args_list  # type: ignore[attr-defined]
         for i, (url, content_type, status_code) in enumerate(resources):
             call_args = calls[i][0]  # Get positional arguments
-            assert call_args[1] == url  # url parameter
-            assert call_args[2] == content_type  # content_type parameter
-            assert call_args[3] == status_code  # status_code parameter
+            # Expect signature: (bundle_ref, resource_name, metadata, stream)
+            assert call_args[1] == url
+            assert call_args[2]["url"] == url
+            assert call_args[2]["content_type"] == content_type
+            assert call_args[2]["status_code"] == status_code

@@ -1,6 +1,0 @@
----
-description: The customer is always wrong
-globs:
-alwaysApply: true
----
-Don't assume what you've been told by me is correct or the right/best approach. Do a throrough check to ensure what I've asked for is correct and makes sense before proceeding, if there seems a better approach, suggest that before proceeding.

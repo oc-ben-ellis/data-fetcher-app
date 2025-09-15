@@ -4,18 +4,20 @@ This module provides decorators for automatically decompressing compressed
 files during storage operations, including ZIP, GZIP, and other formats.
 """
 
+import asyncio
 import gzip
 import tempfile
-import zipfile
 from collections.abc import AsyncGenerator
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from data_fetcher_core.storage.streaming.tee_stream import StreamingZipReader, TeeStream
+
 if TYPE_CHECKING:
-    from data_fetcher_core.core import BundleRef, FetcherRecipe
+    from data_fetcher_core.core import BundleRef, DataRegistryFetcherConfig
     from data_fetcher_core.storage.bundle_storage_context import BundleStorageContext
 
 # Get logger for this module
@@ -34,19 +36,19 @@ class UnzipResourceDecorator:
         self.base_storage = base_storage
 
     async def start_bundle(
-        self, bundle_ref: "BundleRef", recipe: "FetcherRecipe"
+        self, bundle_ref: "BundleRef", config: "DataRegistryFetcherConfig"
     ) -> "BundleStorageContext":
         """Initialize a new bundle and return a BundleStorageContext for managing it.
 
         Args:
             bundle_ref: Reference to the bundle being created.
-            recipe: The fetcher recipe containing callback information.
+            config: The fetcher configuration containing callback information.
 
         Returns:
             A BundleStorageContext for managing the bundle lifecycle.
         """
         # Get the base storage context
-        base_context = await self.base_storage.start_bundle(bundle_ref, recipe)  # type: ignore[attr-defined]
+        base_context = await self.base_storage.start_bundle(bundle_ref, config)  # type: ignore[attr-defined]
 
         # Return a wrapped context that applies decompression
         return UnzipResourceBundleStorageContext(base_context, self)  # type: ignore[return-value]
@@ -150,21 +152,29 @@ class UnzipResourceBundleStorageContext:
 
     async def add_resource(
         self,
-        url: str,
-        content_type: str | None,
-        status_code: int,
+        resource_name: str,
+        metadata: dict[str, Any],
         stream: AsyncGenerator[bytes],
     ) -> None:
-        """Add a resource to the bundle with decompression.
+        """Add a resource to the bundle with decompression using streaming approach.
+
+        This implementation streams the input to the wrapped storage while simultaneously
+        writing a copy to a temp file for processing. Once the stream is finished, it
+        processes the temp file and adds extracted resources if needed.
 
         Args:
-            url: The URL of the resource being added.
-            content_type: The content type of the resource.
-            status_code: The HTTP status code of the resource.
+            resource_name: The name of the resource being added.
+            metadata: Dictionary containing metadata about the resource.
             stream: Async generator yielding the resource content.
         """
+        # Extract metadata with defaults
+        url = metadata.get("url", "")
+        content_type = metadata.get("content_type")
+        metadata.get("status_code", 200)
+
         logger.debug(
             "UNZIPRESOURCEDECORATOR_ADD_RESOURCE_CALLED",
+            resource_name=resource_name,
             url=url,
             content_type=content_type,
         )
@@ -173,17 +183,48 @@ class UnzipResourceBundleStorageContext:
         # bundle.zip), bypass decompression entirely and stream as-is.
         if self.decorator._should_bypass_decompression(url, content_type):  # noqa: SLF001
             await self.base_context.add_resource(
-                self.decorator._strip_compression_suffix(url),  # noqa: SLF001
-                content_type,
-                status_code,
+                self.decorator._strip_compression_suffix(resource_name),  # noqa: SLF001
+                metadata,
                 stream,
             )
             return
 
-        # Stream to temporary file for compression detection
+        # Create a tee stream to split the input into two streams
+        tee_stream = TeeStream(stream)
+
+        # Start streaming to wrapped storage immediately (non-blocking)
+        wrapped_task = asyncio.create_task(
+            self.base_context.add_resource(
+                self.decorator._strip_compression_suffix(resource_name),  # noqa: SLF001
+                metadata,
+                tee_stream.get_stream(0),
+            )
+        )
+
+        # Simultaneously write to temp file for processing
+        temp_file_path = await self._stream_to_temp_file(tee_stream.get_stream(1))
+
+        # Wait for wrapped storage to complete
+        await wrapped_task
+
+        # Process temp file and add extracted resources if needed
+        await self._process_temp_file(resource_name, metadata, temp_file_path)
+
+        # Clean up tee stream
+        await tee_stream.close()
+
+    async def complete(self, metadata: dict[str, object]) -> None:
+        """Complete the bundle after all uploads are finished.
+
+        Args:
+            metadata: Additional metadata to include with the bundle.
+        """
+        await self.base_context.complete(metadata)
+
+    async def _stream_to_temp_file(self, stream: AsyncGenerator[bytes]) -> str:
+        """Stream data to a temporary file and return the file path."""
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             try:
-                # Stream content to temp file
                 async for chunk in stream:
                     temp_file.write(chunk)
                 temp_file.flush()
@@ -195,42 +236,37 @@ class UnzipResourceBundleStorageContext:
                     size=Path(temp_file.name).stat().st_size,
                 )
 
-                # Check if content is compressed and process accordingly
-                if self.decorator._is_gzipped_file(temp_file.name):  # noqa: SLF001
-                    logger.debug("DETECTED_GZIPPED_CONTENT_DECOMPRESSING")
-                    await self._add_decompressed_gzip_file(
-                        url, content_type, status_code, temp_file.name
-                    )
-                elif self.decorator._is_zipped_file(temp_file.name):  # noqa: SLF001
-                    logger.debug("DETECTED_ZIPPED_CONTENT_EXTRACTING")
-                    await self._add_decompressed_zip_file(
-                        url, content_type, status_code, temp_file.name
-                    )
-                else:
-                    logger.debug("CONTENT_NOT_COMPRESSED_STREAMING_AS_IS")
-                    # Stream original content from temp file
-                    await self._add_temp_file_to_storage(
-                        self.decorator._strip_compression_suffix(url),  # noqa: SLF001
-                        content_type,
-                        status_code,
-                        temp_file.name,
-                    )
-
-            finally:
-                # Clean up temp file
+                return temp_file.name
+            except Exception:
+                # Clean up temp file on error
                 with suppress(OSError):
                     Path(temp_file.name).unlink()
+                raise
 
-    async def complete(self, metadata: dict[str, object]) -> None:
-        """Complete the bundle after all uploads are finished.
-
-        Args:
-            metadata: Additional metadata to include with the bundle.
-        """
-        await self.base_context.complete(metadata)
+    async def _process_temp_file(
+        self, resource_name: str, metadata: dict[str, Any], filepath: str
+    ) -> None:
+        """Process the temp file and add extracted resources if needed."""
+        try:
+            # Check if content is compressed and process accordingly
+            if self.decorator._is_gzipped_file(filepath):  # noqa: SLF001
+                logger.debug("DETECTED_GZIPPED_CONTENT_DECOMPRESSING")
+                await self._add_decompressed_gzip_file(
+                    resource_name, metadata, filepath
+                )
+            elif self.decorator._is_zipped_file(filepath):  # noqa: SLF001
+                logger.debug("DETECTED_ZIPPED_CONTENT_EXTRACTING")
+                await self._add_decompressed_zip_file(resource_name, metadata, filepath)
+            else:
+                logger.debug("CONTENT_NOT_COMPRESSED_NO_ADDITIONAL_PROCESSING")
+                # No additional processing needed - content already streamed to storage
+        finally:
+            # Clean up temp file
+            with suppress(OSError):
+                Path(filepath).unlink()
 
     async def _add_temp_file_to_storage(
-        self, url: str, content_type: str | None, status_code: int, filepath: str
+        self, resource_name: str, metadata: dict[str, Any], filepath: str
     ) -> None:
         """Stream a temp file to storage without loading into memory."""
 
@@ -243,14 +279,13 @@ class UnzipResourceBundleStorageContext:
                     yield chunk
 
         await self.base_context.add_resource(
-            url=url,
-            content_type=content_type,
-            status_code=status_code,
+            resource_name=resource_name,
+            metadata=metadata,
             stream=file_stream(),
         )
 
     async def _add_decompressed_gzip_file(
-        self, url: str, content_type: str | None, status_code: int, filepath: str
+        self, resource_name: str, metadata: dict[str, Any], filepath: str
     ) -> None:
         """Decompress gzip file and stream to storage."""
         try:
@@ -264,60 +299,59 @@ class UnzipResourceBundleStorageContext:
                         yield chunk
 
             await self.base_context.add_resource(
-                url=self.decorator._strip_compression_suffix(url),  # noqa: SLF001
-                content_type=content_type,
-                status_code=status_code,
+                resource_name=self.decorator._strip_compression_suffix(resource_name),  # noqa: SLF001
+                metadata=metadata,
                 stream=gzip_stream(),
             )
         except Exception as e:
-            logger.exception("GZIP_DECOMPRESSION_ERROR", url=url, error=str(e))
+            logger.exception(
+                "GZIP_DECOMPRESSION_ERROR", resource_name=resource_name, error=str(e)
+            )
             # Stream original content as fallback
             await self._add_temp_file_to_storage(
-                self.decorator._strip_compression_suffix(url),  # noqa: SLF001
-                content_type,
-                status_code,
+                self.decorator._strip_compression_suffix(resource_name),  # noqa: SLF001
+                metadata,
                 filepath,
             )
 
     async def _add_decompressed_zip_file(
-        self, url: str, content_type: str | None, status_code: int, filepath: str
+        self, resource_name: str, metadata: dict[str, Any], filepath: str
     ) -> None:
-        """Decompress zip file and stream to storage."""
+        """Decompress zip file and stream to storage using streaming approach."""
         try:
-            with zipfile.ZipFile(filepath) as zip_file:
-                for zip_info in zip_file.filelist:
-                    if zip_info.is_dir():
-                        continue
+            async with StreamingZipReader(filepath) as zip_reader:
+                # Get list of files in the ZIP
+                files = zip_reader.list_files()
 
-                    # Stream extracted file
-                    filename = zip_info.filename
+                # Process each file in the ZIP
+                for filename in files:
+                    # Create extracted URL
+                    extracted_url = f"{self.decorator._strip_compression_suffix(resource_name)}/{filename}"  # noqa: SLF001
 
-                    async def create_zip_stream(
-                        zip_file: zipfile.ZipFile, filename: str
-                    ) -> AsyncGenerator[bytes]:
-                        with zip_file.open(filename) as zf:
-                            while True:
-                                chunk = zf.read(8192)  # 8KB chunks
-                                if not chunk:
-                                    break
-                                yield chunk
-
-                    # Add extracted file
-                    extracted_url = (
-                        f"{self.decorator._strip_compression_suffix(url)}/{filename}"  # noqa: SLF001
-                    )
+                    # Stream the file content
+                    extracted_metadata = {
+                        "url": extracted_url,
+                        "content_type": "application/octet-stream",
+                        "status_code": metadata.get("status_code", 200),
+                        "derived_from": resource_name,  # Track the original resource
+                        **metadata,  # Include all original metadata
+                    }
                     await self.base_context.add_resource(
-                        url=extracted_url,
-                        content_type="application/octet-stream",
-                        status_code=status_code,
-                        stream=create_zip_stream(zip_file, filename),
+                        resource_name=extracted_url,
+                        metadata=extracted_metadata,
+                        stream=zip_reader.get_file_stream(filename),
                     )
+
+                    logger.debug(
+                        "ZIP_FILE_EXTRACTED",
+                        original_resource_name=resource_name,
+                        extracted_url=extracted_url,
+                        filename=filename,
+                    )
+
         except Exception as e:
-            logger.exception("ZIP_DECOMPRESSION_ERROR", url=url, error=str(e))
-            # Stream original content as fallback
-            await self._add_temp_file_to_storage(
-                self.decorator._strip_compression_suffix(url),  # noqa: SLF001
-                content_type,
-                status_code,
-                filepath,
+            logger.exception(
+                "ZIP_DECOMPRESSION_ERROR", resource_name=resource_name, error=str(e)
             )
+            # Note: We don't need to stream original content as fallback since
+            # the original content was already streamed to storage via the tee stream

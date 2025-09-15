@@ -16,7 +16,7 @@ The stubs directory serves as a centralized location for:
 
 - `__init__.py` - Module initialization and documentation
 
-Note: Mock services are now organized in the project root under `mocks/` directory (e.g., `mocks/api_fr_siren/` for the French SIREN API mock).
+Note: Mock services are now organized in the project root under `mocks/` directory (e.g., `mocks/fr/images/siren_api/` for the French SIREN API mock).
 
 ## Usage
 
@@ -26,7 +26,7 @@ Mock services are automatically used by test fixtures and can be started manuall
 
 ```bash
 # Manual testing (optional)
-cd mocks/api_fr_siren
+cd mocks/fr/images/siren_api
 docker build -t siren_api_mock .
 docker run -p 5000:5000 siren_api_mock
 ```

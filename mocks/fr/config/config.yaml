@@ -1,0 +1,73 @@
+data_source_id: fr
+
+loader:
+  http_loader:
+    meta_load_name: fr_sirene_api_loader
+    http_config: fr_api
+    follow_redirects: true
+    max_redirects: 5
+
+locators:
+  - siren_provider:
+      http_config: fr_api
+      base_url: https://api.insee.fr/entreprises/sirene/V3.11/siren
+      date_start: "2025-09-07"
+      date_end: "2025-09-07"
+      max_records_per_page: 1000
+      rate_limit_requests_per_second: 2.0
+      headers:
+        Accept: "application/json"
+      query_builder:
+        type: sirene_query_builder
+      pagination_strategy:
+        type: cursor_pagination
+        cursor_field: "curseurSuivant"
+        total_field: "total"
+        count_field: "nombre"
+        max_records: 20000
+      narrowing_strategy:
+        type: siren_narrowing
+        prefix_length: 2
+        prefix_suffix: "9"
+      state_management_prefix: fr_siren_provider
+  - gap_provider:
+      http_config: fr_api
+      base_url: https://api.insee.fr/entreprises/sirene/V3.11/siren
+      date_start: "2025-09-07"
+      date_end: "2025-09-07"
+      max_records_per_page: 1000
+      rate_limit_requests_per_second: 2.0
+      headers:
+        Accept: "application/json"
+      query_builder:
+        type: sirene_query_builder
+      pagination_strategy:
+        type: cursor_pagination
+        cursor_field: "curseurSuivant"
+        total_field: "total"
+        count_field: "nombre"
+        max_records: 20000
+      narrowing_strategy:
+        type: siren_narrowing
+        prefix_length: 2
+        prefix_suffix: "9"
+      state_management_prefix: fr_gap_provider
+  - failed_companies_provider:
+      http_config: fr_api
+      urls: []
+      headers:
+        Accept: "application/json"
+      state_management_prefix: fr_failed_companies_provider
+
+fetcher_settings:
+  concurrency: 1
+  target_queue_size: 100
+  rate_limit:
+    requests_per_second: 2.0
+  timeouts:
+    connect_timeout: 120.0
+    read_timeout: 120.0
+
+protocols:
+  http:
+    fr_api: http_config.yaml

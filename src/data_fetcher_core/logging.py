@@ -249,7 +249,3 @@ def setup_logging() -> None:
     """Set up logging with default configuration."""
     config = parse_logging_config()
     configure_logging(**config)
-
-
-# Set up logging when this module is imported
-setup_logging()

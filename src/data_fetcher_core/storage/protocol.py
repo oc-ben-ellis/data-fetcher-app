@@ -7,7 +7,7 @@ must follow for bundle lifecycle management.
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from data_fetcher_core.core import BundleRef, FetcherRecipe
+    from data_fetcher_core.core import BundleRef, DataRegistryFetcherConfig
     from data_fetcher_core.storage.bundle_storage_context import BundleStorageContext
 
 
@@ -19,7 +19,7 @@ class Storage(Protocol):
     """
 
     async def start_bundle(
-        self, bundle_ref: "BundleRef", recipe: "FetcherRecipe"
+        self, bundle_ref: "BundleRef", recipe: "DataRegistryFetcherConfig"
     ) -> "BundleStorageContext":
         """Initialize a new bundle and return a BundleStorageContext for managing it.
 

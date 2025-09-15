@@ -1,6 +1,0 @@
----
-description: Use poetry to run python
-globs:
-alwaysApply: true
----
-When running project python code, always use poetry run as otherwise some dependencies may not be found.

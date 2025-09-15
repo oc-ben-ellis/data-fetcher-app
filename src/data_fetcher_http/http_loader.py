@@ -7,21 +7,22 @@ import structlog
 
 from data_fetcher_core.core import (
     BundleRef,
-    FetcherRecipe,
+    DataRegistryFetcherConfig,
     FetchRunContext,
     RequestMeta,
 )
-from data_fetcher_core.protocol_config import HttpProtocolConfig
+from data_fetcher_http.http_config import HttpProtocolConfig
 from data_fetcher_http.http_manager import HttpManager
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from data_fetcher_core.storage.file_storage import FileStorage
-    from data_fetcher_core.storage.pipeline_storage import PipelineStorage
+    from data_fetcher_core.storage.pipeline_bus_storage import DataPipelineBusStorage
+    from data_fetcher_core.storage.s3_storage import S3Storage
 
 # Type alias for storage classes
-Storage = Union["FileStorage", "PipelineStorage"]
+Storage = Union["FileStorage", "S3Storage", "DataPipelineBusStorage"]
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -42,7 +43,7 @@ class StreamingHttpBundleLoader:
         request: RequestMeta,
         storage: Storage | None,
         ctx: FetchRunContext,
-        recipe: FetcherRecipe,
+        recipe: DataRegistryFetcherConfig,
     ) -> list[BundleRef]:
         """Load data from HTTP endpoint with streaming support.
 
@@ -59,16 +60,16 @@ class StreamingHttpBundleLoader:
             # Make HTTP request
             response = await self.http_manager.request(
                 self.http_config,
-                ctx.app_config,  # type: ignore[arg-type]
+                ctx.app_config,
                 "GET",
-                request.url,
-                headers=request.headers,
+                request["url"],
+                headers=request.get("headers", {}),
                 follow_redirects=self.follow_redirects,
             )
 
             # Create bundle reference
             bundle_ref = BundleRef(
-                primary_url=request.url,
+                primary_url=request["url"],
                 resources_count=1,
                 meta={
                     "status_code": response.status_code,
@@ -82,16 +83,21 @@ class StreamingHttpBundleLoader:
 
             # Stream to storage
             if storage:
-                bid_logger.debug("STREAMING_HTTP_RESPONSE_TO_STORAGE", url=request.url)
+                bid_logger.debug(
+                    "STREAMING_HTTP_RESPONSE_TO_STORAGE", url=request["url"]
+                )
                 bundle_context = await storage.start_bundle(bundle_ref, recipe)
                 # BundleStorageContext doesn't support async with, so we use it directly
                 bundle = bundle_context
 
                 # Write primary resource
                 await bundle.add_resource(
-                    url=request.url,
-                    content_type=response.headers.get("content-type"),
-                    status_code=response.status_code,
+                    resource_name=request["url"],
+                    metadata={
+                        "url": request["url"],
+                        "content_type": response.headers.get("content-type"),
+                        "status_code": response.status_code,
+                    },
                     stream=cast("AsyncGenerator[bytes]", response.aiter_bytes()),
                 )
 
@@ -102,22 +108,30 @@ class StreamingHttpBundleLoader:
                         try:
                             related_response = await self.http_manager.request(
                                 self.http_config,
-                                ctx.app_config,  # type: ignore[arg-type]
+                                ctx.app_config,
                                 "GET",
                                 related_url,
                             )
                             await bundle.add_resource(
-                                url=related_url,
-                                content_type=related_response.headers.get(
-                                    "content-type"
-                                ),
-                                status_code=related_response.status_code,
+                                resource_name=related_url,
+                                metadata={
+                                    "url": related_url,
+                                    "content_type": related_response.headers.get(
+                                        "content-type"
+                                    ),
+                                    "status_code": related_response.status_code,
+                                },
                                 stream=cast(
                                     "AsyncGenerator[bytes]",
                                     related_response.aiter_bytes(),
                                 ),
                             )
-                            bundle_ref.resources_count += 1
+                            # Increment resources_count if tracked in meta
+                            try:
+                                current = int(bundle_ref.meta.get("resources_count", 0))
+                            except (TypeError, ValueError):
+                                current = 0
+                            bundle_ref.meta["resources_count"] = current + 1
                         except Exception as e:  # noqa: BLE001
                             bid_logger.warning(
                                 "ERROR_FETCHING_RELATED_RESOURCE",
@@ -125,12 +139,14 @@ class StreamingHttpBundleLoader:
                                 error=str(e),
                             )
                 bid_logger.debug(
-                    "SUCCESSFULLY_STREAMED_HTTP_RESPONSE_TO_STORAGE", url=request.url
+                    "SUCCESSFULLY_STREAMED_HTTP_RESPONSE_TO_STORAGE", url=request["url"]
                 )
 
         except Exception as e:
             logger.exception(
-                "ERROR_LOADING_HTTP_REQUEST", url=request.url, error=str(e)
+                "ERROR_LOADING_HTTP_REQUEST",
+                url=request.get("url", "unknown"),
+                error=str(e),
             )
             return []
         else:

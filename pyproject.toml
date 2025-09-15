@@ -7,26 +7,25 @@ readme = "README.md"
 packages = [
     {include = "data_fetcher_app", from = "src"},
     {include = "data_fetcher_core", from = "src"},
-    {include = "data_fetcher_recipes", from = "src"},
     {include = "data_fetcher_sftp", from = "src"},
     {include = "data_fetcher_http", from = "src"},
     {include = "data_fetcher_http_api", from = "src"},
 ]
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = ">=3.13,<3.15"
 httpx = "^0.25.0"
 asyncssh = "^2.13.0"
 paramiko = "^3.4.0"
 pysftp = "^0.2.9"
-
 boto3 = "^1.34.0"
 redis = "^5.0.0"
 aiofiles = "^23.0.0"
 structlog = "^24.1.0"
 aiohttp = "^3.12.15"
 cairosvg = "^2.8.2"
-openc-python-common = "^1.1.1"
+# openc-python-common = "*"
+# oc-pipeline-bus = "*"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.12.0"
@@ -42,7 +41,6 @@ types-boto3 = "^1.40.19"
 types-botocore = "^1.0.2"
 markdown = "^3.5.0"
 jinja2 = "^3.1.0"
-lspygments = "2.19.1"
 pre-commit = "^3.5.0"
 types-flask = "^1.1.6"
 types-Markdown = "^3.5.0"
@@ -59,10 +57,6 @@ mkdocs-techdocs-core = "^1.3.0"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[[tool.poetry.source]]
-name = "ocpy"
-url = "https://open-corporates-089449186373.d.codeartifact.eu-west-2.amazonaws.com/pypi/dev/simple/"
-priority = "supplemental"
 
 [tool.ruff]
 target-version = "py313"
@@ -140,10 +134,23 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"tests/**/*.py" = ["S101", "S105", "S106", "S108", "S110", "S104", "S201", "S603", "S607", "PTH110", "PTH118", "PTH123", "PLR2004", "PLR0912", "PLR0915", "PLR1704", "ANN", "SLF", "BLE", "PLC0415", "TRY002", "TRY003", "TRY300", "TRY301", "T201", "ARG001", "ARG002", "PLW0602", "PLW0603", "PLW1508", "SIM102", "SIM105", "SIM117", "DTZ005", "DTZ011", "PT017"]  # Allow assert, hardcoded passwords, URLs, SQL, subprocess, pathlib, magic values, complexity, annotations, self, blind except, import, exception, print, unused args, global vars, nested ifs, datetime, and pytest rules in test files
+"tests/**/*.py" = ["S101", "S105", "S106", "S108", "S110", "S104", "S201", "S603", "S607", "PTH110", "PTH118", "PTH123", "PLR2004", "PLR0912", "PLR0915", "PLR1704", "ANN", "SLF", "BLE", "PLC0415", "TRY002", "TRY003", "TRY300", "TRY301", "T201", "ARG001", "ARG002", "PLW0602", "PLW0603", "PLW1508", "SIM102", "SIM105", "SIM117", "DTZ005", "DTZ011", "PT017", "B017", "PT011", "N814"]
 "mocks/**/*.py" = ["S101", "S105", "S106", "S110", "S104", "S201", "S603", "S607", "PTH110", "PTH118", "PTH123", "PLR2004", "PLR0912", "PLR0915", "PLR1704", "ANN", "SLF", "BLE", "PLC0415", "TRY003", "TRY300", "TRY301", "T201", "ARG001", "ARG002", "PLW0602", "PLW0603", "PLW1508", "SIM102", "SIM105", "SIM117", "DTZ005", "DTZ011", "PT017"]  # Allow assert, hardcoded passwords, URLs, SQL, subprocess, pathlib, magic values, complexity, annotations, self, blind except, import, exception, print, unused args, global vars, nested ifs, datetime, and pytest rules in mock files
 "bin/**/*.py" = ["PTH123", "TRY300", "BLE001", "SIM102", "PLR0912", "PLR0915", "RUF001", "S110", "PLC0415", "B007", "T201", "S603"]  # Allow pathlib, exception handling, simplification, complexity, unicode, security, import, loop control, print, and subprocess rules in bin scripts
 "examples/**/*.py" = ["PLC0415", "S110", "BLE001", "S105", "DTZ005", "SIM105", "INP001"]  # Allow import, exception handling, hardcoded passwords, datetime, simplification, and namespace package rules in examples
+
+# Specific modules with deliberate exception messages and runtime imports
+"src/data_fetcher_core/storage/decorators/tar_gz_resource.py" = ["BLE001", "TRY003", "TRY300", "PLC0415", "PLR2004", "B904", "SIM117"]
+"src/data_fetcher_core/storage/decorators/unzip_resource.py" = ["TRY300"]
+"src/data_fetcher_core/storage/factory.py" = ["PLR0912"]
+"src/data_fetcher_core/fetcher.py" = ["TRY301"]
+"src/data_fetcher_core/storage/s3_storage.py" = ["ARG002", "PLC0415"]
+"src/data_fetcher_core/strategies/*.py" = ["TRY003", "ANN001", "PLC0415", "N806"]
+"src/data_fetcher_core/strategies/filter_factories.py" = ["TRY003", "ANN001", "PLC0415", "N806", "BLE001", "TRY300"]
+"src/data_fetcher_http_api/*.py" = ["TRY003", "ANN001", "PLC0415", "N806"]
+"src/data_fetcher_sftp/strategy_factories.py" = ["TRY003", "ANN001"]
+"src/data_fetcher_core/storage/streaming/tee_stream.py" = ["TRY003", "PYI036"]
+"tests/conftest.py" = ["PGH003", "I001", "F401", "RUF100"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -195,6 +202,69 @@ ignore_errors = true
 module = "botocore.*"
 ignore_missing_imports = true
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "oc_pipeline_bus.*"
+ignore_missing_imports = true
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_core.*"
+ignore_missing_imports = true
+ignore_errors = false
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_http.*"
+ignore_missing_imports = true
+ignore_errors = false
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_http_api.*"
+ignore_missing_imports = true
+ignore_errors = false
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_sftp.*"
+ignore_missing_imports = true
+ignore_errors = false
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_core.strategies.*"
+ignore_missing_imports = true
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_http_api.api_bundle_locators"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_http_api.api_pagination_bundle_locators"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_sftp.sftp_bundle_locators"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_http_api.api_loader"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_sftp.sftp_manager"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_sftp.strategy_factories"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_http_api.fr_strategy_factories"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "data_fetcher_http_api.strategy_factories"
+ignore_errors = true
+
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -116,3 +116,15 @@ class FatalError(DataFetcherError):
         """
         super().__init__(message, "FATAL_ERROR")
         self.component = component
+
+
+class BundleRefValidationError(ValidationError):
+    """Raised when BundleRef data validation fails."""
+
+    def __init__(self, message: str) -> None:
+        """Initialize the error with a specific message.
+
+        Args:
+            message: Description of the validation failure.
+        """
+        super().__init__(message, "bundle_ref")

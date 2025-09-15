@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # Mock SIREN API server for French configuration
+  siren-api:
+    build:
+      context: ../images/siren_api
+      dockerfile: Dockerfile
+    ports:
+      - "${SIREN_API_PORT:-5001}:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fr_network
+
+  # Note: LocalStack is managed by the test harness; not started here to avoid port conflicts
+
+networks:
+  fr_network:
+    driver: bridge

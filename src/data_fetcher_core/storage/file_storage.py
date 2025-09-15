@@ -17,7 +17,7 @@ import structlog
 from data_fetcher_core.storage.bundle_storage_context import BundleStorageContext
 
 if TYPE_CHECKING:
-    from data_fetcher_core.core import BundleRef, FetcherRecipe
+    from data_fetcher_core.core import BundleRef, DataRegistryFetcherConfig
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -38,7 +38,7 @@ class FileStorage:
 
     # New interface methods
     async def start_bundle(
-        self, bundle_ref: "BundleRef", recipe: "FetcherRecipe"
+        self, bundle_ref: "BundleRef", recipe: "DataRegistryFetcherConfig"
     ) -> "BundleStorageContext":
         """Initialize a new bundle and return a BundleStorageContext."""
         # Create file bundle
@@ -48,16 +48,15 @@ class FileStorage:
         # Create and return BundleStorageContext
         context = BundleStorageContext(bundle_ref, recipe, self)
         logger.debug(
-            "Bundle started", bid=str(bundle_ref.bid), recipe_id=recipe.recipe_id
+            "Bundle started", bid=str(bundle_ref.bid), config_id=recipe.config_id
         )
         return context
 
     async def _add_resource_to_bundle(
         self,
         bundle_ref: "BundleRef",
-        url: str,
-        content_type: str | None,
-        status_code: int,
+        resource_name: str,
+        metadata: dict[str, Any],
         stream: AsyncGenerator[bytes],
     ) -> None:
         """Internal method to add a resource to a bundle."""
@@ -66,12 +65,12 @@ class FileStorage:
             error_message = "Bundle not found"
             raise ValueError(error_message)
 
-        await bundle.write_resource(url, content_type, status_code, stream)
+        await bundle.write_resource(resource_name, metadata, stream)
 
     async def complete_bundle_with_callbacks_hook(
         self,
         bundle_ref: "BundleRef",
-        recipe: "FetcherRecipe",
+        recipe: "DataRegistryFetcherConfig",
         _metadata: dict[str, "Any"],
     ) -> None:
         """Complete bundle and execute all completion callbacks."""
@@ -82,7 +81,7 @@ class FileStorage:
         await self._execute_completion_callbacks(bundle_ref, recipe)
 
         logger.debug(
-            "Bundle completed", bid=str(bundle_ref.bid), recipe_id=recipe.recipe_id
+            "Bundle completed", bid=str(bundle_ref.bid), config_id=recipe.config_id
         )
 
     async def _finalize_bundle(
@@ -102,36 +101,37 @@ class FileStorage:
         del self._active_bundles[str(bundle_ref.bid)]
 
     async def _execute_completion_callbacks(
-        self, bundle_ref: "BundleRef", recipe: "FetcherRecipe"
+        self, bundle_ref: "BundleRef", recipe: "DataRegistryFetcherConfig"
     ) -> None:
         """Execute completion callbacks from recipe components."""
         # Execute loader completion callback
-        if hasattr(recipe.bundle_loader, "on_bundle_complete_hook"):
+        loader = recipe.loader
+        if loader is not None and getattr(loader, "on_bundle_complete_hook", None):
             try:
-                await recipe.bundle_loader.on_bundle_complete_hook(bundle_ref)
+                await loader.on_bundle_complete_hook(bundle_ref)
                 logger.debug(
                     "Loader completion callback executed",
                     bid=str(bundle_ref.bid),
-                    recipe_id=recipe.recipe_id,
-                    loader_type=type(recipe.bundle_loader).__name__,
+                    config_id=recipe.config_id,
+                    loader_type=type(recipe.loader).__name__,
                 )
             except Exception as e:
                 logger.exception(
                     "Error executing loader completion callback",
                     error=str(e),
                     bid=str(bundle_ref.bid),
-                    recipe_id=recipe.recipe_id,
+                    config_id=recipe.config_id,
                 )
 
         # Execute locator completion callbacks
-        for locator in recipe.bundle_locators:
-            if hasattr(locator, "on_bundle_complete_hook"):
+        for locator in recipe.locators:
+            if locator is not None and getattr(locator, "on_bundle_complete_hook", None):
                 try:
                     await locator.on_bundle_complete_hook(bundle_ref)
                     logger.debug(
                         "Locator completion callback executed",
                         bid=str(bundle_ref.bid),
-                        recipe_id=recipe.recipe_id,
+                        config_id=recipe.config_id,
                         locator_type=type(locator).__name__,
                     )
                 except Exception as e:
@@ -139,7 +139,7 @@ class FileStorage:
                         "Error executing locator completion callback",
                         error=str(e),
                         bid=str(bundle_ref.bid),
-                        recipe_id=recipe.recipe_id,
+                        config_id=recipe.config_id,
                     )
 
 
@@ -160,21 +160,20 @@ class FileStorageBundle:
     def _create_bundle_dir(self) -> str:
         """Create a directory for this bundle."""
         # Use BID for directory naming to enable time-based organization
-        # BID contains timestamp information from UUIDv7
+        # BID contains timestamp information for chronological sorting
         bundle_dir = str(Path(self.output_dir) / f"bundle_{self.bundle_ref.bid}")
         Path(bundle_dir).mkdir(parents=True, exist_ok=True)
         return bundle_dir
 
     async def write_resource(
         self,
-        url: str,
-        content_type: str | None,
-        status_code: int,
+        resource_name: str,
+        metadata: dict[str, Any],
         stream: AsyncGenerator[bytes],
     ) -> None:
         """Write a resource to the bundle."""
-        # Create a safe filename from the URL
-        filename = self._safe_filename(url)
+        # Create a safe filename from the resource name
+        filename = self._safe_filename(resource_name)
         filepath = str(Path(self.bundle_dir) / filename)
 
         # Write the file
@@ -184,15 +183,15 @@ class FileStorageBundle:
 
         # Create metadata file
         meta_filepath = f"{filepath}.meta"
-        metadata = {
-            "url": url,
-            "content_type": content_type,
-            "status_code": status_code,
+        # Merge provided metadata with file size
+        file_metadata = {
+            "resource_name": resource_name,
             "size": Path(filepath).stat().st_size,
+            **metadata,  # Include all provided metadata
         }
 
         async with aiofiles_module.open(meta_filepath, "w") as f:
-            await f.write(str(metadata))
+            await f.write(str(file_metadata))
 
     def _safe_filename(self, url: str) -> str:
         """Create a safe filename from a URL."""
@@ -223,8 +222,8 @@ class FileStorageBundle:
         meta_filepath = str(Path(self.bundle_dir) / "bundle.meta")
         metadata = {
             "bid": str(self.bundle_ref.bid),
-            "primary_url": self.bundle_ref.primary_url,
-            "resources_count": self.bundle_ref.resources_count,
+            "primary_url": self.bundle_ref.meta.get("primary_url"),
+            "resources_count": self.bundle_ref.meta.get("resources_count"),
             "storage_key": self.bundle_dir,
             "meta": self.bundle_ref.meta,
         }

@@ -9,7 +9,7 @@ from typing import Any
 
 from data_fetcher_core.kv_store import KeyValueStore
 from data_fetcher_core.kv_store.factory import create_kv_store
-from data_fetcher_core.protocol_config import HttpProtocolConfig
+from data_fetcher_http.http_config import HttpProtocolConfig
 from data_fetcher_http_api.api_bundle_locators import (
     PaginationHttpBundleLocator,
     SingleHttpBundleLocator,

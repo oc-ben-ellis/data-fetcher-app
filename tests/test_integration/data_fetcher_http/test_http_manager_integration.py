@@ -116,8 +116,18 @@ class TestHttpIntegration:
         # Make a real HTTP request
         response = await manager.request(mock_config, mock_app_config, "GET", url)
 
+        # Validate response
         assert response.status_code == 200
         assert "Test Server" in response.text
+        
+        # Validate response headers and structure
+        assert response.headers is not None
+        assert 'content-type' in response.headers or 'Content-Type' in response.headers
+        
+        # Validate that the response contains expected HTML structure
+        assert "<html>" in response.text
+        assert "<body>" in response.text
+        assert "<h1>" in response.text
 
 
 # Mark tests that require Docker/containers

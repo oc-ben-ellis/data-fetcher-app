@@ -14,7 +14,8 @@ import structlog
 
 from data_fetcher_core.core import BundleRef, FetchRunContext, RequestMeta
 from data_fetcher_core.kv_store import KeyValueStore
-from data_fetcher_core.protocol_config import HttpProtocolConfig
+from data_fetcher_http.http_config import HttpProtocolConfig
+from data_fetcher_http.http_manager import HttpManager
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -38,6 +39,7 @@ class NoKeyValueStoreError(ValueError):
 class PaginationHttpBundleLocator:
     """Generic API bundle locator with pagination support."""
 
+    http_manager: HttpManager
     http_config: HttpProtocolConfig
     store: KeyValueStore
     base_url: str
@@ -132,9 +134,9 @@ class PaginationHttpBundleLocator:
             raise NoKeyValueStoreError
         store = self.store
 
-        result_key = f"{self.state_management_prefix}:results:{self.base_url}:{hash(request.url)}"
+        result_key = f"{self.state_management_prefix}:results:{self.base_url}:{hash(request['url'])}"
         result_data = {
-            "url": request.url,
+            "url": request["url"],
             "timestamp": datetime.now(UTC).isoformat(),
             "success": success,
             "bundle_count": len(bundle_refs),
@@ -153,29 +155,28 @@ class PaginationHttpBundleLocator:
             raise NoKeyValueStoreError
         store = self.store
 
-        error_key = (
-            f"{self.state_management_prefix}:errors:{self.base_url}:{hash(request.url)}"
-        )
+        error_key = f"{self.state_management_prefix}:errors:{self.base_url}:{hash(request['url'])}"
         error_data = {
-            "url": request.url,
+            "url": request["url"],
             "error": error,
             "timestamp": datetime.now(UTC).isoformat(),
             "retry_count": 0,
         }
         await store.put(error_key, error_data, ttl=timedelta(hours=24))
 
-    async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
+    async def get_next_bundle_refs(
+        self, ctx: FetchRunContext, bundle_refs_needed: int
+    ) -> list[RequestMeta]:
         """Get the next batch of API URLs to process."""
         if not self._initialized:
             await self._load_persistence_state(ctx)
             await self._initialize()
 
         urls: list[RequestMeta] = []
-        BATCH_SIZE = 5  # noqa: N806
-        while self._url_queue and len(urls) < BATCH_SIZE:  # Batch size
+        while self._url_queue and len(urls) < bundle_refs_needed:
             url = self._url_queue.pop(0)
             if url not in self._processed_urls:
-                urls.append(RequestMeta(url=url, headers=self.headers or {}))
+                urls.append({"url": url, "headers": self.headers or {}})
                 self._processed_urls.add(url)
 
         # Save state after generating URLs
@@ -187,7 +188,7 @@ class PaginationHttpBundleLocator:
     ) -> None:
         """Handle when a URL has been processed and potentially generate next URLs."""
         # Mark as processed
-        self._processed_urls.add(request.url)
+        self._processed_urls.add(request["url"])
 
         # Save processing result
         await self._save_processing_result(request, bundle_refs, ctx, success=True)
@@ -382,15 +383,16 @@ class SingleHttpBundleLocator:
         }
         await store.put(result_key, result_data, ttl=timedelta(days=30))
 
-    async def get_next_urls(self, ctx: FetchRunContext) -> list[RequestMeta]:
+    async def get_next_bundle_refs(
+        self, ctx: FetchRunContext, bundle_refs_needed: int
+    ) -> list[RequestMeta]:
         """Get the next batch of API URLs to process."""
         # Load persistence state on first call
         if not self._processed_urls:
             await self._load_persistence_state(ctx)
 
         urls: list[RequestMeta] = []
-        BATCH_SIZE = 10  # noqa: N806
-        while self._url_queue and len(urls) < BATCH_SIZE:  # Batch size
+        while self._url_queue and len(urls) < bundle_refs_needed:
             url = self._url_queue.pop(0)
             if url not in self._processed_urls:
                 urls.append(RequestMeta(url=url, headers=self.headers or {}))

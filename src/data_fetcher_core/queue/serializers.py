@@ -59,8 +59,8 @@ class RequestMetaSerializer(JSONSerializer):
         Returns:
             JSON string representation of the RequestMeta.
         """
-        if hasattr(obj, "__dict__"):
-            return json.dumps(obj.__dict__, default=str)
+        if isinstance(obj, dict):
+            return json.dumps(obj, default=str)
         return super().dumps(obj)
 
     def loads(self, data: str) -> RequestMeta:
@@ -74,13 +74,13 @@ class RequestMetaSerializer(JSONSerializer):
         """
         data_dict = json.loads(data)
 
-        # Reconstruct RequestMeta object
-        return RequestMeta(
-            url=str(URL(data_dict["url"])),
-            depth=data_dict.get("depth", 0),
-            referer=str(URL(data_dict["referer"]))
+        # Reconstruct RequestMeta dict
+        return {
+            "url": str(URL(data_dict["url"])),
+            "depth": data_dict.get("depth", 0),
+            "referer": str(URL(data_dict["referer"]))
             if data_dict.get("referer")
             else None,
-            headers=data_dict.get("headers", {}),
-            flags=data_dict.get("flags", {}),
-        )
+            "headers": data_dict.get("headers", {}),
+            "flags": data_dict.get("flags", {}),
+        }

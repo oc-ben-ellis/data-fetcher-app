@@ -12,11 +12,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 
-from data_fetcher_core.protocol_config import HttpProtocolConfig
-from data_fetcher_core.utils.retry import create_retry_engine
+from data_fetcher_core.retry import create_retry_engine
+from data_fetcher_http.http_config import HttpProtocolConfig
 
 if TYPE_CHECKING:
-    from data_fetcher_core.config_factory import FetcherConfig
+    from data_fetcher_app.app_config import FetcherConfig
 
 
 @dataclass

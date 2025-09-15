@@ -2,7 +2,8 @@
 
 import pytest
 
-from data_fetcher_core.utils.retry import (
+# Project has unified retry in data_fetcher_core.retry module; import accordingly
+from data_fetcher_core.retry import (
     RetryConfig,
     RetryEngine,
     async_retry_with_backoff,

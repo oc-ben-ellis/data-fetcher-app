@@ -9,12 +9,13 @@ import structlog
 
 from data_fetcher_core.core import (
     BundleRef,
-    FetcherRecipe,
+    DataRegistryFetcherConfig,
     FetchRunContext,
     RequestMeta,
 )
-from data_fetcher_core.protocol_config import SftpProtocolConfig
+from data_fetcher_sftp.sftp_config import SftpProtocolConfig
 from data_fetcher_sftp.sftp_manager import SftpManager
+from data_fetcher_core.strategy_types import LoaderStrategy
 
 
 class StorageRequiredError(Exception):
@@ -31,10 +32,10 @@ def _raise_storage_required() -> None:
 
 
 if TYPE_CHECKING:
-    from data_fetcher_core.storage import FileStorage, PipelineStorage
+    from data_fetcher_core.storage import DataPipelineBusStorage, FileStorage, S3Storage
 
 # Type alias for storage classes
-Storage = Union["FileStorage", "PipelineStorage"]
+Storage = Union["FileStorage", "S3Storage", "DataPipelineBusStorage"]
 
 
 class ReadableFile(Protocol):
@@ -55,9 +56,10 @@ logger = structlog.get_logger(__name__)
 
 
 @dataclass
-class SftpBundleLoader:
+class SftpBundleLoader(LoaderStrategy):
     """SFTP loader with AWS integration and file pattern support."""
 
+    sftp_manager: SftpManager
     sftp_config: SftpProtocolConfig
     remote_dir: str = "/"
     filename_pattern: str = "*"
@@ -68,7 +70,7 @@ class SftpBundleLoader:
         request: RequestMeta,
         storage: Storage,
         ctx: FetchRunContext,
-        recipe: FetcherRecipe,
+        recipe: DataRegistryFetcherConfig,
     ) -> list[BundleRef]:
         """Load data from SFTP endpoint.
 
@@ -82,11 +84,8 @@ class SftpBundleLoader:
             List of bundle references
         """
         try:
-            # Get SFTP manager
-            sftp_manager = SftpManager()
-
             # List files in remote directory
-            remote_path = request.url.replace("sftp://", "")
+            remote_path = str(request.get("url", "")).replace("sftp://", "")
             # If the path doesn't start with /, it's relative to the home directory
             # Don't prefix with remote_dir for relative paths
 
@@ -117,7 +116,7 @@ class SftpBundleLoader:
         except Exception as e:
             logger.exception(
                 "ERROR_LOADING_SFTP_REQUEST",
-                url=request.url,
+                url=request.get("url", "unknown"),
                 error=str(e),
             )
             return []
@@ -129,7 +128,7 @@ class SftpBundleLoader:
         remote_path: str,
         storage: Storage,
         _ctx: FetchRunContext,
-        recipe: FetcherRecipe,
+        recipe: DataRegistryFetcherConfig,
     ) -> list[BundleRef]:
         """Load a single file from SFTP."""
         try:
@@ -167,9 +166,12 @@ class SftpBundleLoader:
                     sftp_config, _ctx, remote_path, "rb"
                 ) as remote_file:
                     await bundle_context.add_resource(
-                        url=f"sftp://{self.remote_dir}/{remote_path}",
-                        content_type="application/octet-stream",
-                        status_code=200,
+                        resource_name=remote_path,  # Use the file path as resource name
+                        metadata={
+                            "url": f"sftp://{self.remote_dir}/{remote_path}",
+                            "content_type": "application/octet-stream",
+                            "status_code": 200,
+                        },
                         stream=self._stream_from_file(remote_file),
                     )
 
@@ -204,7 +206,7 @@ class SftpBundleLoader:
         remote_path: str,
         storage: Storage,
         ctx: FetchRunContext,
-        recipe: FetcherRecipe,
+        recipe: DataRegistryFetcherConfig,
     ) -> list[BundleRef]:
         """Load all files in a directory from SFTP."""
         bundle_refs = []

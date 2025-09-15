@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
-    from data_fetcher_core.core import BundleRef, FetcherRecipe
+    from data_fetcher_core.core import BundleRef, DataRegistryFetcherConfig
     from data_fetcher_core.storage import Storage
 
 # Get logger for this module
@@ -27,7 +27,10 @@ class BundleStorageContext:
     """
 
     def __init__(
-        self, bundle_ref: "BundleRef", recipe: "FetcherRecipe", storage: "Storage"
+        self,
+        bundle_ref: "BundleRef",
+        recipe: "DataRegistryFetcherConfig",
+        storage: "Storage",
     ) -> None:
         """Initialize the bundle storage context.
 
@@ -49,24 +52,22 @@ class BundleStorageContext:
 
     async def add_resource(
         self,
-        url: str,
-        content_type: str | None,
-        status_code: int,
+        resource_name: str,
+        metadata: dict[str, Any],
         stream: AsyncGenerator[bytes],
     ) -> None:
         """Add a resource to the bundle.
 
         Args:
-            url: The URL of the resource being added.
-            content_type: The content type of the resource.
-            status_code: The HTTP status code of the resource.
+            resource_name: The name of the resource (e.g., filename, or "original.tar.gz/path/to/file.csv").
+            metadata: Dictionary containing metadata about the resource (url, content_type, status_code, etc.).
             stream: Async generator yielding the resource content.
 
         Raises:
             ValueError: If the bundle is not found in storage.
             Exception: If the resource upload fails.
         """
-        upload_id = f"{url}_{id(stream)}"  # Unique identifier for this upload
+        upload_id = f"{resource_name}_{id(stream)}"  # Unique identifier for this upload
 
         async with self._upload_lock:
             self._pending_uploads.add(upload_id)
@@ -77,7 +78,7 @@ class BundleStorageContext:
         try:
             # Delegate to storage implementation
             await self.storage._add_resource_to_bundle(  # type: ignore[attr-defined]  # noqa: SLF001
-                self.bundle_ref, url, content_type, status_code, stream
+                self.bundle_ref, resource_name, metadata, stream
             )
 
             # Mark upload as completed

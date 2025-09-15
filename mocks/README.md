@@ -15,12 +15,14 @@ The mocks directory serves as a centralized location for:
 
 ```
 mocks/
-├── images/           # Docker images for mock services
-│   ├── api_fr_siren/     # French SIREN API mock
-│   └── us_fl_sftp/       # US Florida SFTP mock
-├── environments/     # Complete test environments
-│   ├── fr/               # French SIREN API test environment
-│   └── us_fl/            # US Florida SFTP test environment
+├── fr/               # French SIREN API test environment
+│   ├── environment/      # Complete test environment
+│   └── images/          # Docker images for mock services
+│       └── siren_api/   # French SIREN API mock
+├── us_fl/            # US Florida SFTP test environment
+│   ├── environment/      # Complete test environment
+│   └── images/          # Docker images for mock services
+│       └── sftp/        # US Florida SFTP mock
 └── README.md         # This file
 ```
 
@@ -32,12 +34,12 @@ For end-to-end testing, use the complete test environments:
 
 ```bash
 # French SIREN API environment
-cd mocks/environments/fr
+cd mocks/fr/environment
 docker-compose up -d
 ./setup-mock-data.sh
 
 # US Florida SFTP environment
-cd mocks/environments/us_fl
+cd mocks/us_fl/environment
 docker-compose up -d
 ./setup-mock-data.sh
 ```
@@ -56,12 +58,12 @@ For development or custom testing:
 
 ```bash
 # Build and run French SIREN API mock
-cd mocks/images/api_fr_siren
+cd mocks/fr/images/siren_api
 docker build -t siren_api_mock .
 docker run -p 5000:5000 siren_api_mock
 
 # Build and run US Florida SFTP mock
-cd mocks/images/us_fl_sftp
+cd mocks/us_fl/images/sftp
 docker build -t us_fl_sftp_mock .
 docker run -p 2222:22 us_fl_sftp_mock
 ```
@@ -84,16 +86,16 @@ docker run -p 2222:22 us_fl_sftp_mock
 
 ## Mock Images
 
-### French SIREN API (`images/api_fr_siren/`)
+### French SIREN API (`fr/images/siren_api/`)
 - **Type**: Flask web application
 - **Endpoints**: OAuth token, SIREN data, health check
-- **Documentation**: [images/api_fr_siren/README.md](images/api_fr_siren/README.md)
+- **Documentation**: [fr/images/siren_api/README.md](fr/images/siren_api/README.md)
 
-### US Florida SFTP (`images/us_fl_sftp/`)
+### US Florida SFTP (`us_fl/images/sftp/`)
 - **Type**: SFTP server with mock data
 - **Credentials**: testuser/testpass
 - **Data**: Daily and quarterly corporate files
-- **Documentation**: [images/us_fl_sftp/README.md](images/us_fl_sftp/README.md)
+- **Documentation**: [us_fl/images/sftp/README.md](us_fl/images/sftp/README.md)
 
 ## Integration with Tests
 
@@ -116,9 +118,9 @@ Mock services are integrated with the test suite through:
 
 When adding new mock services:
 
-1. Create the mock image in `images/[service_name]/`
+1. Create the mock image in `[service_name]/images/[mock_name]/`
 2. Include Dockerfile, mock data, and README.md
-3. Create a test environment in `environments/[service_name]/`
+3. Create a test environment in `[service_name]/environment/`
 4. Include docker-compose.yml and README.md
 5. Update this README.md with the new service information
 

@@ -15,12 +15,12 @@ from typing import TYPE_CHECKING, Any, cast
 import pysftp
 import structlog
 
-from data_fetcher_core.protocol_config import SftpProtocolConfig
-from data_fetcher_core.utils.retry import create_retry_engine
+from data_fetcher_core.retry import create_retry_engine
+from data_fetcher_sftp.sftp_config import SftpProtocolConfig
 from data_fetcher_sftp.sftp_credentials import SftpCredentialsWrapper
 
 if TYPE_CHECKING:
-    from data_fetcher_core.config_factory import FetcherConfig
+    from data_fetcher_app.app_config import FetcherConfig
     from data_fetcher_core.core import FetchRunContext
 
 # Get logger for this module
