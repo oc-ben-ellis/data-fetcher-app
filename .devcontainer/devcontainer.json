@@ -19,11 +19,15 @@
     "source=${localWorkspaceFolder},target=/code,type=bind,consistency=cached",
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
     "source=${env:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
-    "source=${env:XDG_RUNTIME_DIR}/gnupg/S.gpg-agent,target=/gnupg/S.gpg-agent,type=bind,consistency=cached",
+    "source=${env:HOME}/.gnupg,target=/home/appuser/.gnupg,type=bind,consistency=cached",
+    "source=${env:XDG_RUNTIME_DIR}/gnupg/S.gpg-agent,target=/gnupg/S.gpg-agent,type=bind,consistency=cached",      "source=${env:XDG_RUNTIME_DIR}/gnupg,target=/home/appuser/.gnupg-runtime,type=bind,consistency=cached",
     "source=${env:HOME}/.gitconfig,target=/home/appuser/.gitconfig,type=bind,readonly,consistency=cached"
+
   ],
   "containerEnv": {
     "SSH_AUTH_SOCK": "/ssh-agent",
-    "GPG_AGENT_INFO": "/gnupg/S.gpg-agent:0:1"
-  }
+    "GPG_TTY": "/dev/tty",
+    "GNUPGHOME": "/home/appuser/.gnupg"
+  },
+  "postCreateCommand": "mkdir -p /home/appuser/.gnupg && echo 'pinentry-mode loopback' >> /home/appuser/.gnupg/gpg.conf && echo 'allow-loopback-pinentry' >> /home/appuser/.gnupg/gpg-agent.conf && gpgconf --kill gpg-agent || true"
 }

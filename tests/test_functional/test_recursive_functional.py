@@ -15,7 +15,7 @@ DATA_REGISTRY_IDS = [
 
 
 FETCHER_DIR = Path(__file__).resolve().parents[2]
-PROJECT_ROOT = FETCHER_DIR.parents[2]
+PROJECT_ROOT = FETCHER_DIR.parents[1]
 MOCKS_DIR = FETCHER_DIR / "mocks"
 
 
@@ -39,7 +39,7 @@ def _aws_client(service: str, endpoint_url: str):
 
 @pytest.fixture(scope="session")
 def localstack_session() -> dict[str, str]:
-    up_script = FETCHER_DIR / "bin" / "test-env-up.sh"
+    up_script = PROJECT_ROOT / "bin" / "test-env-up.sh"
     if not up_script.exists():
         pytest.skip("test-env-up.sh not found")
 
@@ -353,12 +353,16 @@ def _run_app_container(
         "DATA_FETCHER_APP_STEP=fetcher",
         "-e",
         "DATA_FETCHER_APP_CONFIG_DIR=/tmp/config",
+        # Ensure KV store is configured for Redis and reachable from container
+        "-e",
+        "DATA_FETCHER_APP_KVSTORE=memory",
         "-e",
         "PYTHONPATH=/code/src",
+        # Back-compat vars used by some components
         "-e",
-        f"OC_KV_STORE_REDIS_HOST={extra_env.get('redis_host', 'host.docker.internal')}",
+        "OC_KVSTORE_TYPE=memory",
         "-e",
-        f"OC_KV_STORE_REDIS_PORT={extra_env.get('redis_port', '6379')}",
+        "OC_KV_STORE_REDIS_PORT=6379",
         "app-container",
         "poetry",
         "run",
@@ -402,6 +406,11 @@ def test_recursive_functional(registry_env, _case):
             "OC_DATA_PIPELINE_CONFIG_S3_BUCKET": bucket,
             "PYTHONUNBUFFERED": "1",
         }
+        # Include redis connection details for app-container
+        if registry_env.get("redis_host"):
+            base_env["redis_host"] = registry_env["redis_host"]
+        if registry_env.get("redis_port"):
+            base_env["redis_port"] = str(registry_env["redis_port"])
 
         # Prepare
         _run_python(case_dir / "prepare.py", base_env)
