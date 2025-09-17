@@ -1,37 +1,29 @@
 {
-  "name": "oc-data-pipeline-dev",
+  "name": "fetcher-devcontainer",
   "build": {
     "dockerfile": "Dockerfile",
-    "context": "..",
-    "args": {
-      "BASE_IMAGE": "ubuntu:22.04",
-      "USER_UID": "${localEnv:UID}",
-      "USER_GID": "${localEnv:GID}"
-    }
+    "context": ".."
   },
-  "workspaceFolder": "/workspace",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
-  "remoteUser": "vscode",
+  "workspaceFolder": "/code",
+  "remoteUser": "appuser",
+  "updateRemoteUserUID": true,
+  "overrideCommand": true,
   "runArgs": [
     "--init",
     "--privileged=false",
     "--cap-drop=ALL",
-    "--security-opt", "label=disable"
+    "--security-opt",
+    "label=disable"
   ],
   "mounts": [
+    "source=${localWorkspaceFolder},target=/code,type=bind,consistency=cached",
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
     "source=${env:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
-    "source=${env:XDG_RUNTIME_DIR}/gnupg/S.gpg-agent,target=/gnupg/S.gpg-agent,type=bind,consistency=cached"
+    "source=${env:XDG_RUNTIME_DIR}/gnupg/S.gpg-agent,target=/gnupg/S.gpg-agent,type=bind,consistency=cached",
+    "source=${env:HOME}/.gitconfig,target=/home/appuser/.gitconfig,type=bind,readonly,consistency=cached"
   ],
   "containerEnv": {
     "SSH_AUTH_SOCK": "/ssh-agent",
-    "GPG_AGENT_INFO": "/gnupg/S.gpg-agent:0:1",
-    "GPG_TTY": "/dev/tty"
-  },
-  "features": {},
-  "overrideCommand": true,
-  "postCreateCommand": "bash -lc 'python3 --version && poetry --version && aws --version'"
+    "GPG_AGENT_INFO": "/gnupg/S.gpg-agent:0:1"
+  }
 }
-
-
-

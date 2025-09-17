@@ -161,7 +161,7 @@ class HttpBundleLoader:
         else:
             return BundleLoadResult(
                 bundle=bundle,
-                 bundle_meta=bundle_meta,
+                bundle_meta=bundle_meta,
                 resources=[
                     {
                         "url": url,

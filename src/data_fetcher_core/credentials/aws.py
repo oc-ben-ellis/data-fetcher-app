@@ -59,13 +59,11 @@ class AWSSecretsCredentialProvider:
 
         def _raise_key_not_found() -> None:
             """Raise error when key is not found in secret."""
-            raise ValueError(  # noqa: TRY003
-                f"Key '{config_key}' not found in secret '{secret_name}'"
-            )
+            raise ValueError(f"Key '{config_key}' not found in secret '{secret_name}'")
 
         def _raise_invalid_type() -> None:
             """Raise error when credential value is not a string."""
-            raise TypeError(  # noqa: TRY003
+            raise TypeError(
                 f"Credential value for key '{config_key}' is not a string: {type(credential_value)}"
             )
 

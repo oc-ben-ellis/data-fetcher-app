@@ -150,7 +150,9 @@ class SftpBundleLoader(LoaderStrategy):
                 "resources_count": 1,
                 "size": stat.st_size,
                 "modified": stat.st_mtime,
-                "permissions": (oct(stat.st_mode) if stat.st_mode is not None else None),
+                "permissions": (
+                    oct(stat.st_mode) if stat.st_mode is not None else None
+                ),
             }
 
             # Create logger with BID context for tracing

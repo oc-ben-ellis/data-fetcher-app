@@ -8,14 +8,17 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Mapping
 from types import MappingProxyType
-
-from oc_pipeline_bus.config import Annotated
-
-from data_fetcher_core.strategy_types import LoaderStrategy, LocatorStrategy
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    # Imports used only for type checking to avoid runtime import side effects
+    from collections.abc import Mapping  # noqa: I001
+    from oc_pipeline_bus.config import Annotated, strategy
+    from data_fetcher_core.strategy_types import (
+        LoaderStrategy,
+        LocatorStrategy,
+    )
     from data_fetcher_core.core_config.config_factory import FetcherConfig
 
 # Import pipeline-bus config types
@@ -33,12 +36,12 @@ class BundleRef:
     """
 
     bid: Bid
-    request_meta: "RequestMeta"
+    request_meta: RequestMeta
 
     def __init__(
         self,
         bid: Bid | str | None = None,
-        request_meta: "RequestMeta | None" = None,
+        request_meta: RequestMeta | None = None,
         **kwargs: object,
     ) -> None:
         # Enforce that bid is provided
@@ -85,7 +88,9 @@ class BundleRef:
         elif "meta" in data:
             meta = data["meta"]
         else:
-            error_message = "BundleRef data must contain 'request_meta' (or legacy 'meta') field"
+            error_message = (
+                "BundleRef data must contain 'request_meta' (or legacy 'meta') field"
+            )
             raise BundleRefValidationError(error_message)
         if not isinstance(meta, dict):
             error_message = "request_meta must be a dictionary"
@@ -164,14 +169,13 @@ class ProtocolConfig(ABC):
 class DataRegistryFetcherConfig:
     """YAML-based fetcher configuration using strategy factory registry."""
 
-    loader: Annotated[LoaderStrategy, "strategy"]
-    locators: list[Annotated[LocatorStrategy, "strategy"]]
+    loader: Annotated[LoaderStrategy, strategy]
+    locators: list[Annotated[LocatorStrategy, strategy]]
     concurrency: int = 10
     target_queue_size: int = 100
     # Optional fields for backward compatibility with storage hooks
     config_id: str = ""
     # Protocol configurations for resolving relative configs
-    # protocols: dict[str, dict[str, str]] = field(default_factory=dict)
 
 
 @dataclass

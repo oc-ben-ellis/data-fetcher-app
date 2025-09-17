@@ -8,16 +8,20 @@ services:
         BASE_IMAGE: alpine:3.22
         USER_UID: ${UID:-1000}
         USER_GID: ${GID:-1000}
+    init: true
+    privileged: false
+    cap_drop:
+      - ALL
+    security_opt:
+      - label=disable
     volumes:
-      - .:/workspace
+      - .:/code
       - ./.devcontainer/wheels:/tmp/wheels:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - ${SSH_AUTH_SOCK}:/ssh-agent
       - ${XDG_RUNTIME_DIR}/gnupg/S.gpg-agent:/gnupg/S.gpg-agent
-      - ${HOME}/.aws:/home/vscode/.aws:ro
-      - ${HOME}/.ssh:/home/vscode/.ssh:ro
-      - ${HOME}/.gnupg:/home/vscode/.gnupg:ro
-    working_dir: /workspace
+      - ${HOME}/.gitconfig:/home/appuser/.gitconfig:ro
+    working_dir: /code
     command: ["sleep", "infinity"]
     restart: unless-stopped
     environment:
@@ -25,8 +29,7 @@ services:
       - BUILDKIT_PROGRESS=plain
       - SSH_AUTH_SOCK=/ssh-agent
       - GPG_AGENT_INFO=/gnupg/S.gpg-agent:0:1
-      - GPG_TTY=/dev/tty
-    user: vscode
+    user: appuser
     networks:
       - build-network
     extra_hosts:

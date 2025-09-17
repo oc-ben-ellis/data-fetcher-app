@@ -39,7 +39,7 @@ def _aws_client(service: str, endpoint_url: str):
 
 @pytest.fixture(scope="session")
 def localstack_session() -> dict[str, str]:
-    up_script = FETCHER_DIR / "scripts" / "test-env-up.sh"
+    up_script = FETCHER_DIR / "bin" / "test-env-up.sh"
     if not up_script.exists():
         pytest.skip("test-env-up.sh not found")
 
@@ -87,6 +87,18 @@ def localstack_session() -> dict[str, str]:
             params["CreateBucketConfiguration"] = {"LocationConstraint": region}
         s3.create_bucket(**params)
 
+    # Ensure storage bucket exists
+    storage_bucket = "oc-local-data-pipeline"
+    try:
+        existing = [b["Name"] for b in s3.list_buckets().get("Buckets", [])]
+    except Exception:
+        existing = []
+    if storage_bucket not in existing:
+        params = {"Bucket": storage_bucket}
+        if region != "us-east-1":
+            params["CreateBucketConfiguration"] = {"LocationConstraint": region}
+        s3.create_bucket(**params)
+
     # Read fetcher service terraform outputs for redis host/port
     tf_dir = FETCHER_DIR / "infra" / "terraform"
     redis_host = "localhost"
@@ -114,6 +126,7 @@ def localstack_session() -> dict[str, str]:
     return {
         "endpoint": endpoint,
         "bucket": bucket,
+        "storage_bucket": "oc-local-data-pipeline",
         "redis_host": redis_host,
         "redis_port": redis_port,
     }
@@ -121,7 +134,9 @@ def localstack_session() -> dict[str, str]:
     # No explicit teardown here; container will be stopped externally if needed
 
 
-def _upload_configs_to_s3(registry_id: str, bucket: str, endpoint: str) -> str:
+def _upload_configs_to_s3(
+    registry_id: str, bucket: str, endpoint: str, step: str
+) -> str:
     s3 = _aws_client("s3", endpoint)
     config_root = MOCKS_DIR / registry_id / "config"
     if not config_root.exists():
@@ -140,10 +155,10 @@ def _upload_configs_to_s3(registry_id: str, bucket: str, endpoint: str) -> str:
         for name in files:
             local_path = Path(root) / name
             rel = local_path.relative_to(config_root)
-            # Expected S3 layout: configs/<registry_id>/raw/...
-            key = f"configs/{registry_id}/raw/{rel.as_posix()}"
+            # Upload under step prefix used by app (e.g., fetcher)
+            key = f"configs/{registry_id}/{step}/{rel.as_posix()}"
             s3.upload_file(str(local_path), bucket, key)
-    return f"s3://{bucket}/configs/{registry_id}/raw/"
+    return f"s3://{bucket}/configs/{registry_id}/{step}/"
 
 
 def _remove_configs_from_s3(registry_id: str, bucket: str, endpoint: str) -> None:
@@ -178,6 +193,41 @@ def _purge_all_test_queues(endpoint: str) -> None:
             pass
 
 
+def _clear_bucket(bucket: str, endpoint: str, prefix: str = "") -> None:
+    s3 = _aws_client("s3", endpoint)
+    list_kwargs = {"Bucket": bucket}
+    if prefix:
+        list_kwargs["Prefix"] = prefix
+    resp = s3.list_objects_v2(**list_kwargs)
+    while True:
+        contents = resp.get("Contents", [])
+        if contents:
+            s3.delete_objects(
+                Bucket=bucket,
+                Delete={"Objects": [{"Key": o["Key"]} for o in contents]},
+            )
+        if resp.get("IsTruncated"):
+            resp = s3.list_objects_v2(
+                **{
+                    **list_kwargs,
+                    "ContinuationToken": resp["NextContinuationToken"],
+                }
+            )
+        else:
+            break
+
+
+def _flush_redis(host: str, port: str | int) -> None:
+    try:
+        import redis  # type: ignore[import-not-found]
+
+        client = redis.Redis(host=host, port=int(port), db=0, socket_connect_timeout=1)
+        client.flushall()
+    except Exception:
+        # Best-effort; ignore if redis not reachable or library missing
+        pass
+
+
 def _clear_config_bucket(bucket: str, endpoint: str) -> None:
     # Best-effort: remove any non-registry prefixes created during tests
     s3 = _aws_client("s3", endpoint)
@@ -194,9 +244,10 @@ def registry_env(request, localstack_session):
     registry_id = request.param
     endpoint = localstack_session["endpoint"]
     bucket = localstack_session["bucket"]
+    step = "fetcher"
 
     # Upload registry configs to S3
-    _upload_configs_to_s3(registry_id, bucket, endpoint)
+    _upload_configs_to_s3(registry_id, bucket, endpoint, step)
 
     # Bring up mocks for this registry (LocalStack is not managed here)
     env_dir = MOCKS_DIR / registry_id / "environment"
@@ -230,6 +281,7 @@ def registry_env(request, localstack_session):
         "env_dir": str(env_dir) if env_dir.exists() else "",
         "redis_host": localstack_session.get("redis_host", "localhost"),
         "redis_port": localstack_session.get("redis_port", "6379"),
+        "step": step,
     }
 
     # Tear down registry-specific environment
@@ -267,57 +319,54 @@ def _run_python(path: Path, env: dict[str, str]) -> None:
 def _run_app_container(
     registry_id: str, endpoint: str, bucket: str, extra_env: dict[str, str]
 ) -> None:
-    # Run the fetcher on the host via Poetry to avoid container path dependency issues
+    # Run the fetcher via docker compose app-container to mimic production
+    # Derive LocalStack port
+    try:
+        port = endpoint.rsplit(":", 1)[1]
+        if "/" in port:
+            port = port.split("/")[0]
+    except Exception:
+        port = "4566"
+
+    compose_cmd = (
+        ["docker", "compose"] if shutil.which("docker") else ["docker-compose"]
+    )
     cmd = [
+        *compose_cmd,
+        "run",
+        "--rm",
+        "-e",
+        f"CONFIG_TEST_ENV_LOCALSTACK_PORT={port}",
+        "-e",
+        f"OC_DATA_PIPELINE_CONFIG_S3_BUCKET={bucket}",
+        "-e",
+        f"OC_DATA_PIPELINE_DATA_REGISTRY_ID={registry_id}",
+        "-e",
+        "OC_DATA_PIPELINE_STAGE=raw",
+        "-e",
+        "OC_DATA_PIPELINE_STEP=fetcher",
+        "-e",
+        f"DATA_FETCHER_APP_DATA_REGISTRY_ID={registry_id}",
+        "-e",
+        "DATA_FETCHER_APP_STAGE=raw",
+        "-e",
+        "DATA_FETCHER_APP_STEP=fetcher",
+        "-e",
+        "DATA_FETCHER_APP_CONFIG_DIR=/tmp/config",
+        "-e",
+        "PYTHONPATH=/code/src",
+        "-e",
+        f"OC_KV_STORE_REDIS_HOST={extra_env.get('redis_host', 'host.docker.internal')}",
+        "-e",
+        f"OC_KV_STORE_REDIS_PORT={extra_env.get('redis_port', '6379')}",
+        "app-container",
         "poetry",
         "run",
         "python",
         "-m",
         "data_fetcher_app.main",
         "run",
-        "--data-registry-id",
-        registry_id,
-        "--stage",
-        "raw",
-        "--config-dir",
-        str((MOCKS_DIR / registry_id / "config").resolve()),
     ]
-
-    env = {**os.environ}
-    env.update(
-        {
-            "AWS_ACCESS_KEY_ID": "test",
-            "AWS_SECRET_ACCESS_KEY": "test",
-            "AWS_DEFAULT_REGION": "eu-west-2",
-            "AWS_ENDPOINT_URL": endpoint,
-            "AWS_ENDPOINT_URL_S3": endpoint,
-            "AWS_ENDPOINT_URL_SQS": endpoint,
-            "OC_DATA_PIPELINE_CONFIG_S3_BUCKET": bucket,
-            # Data Pipeline Bus envs (bucket, stage, registry id, orchestration queue)
-            "OC_DATA_PIPELINE_STORAGE_S3_URL": "s3://oc-local-data-pipeline",
-            "OC_DATA_PIPELINE_STAGE": "raw",
-            "OC_DATA_PIPELINE_DATA_REGISTRY_ID": registry_id,
-            "OC_DATA_PIPELINE_ORCHESTRATION_SQS_URL": f"{endpoint}/000000000000/data-pipeline-orchestration",
-            "PYTHONPATH": str((FETCHER_DIR / "src").resolve()),
-            # Ensure booleans expected by environ-config are strings
-            "DATA_FETCHER_APP_STORAGE_USE_UNZIP": "false",
-            "DATA_FETCHER_APP_STORAGE_USE_TAR_GZ": "false",
-            # Use file storage locally and in tests
-            "OC_STORAGE_TYPE": "file",
-            "OC_STORAGE_FILE_PATH": str(
-                (FETCHER_DIR / "tmp" / "test_output").resolve()
-            ),
-            # Keep redis but pass host/port via expected env for config factory
-            "OC_KVSTORE_TYPE": "redis",
-        }
-    )
-    # Inject redis host/port if available on the fixture
-    if "redis_host" in extra_env:
-        env["OC_KVSTORE_REDIS_HOST"] = extra_env["redis_host"]
-    if "redis_port" in extra_env:
-        env["OC_KVSTORE_REDIS_PORT"] = str(extra_env["redis_port"])
-
-    env.update(extra_env)
 
     try:
         subprocess.run(
@@ -326,7 +375,6 @@ def _run_app_container(
             cwd=FETCHER_DIR,
             text=True,
             capture_output=True,
-            env=env,
             timeout=1800,
         )
     except subprocess.CalledProcessError as exc:
@@ -342,6 +390,7 @@ def test_recursive_functional(registry_env, _case):
     registry_id = registry_env["registry_id"]
     endpoint = registry_env["endpoint"]
     bucket = registry_env["bucket"]
+    storage_bucket = registry_env.get("storage_bucket", "oc-local-data-pipeline")
 
     env_cleanup = MOCKS_DIR / registry_id / "environment" / "cleanup.py"
 
@@ -364,7 +413,15 @@ def test_recursive_functional(registry_env, _case):
         _run_python(case_dir / "expectation.py", base_env)
 
         # Cleanup between tests
+        # - Clear storage S3 (only storage, configs remain untouched)
+        _clear_bucket(storage_bucket, endpoint)
+        # - Purge SQS queues
         _purge_all_test_queues(endpoint)
-        # Reset registry-specific mock environment if cleanup.py exists
+        # - Flush Redis
+        _flush_redis(
+            registry_env.get("redis_host", "localhost"),
+            registry_env.get("redis_port", "6379"),
+        )
+        # - Reset registry-specific mock environment if cleanup.py exists
         if env_cleanup.exists():
             _run_python(env_cleanup, base_env)

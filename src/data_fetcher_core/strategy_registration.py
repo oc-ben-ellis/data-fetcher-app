@@ -12,7 +12,9 @@ from data_fetcher_http_api.strategy_factories import register_http_strategies
 from data_fetcher_sftp.strategy_factories import register_sftp_strategies
 
 
-def create_strategy_registry(sftp_manager, http_manager) -> StrategyFactoryRegistry:
+def create_strategy_registry(
+    sftp_manager: object, http_manager: object
+) -> StrategyFactoryRegistry:
     """Create and register all available strategy factories with a new registry.
 
     Returns:

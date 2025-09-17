@@ -4,7 +4,7 @@ This module defines the Storage protocol that all storage implementations
 must follow for bundle lifecycle management.
 """
 
-from typing import TYPE_CHECKING, Protocol, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from data_fetcher_core.core import BundleRef, DataRegistryFetcherConfig

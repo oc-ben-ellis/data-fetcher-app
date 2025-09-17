@@ -61,7 +61,7 @@ class DateFilterFactory(StrategyFactory):
             Filter function that takes a filename and returns True if it should be processed
         """
         start_date = params.start_date
-        params.date_pattern
+        _date_pattern = params.date_pattern  # Reserved for future use
 
         def date_filter(filename: str) -> bool:
             """Check if daily file should be processed based on start date."""

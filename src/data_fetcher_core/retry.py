@@ -117,8 +117,8 @@ class RetryEngine:
                     await asyncio.sleep(delay)
                     continue
                 if attempt == self.config.max_retries:
-                    # Final attempt failed, re-raise the exception
-                    self._logger.error(
+                    # Final attempt failed, log with exception details and re-raise
+                    self._logger.exception(
                         "RETRY_ASYNC_GAVE_UP",
                         attempts=self.config.max_retries + 1,
                         last_error=str(e),
@@ -167,8 +167,8 @@ class RetryEngine:
                     time.sleep(delay)
                     continue
                 if attempt == self.config.max_retries:
-                    # Final attempt failed, re-raise the exception
-                    self._logger.error(
+                    # Final attempt failed, log with exception details and re-raise
+                    self._logger.exception(
                         "RETRY_SYNC_GAVE_UP",
                         attempts=self.config.max_retries + 1,
                         last_error=str(e),
