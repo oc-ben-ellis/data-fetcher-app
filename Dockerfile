@@ -12,25 +12,33 @@ WORKDIR "/code"
 RUN mkdir -p "/opt/poetry-cache"
 ENV POETRY_CACHE_DIR=/opt/poetry-cache
 
-RUN addgroup -S appuser && adduser -S -G appuser appuser
+RUN addgroup -S appuser \
+    && adduser -S -G appuser -h /home/appuser -s /bin/sh appuser \
+    && mkdir -p /home/appuser \
+    && chown -R appuser:appuser /home/appuser
 RUN chgrp appuser "/opt/poetry-cache" && chmod g+w "/opt/poetry-cache"
 
 # install a base layer with our dependencies as these will change less frequently
 COPY pyproject.toml ./
 # Copy local wheel files
-COPY .devcontainer/wheels/*.whl /tmp/wheels/
+# Allow missing wheels dir in devcontainer context; copy if present
+COPY .devcontainer/wheels/ /tmp/wheels/
 # Fix ownership of copied files
 RUN chown -R appuser:appuser /code /tmp/wheels
 # Install dependencies without lock file to avoid local repository references
 # Install local wheels first using poetry
 RUN poetry install --no-ansi --no-interaction --only=main --no-root
-RUN poetry run pip install /tmp/wheels/*.whl
+RUN if [ -d /tmp/wheels ] && ls -1 /tmp/wheels/*.whl >/dev/null 2>&1; then \
+      poetry run pip install /tmp/wheels/*.whl; \
+    fi
 
 # copy over our actual code
 COPY ./ ./
 
 # Install the package itself (without --no-root)
-RUN poetry install --no-ansi --no-interaction --only=main
+# Regenerate lock to reflect updated dependency pins, then install
+RUN poetry lock --no-ansi --no-interaction && \
+    poetry install --no-ansi --no-interaction --only=main
 
 USER appuser
 

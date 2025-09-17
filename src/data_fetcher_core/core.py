@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Mapping
+from types import MappingProxyType
 
 from oc_pipeline_bus.config import Annotated
 
@@ -45,15 +46,16 @@ class BundleRef:
             raise TypeError("BundleRef requires a 'bid' (str or Bid)")
         self.bid = bid if isinstance(bid, Bid) else Bid(bid)
         # Start with provided request_meta or empty
-        rm: RequestMeta = dict(request_meta or {})
+        rm_dict: dict[str, Any] = dict(request_meta or {})
         # Back-compat: fold legacy kwargs into request_meta
         if "primary_url" in kwargs and kwargs["primary_url"] is not None:
-            rm.setdefault("url", kwargs["primary_url"])  # type: ignore[index]
+            rm_dict.setdefault("url", kwargs["primary_url"])  # type: ignore[index]
         if "resources_count" in kwargs and kwargs["resources_count"] is not None:
-            rm.setdefault("resources_count", kwargs["resources_count"])  # type: ignore[index]
+            rm_dict.setdefault("resources_count", kwargs["resources_count"])  # type: ignore[index]
         if "storage_key" in kwargs and kwargs["storage_key"] is not None:
-            rm.setdefault("storage_key", kwargs["storage_key"])  # type: ignore[index]
-        self.request_meta = rm
+            rm_dict.setdefault("storage_key", kwargs["storage_key"])  # type: ignore[index]
+        # Freeze request metadata to prevent mutation after construction
+        self.request_meta = MappingProxyType(rm_dict)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> BundleRef:
@@ -113,7 +115,7 @@ class BundleLoadResult:
     """
 
     bundle: BundleRef
-    bundle_meta: dict[str, Any]
+    bundle_meta: Mapping[str, Any]
     resources: list[dict[str, Any]]
 
 

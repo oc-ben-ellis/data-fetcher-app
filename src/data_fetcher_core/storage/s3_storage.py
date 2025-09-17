@@ -396,11 +396,11 @@ class S3StorageBundle:
 
         metadata = {
             "bid": bid_str,
-            "primary_url": self.bundle_ref.meta.get("primary_url"),
-            "resources_count": self.bundle_ref.meta.get("resources_count"),
+            "primary_url": self.bundle_ref.request_meta.get("url"),
+            "resources_count": self.bundle_ref.request_meta.get("resources_count"),
             "storage_key": bundle_key,
             "uploaded_keys": self.uploaded_keys,
-            "meta": self.bundle_ref.meta,
+            "meta": dict(self.bundle_ref.request_meta),
         }
 
         self.s3_client.put_object(  # type: ignore[attr-defined]

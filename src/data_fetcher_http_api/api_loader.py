@@ -101,13 +101,14 @@ class HttpBundleLoader:
                 )
                 raise RuntimeError("Error handler rejected response")
 
-            # Update bundle request_meta
-            bundle.request_meta.update({
+            # Build immutable bundle_meta for the result
+            bundle_meta = {
+                **dict(bundle.request_meta),
                 "status_code": response.status_code,
                 "content_type": response.headers.get("content-type"),
                 "content_length": response.headers.get("content-length"),
                 "resources_count": 1,
-            })
+            }
 
             # Create logger with BID context for tracing
             bid_logger = logger.bind(bid=str(bundle.bid))
@@ -160,7 +161,7 @@ class HttpBundleLoader:
         else:
             return BundleLoadResult(
                 bundle=bundle,
-                 bundle_meta=bundle.request_meta,
+                 bundle_meta=bundle_meta,
                 resources=[
                     {
                         "url": url,

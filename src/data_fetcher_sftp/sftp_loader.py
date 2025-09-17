@@ -143,14 +143,15 @@ class SftpBundleLoader(LoaderStrategy):
             # Get file info
             stat = await sftp_manager.stat(sftp_config, _ctx, remote_path)
 
-            # Update incoming bundle request_meta with file details
-            bundle.request_meta.update({
+            # Build immutable bundle_meta for the result; do not mutate request_meta
+            bundle_meta = {
+                **dict(bundle.request_meta),
                 "url": f"sftp://{self.remote_dir}/{remote_path}",
                 "resources_count": 1,
                 "size": stat.st_size,
                 "modified": stat.st_mtime,
                 "permissions": (oct(stat.st_mode) if stat.st_mode is not None else None),
-            })
+            }
 
             # Create logger with BID context for tracing
             bid_logger = logger.bind(bid=str(bundle.bid))
@@ -203,7 +204,7 @@ class SftpBundleLoader(LoaderStrategy):
         else:
             return BundleLoadResult(
                 bundle=bundle,
-                bundle_meta=bundle.request_meta,
+                bundle_meta=bundle_meta,
                 resources=[
                     {
                         "url": f"sftp://{self.remote_dir}/{remote_path}",

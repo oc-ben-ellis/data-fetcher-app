@@ -40,7 +40,7 @@ From the project root directory (`/media/ben-ellis/T7/wsldev/oc/oc/data-pipeline
 
 ```bash
 # Start LocalStack and provision infrastructure
-./bin/test-env-up.sh
+eval \$(./bin/test-env-up.sh --env-vars-only)
 
 # The script will:
 # - Start a LocalStack container with S3, SQS, and other AWS services

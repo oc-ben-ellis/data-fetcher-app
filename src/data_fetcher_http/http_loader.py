@@ -68,13 +68,14 @@ class StreamingHttpBundleLoader:
                 follow_redirects=self.follow_redirects,
             )
 
-            # Update incoming bundle request_meta
-            bundle.request_meta.update({
+            # Build immutable bundle_meta for the result (do not mutate request_meta)
+            bundle_meta = {
+                **dict(bundle.request_meta),
                 "status_code": response.status_code,
                 "content_type": response.headers.get("content-type"),
                 "content_length": response.headers.get("content-length"),
                 "resources_count": 1,
-            })
+            }
 
             # Create logger with BID context for tracing
             bid_logger = logger.bind(bid=str(bundle.bid))
@@ -130,11 +131,12 @@ class StreamingHttpBundleLoader:
                             )
                             resources_meta.append(related_meta)
                             # Increment resources_count if tracked in meta
+                            # Track resource count in local bundle_meta only
                             try:
-                                current = int(bundle.request_meta.get("resources_count", 0))
+                                current = int(bundle_meta.get("resources_count", 0))
                             except (TypeError, ValueError):
                                 current = 0
-                            bundle.request_meta["resources_count"] = current + 1
+                            bundle_meta["resources_count"] = current + 1
                         except Exception as e:  # noqa: BLE001
                             bid_logger.warning(
                                 "ERROR_FETCHING_RELATED_RESOURCE",
@@ -154,7 +156,7 @@ class StreamingHttpBundleLoader:
             raise
         else:
             return BundleLoadResult(
-                bundle=bundle, bundle_meta=bundle.request_meta, resources=resources_meta
+                bundle=bundle, bundle_meta=bundle_meta, resources=resources_meta
             )
 
     def _extract_related_urls(self, response: object) -> list[str]:  # noqa: ARG002

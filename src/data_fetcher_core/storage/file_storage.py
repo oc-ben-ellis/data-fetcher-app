@@ -235,10 +235,10 @@ class FileStorageBundle:
         meta_filepath = str(Path(self.bundle_dir) / "bundle.meta")
         metadata = {
             "bid": str(self.bundle_ref.bid),
-            "primary_url": self.bundle_ref.meta.get("primary_url"),
-            "resources_count": self.bundle_ref.meta.get("resources_count"),
+            "primary_url": self.bundle_ref.request_meta.get("url"),
+            "resources_count": self.bundle_ref.request_meta.get("resources_count"),
             "storage_key": self.bundle_dir,
-            "meta": self.bundle_ref.meta,
+            "meta": dict(self.bundle_ref.request_meta),
         }
 
         async with aiofiles_module.open(meta_filepath, "w") as f:

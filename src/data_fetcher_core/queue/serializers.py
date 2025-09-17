@@ -91,13 +91,26 @@ class BundleRefSerializer(JSONSerializer):
 
     def dumps(self, obj: object) -> str:
         if isinstance(obj, BundleRef):
-            data = {"bid": str(obj.bid), "request_meta": obj.request_meta}
+            # Ensure request_meta is serialized as a plain dict
+            data = {
+                "bid": str(obj.bid),
+                "request_meta": dict(obj.request_meta),
+                # Optionally include bundle_meta placeholder for forward-compat
+                # "bundle_meta": {},
+            }
             return json.dumps(data, default=str)
         return super().dumps(obj)
 
     def loads(self, data: str) -> BundleRef:
         data_dict = json.loads(data)
+        request_meta = data_dict.get("request_meta", {})
+        # Coerce non-dict mappings/strings defensively into a dict
+        if not isinstance(request_meta, dict):
+            try:
+                request_meta = dict(request_meta)  # type: ignore[arg-type]
+            except Exception:
+                request_meta = {}
         return BundleRef.from_dict({
             "bid": data_dict.get("bid"),
-            "request_meta": data_dict.get("request_meta", {}),
+            "request_meta": request_meta,
         })

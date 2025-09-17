@@ -42,9 +42,9 @@ class DataPipelineBusStorage:
         """Initialize a new bundle and return a BundleStorageContext."""
         # Create bundle metadata for the pipeline bus
         bundle_metadata = {
-            "primary_url": bundle_ref.meta.get("primary_url"),
-            "resources_count": bundle_ref.meta.get("resources_count"),
-            "meta": bundle_ref.meta,
+            "primary_url": bundle_ref.request_meta.get("url"),
+            "resources_count": bundle_ref.request_meta.get("resources_count"),
+            "meta": dict(bundle_ref.request_meta),
             "config_id": recipe.config_id,
         }
 
