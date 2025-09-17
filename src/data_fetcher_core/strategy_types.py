@@ -5,87 +5,77 @@ strategy types used in the data fetcher service, providing proper type
 annotations instead of using generic Callable types.
 """
 
-from abc import ABC
-from typing import Any, AsyncGenerator, Protocol, runtime_checkable
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any
 
-from data_fetcher_core.kv_store import KeyValueStore
-
-
-@runtime_checkable
-class BundleLoader(Protocol):
-    """Protocol for bundle loader strategies.
-    
-    Bundle loaders are responsible for loading data bundles from various sources.
-    """
-    
-    async def load(self, bundle_id: str) -> AsyncGenerator[bytes, None]:
-        """Load a bundle by its identifier.
-        
-        Args:
-            bundle_id: The identifier of the bundle to load
-            
-        Yields:
-            Chunks of data from the bundle
-        """
-        ...
-
-
-@runtime_checkable
-class BundleLocator(Protocol):
-    """Protocol for bundle locator strategies.
-    
-    Bundle locators are responsible for discovering and enumerating available
-    bundles from various sources.
-    """
-    
-    async def locate(self) -> AsyncGenerator[str, None]:
-        """Locate and enumerate available bundles.
-        
-        Yields:
-            Bundle identifiers that can be loaded
-        """
-        ...
-
-
-@runtime_checkable
-class FilterStrategy(Protocol):
-    """Protocol for filter strategies.
-    
-    Filter strategies are used to filter or transform data during processing.
-    """
-    
-    def filter(self, data: Any) -> bool:
-        """Filter data based on the strategy's criteria.
-        
-        Args:
-            data: The data to filter
-            
-        Returns:
-            True if the data should be included, False otherwise
-        """
-        ...
+if TYPE_CHECKING:  # Only for static typing; avoids runtime circular imports
+    from data_fetcher_core.core import (
+        BundleLoadResult,
+        BundleRef,
+        DataRegistryFetcherConfig,
+        FetchRunContext,
+    )
 
 
 class LoaderStrategy(ABC):
-    """Marker base class for loader strategies.
-    
-    Implementations may define their own `load` signatures compatible with the runtime.
-    This class exists purely for isinstance checks in the strategy registry.
+    """Abstract base class for loader strategies.
+
+    This provides a concrete base class for loader implementations that
+    need to be instantiated as dataclasses.
     """
+
+    @abstractmethod
+    async def load(
+        self,
+        bundle: "BundleRef",
+        storage: Any,
+        ctx: "FetchRunContext",
+        recipe: "DataRegistryFetcherConfig",
+    ) -> "BundleLoadResult":
+        """Load resources for the provided BundleRef and return a BundleLoadResult."""
 
 
 class LocatorStrategy(ABC):
-    """Marker base class for locator strategies (isinstance only)."""
+    """Abstract base class for locator strategies.
+
+    This provides a concrete base class for locator implementations that
+    need to be instantiated as dataclasses.
+    """
+
+    @abstractmethod
+    async def get_next_bundle_refs(
+        self, ctx: "FetchRunContext", bundle_refs_needed: int
+    ) -> list["BundleRef"]:
+        """Locate and enumerate available bundle references."""
 
 
 class FilterStrategyBase(ABC):
-    """Marker base class for filter strategies (isinstance only)."""
+    """Abstract base class for filter strategies.
+
+    Implementations must provide a `filter` method.
+    """
+
+    @abstractmethod
+    def filter(self, data: Any) -> bool:
+        """Return True if the data should be included, False otherwise."""
 
 
 # Type aliases for common strategy types
 LoaderStrategyType = type[LoaderStrategy]
 LocatorStrategyType = type[LocatorStrategy]
+# Kept for backward compatibility where referenced, but prefer using FilterStrategyBase directly
 FilterStrategyType = type[FilterStrategyBase]
+
+
+class FileSortStrategyBase(ABC):
+    """Abstract base class for file sorting strategies.
+
+    Implementations receive a list of (path, mtime) tuples and return a sorted list.
+    """
+
+    @abstractmethod
+    def sort(self, items: list[tuple[str, float | int | None]]) -> list[tuple[str, float | int | None]]:
+        """Return a sorted list of (path, mtime) tuples according to strategy."""
 
 # Strategy configuration types (for YAML config)
 LoaderStrategyConfig = dict[str, Any]  # Configuration dict for loader strategies

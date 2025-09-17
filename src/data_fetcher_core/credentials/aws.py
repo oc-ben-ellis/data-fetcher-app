@@ -94,18 +94,12 @@ class AWSSecretsCredentialProvider:
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             if error_code == "ResourceNotFoundException":
-                raise ValueError(
-                    f"Secret '{secret_name}' not found"
-                ) from e
+                raise ValueError(f"Secret '{secret_name}' not found") from e
             if error_code == "AccessDeniedException":
-                raise ValueError(
-                    f"Access denied to secret '{secret_name}'"
-                ) from e
+                raise ValueError(f"Access denied to secret '{secret_name}'") from e
             raise ValueError(f"AWS Secrets Manager error: {e}") from e
         except json.JSONDecodeError as e:
-            raise ValueError(
-                f"Secret '{secret_name}' not valid JSON"
-            ) from e
+            raise ValueError(f"Secret '{secret_name}' not valid JSON") from e
         except Exception as e:
             raise ValueError(
                 f"Unexpected error accessing secret '{secret_name}': {e}"

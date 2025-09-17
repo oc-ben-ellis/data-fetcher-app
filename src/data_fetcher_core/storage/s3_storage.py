@@ -100,6 +100,16 @@ class S3Storage:
         )
         return context
 
+    def bundle_found(self, metadata: dict[str, Any]) -> str:
+        """Return a stub/mock BID value for S3 storage (no event emission)."""
+        from datetime import UTC, datetime
+        from secrets import token_hex
+
+        ts = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+        reg = str(metadata.get("config_id", "s3")).lower().replace(" ", "-")
+        rnd = token_hex(4)
+        return f"bid:v1:{reg}:{ts}:{rnd}"
+
     async def _add_resource_to_bundle(
         self,
         bundle_ref: "BundleRef",
@@ -173,7 +183,9 @@ class S3Storage:
 
         # Execute locator completion callbacks
         for locator in config.locators:
-            if locator is not None and getattr(locator, "on_bundle_complete_hook", None):
+            if locator is not None and getattr(
+                locator, "on_bundle_complete_hook", None
+            ):
                 try:
                     await locator.on_bundle_complete_hook(bundle_ref)
                     logger.debug(

@@ -53,10 +53,11 @@ services:
       - OC_DATA_PIPELINE_STAGE=${OC_DATA_PIPELINE_STAGE:-raw}
       - OC_DATA_PIPELINE_STEP=${OC_DATA_PIPELINE_STEP:-fetch}
       - OC_DATA_PIPELINE_DATA_REGISTRY_ID=${OC_DATA_PIPELINE_DATA_REGISTRY_ID:-us_fl}
-      - OC_DATA_PIPELINE_ORCHESTRATION_SQS_URL=http://host.docker.internal:${CONFIG_TEST_ENV_LOCALSTACK_PORT:-4566}/000000000000/data-pipeline-orchestration
+      - OC_DATA_PIPELINE_ORCHESTRATION_SQS_URL=http://host.docker.internal:${CONFIG_TEST_ENV_LOCALSTACK_PORT:-4566}/000000000000/data-pipeline-orchestration-queue
       - OC_KVSTORE_TYPE=${OC_KVSTORE_TYPE:-redis}
       - OC_KV_STORE_REDIS_HOST=host.docker.internal
       - OC_KV_STORE_REDIS_PORT=${OC_KV_STORE_REDIS_PORT:-6379}
+      - OC_LOGGING_LEVEL=DEBUG
     networks:
       - build-network
     extra_hosts:

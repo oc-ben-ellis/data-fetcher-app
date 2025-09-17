@@ -35,6 +35,10 @@ class UnzipResourceDecorator:
         """
         self.base_storage = base_storage
 
+    def bundle_found(self, metadata: dict[str, Any]) -> str:
+        """Passthrough BID minting to the underlying storage."""
+        return self.base_storage.bundle_found(metadata)  # type: ignore[attr-defined]
+
     async def start_bundle(
         self, bundle_ref: "BundleRef", config: "DataRegistryFetcherConfig"
     ) -> "BundleStorageContext":

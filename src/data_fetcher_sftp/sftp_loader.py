@@ -8,14 +8,14 @@ from typing import TYPE_CHECKING, Protocol, Union
 import structlog
 
 from data_fetcher_core.core import (
+    BundleLoadResult,
     BundleRef,
     DataRegistryFetcherConfig,
     FetchRunContext,
-    RequestMeta,
 )
+from data_fetcher_core.strategy_types import LoaderStrategy
 from data_fetcher_sftp.sftp_config import SftpProtocolConfig
 from data_fetcher_sftp.sftp_manager import SftpManager
-from data_fetcher_core.strategy_types import LoaderStrategy
 
 
 class StorageRequiredError(Exception):
@@ -67,11 +67,11 @@ class SftpBundleLoader(LoaderStrategy):
 
     async def load(
         self,
-        request: RequestMeta,
+        bundle: BundleRef,
         storage: Storage,
         ctx: FetchRunContext,
         recipe: DataRegistryFetcherConfig,
-    ) -> list[BundleRef]:
+    ) -> BundleLoadResult:
         """Load data from SFTP endpoint.
 
         Args:
@@ -85,25 +85,32 @@ class SftpBundleLoader(LoaderStrategy):
         """
         try:
             # List files in remote directory
-            remote_path = str(request.get("url", "")).replace("sftp://", "")
+            remote_path = str(bundle.request_meta.get("url", "")).replace("sftp://", "")
             # If the path doesn't start with /, it's relative to the home directory
             # Don't prefix with remote_dir for relative paths
 
             # Check if it's a file or directory
             try:
-                stat = await sftp_manager.stat(self.sftp_config, ctx, remote_path)
+                stat = await self.sftp_manager.stat(self.sftp_config, ctx, remote_path)
                 if stat.st_mode is not None and stat.st_mode & 0o40000:  # Directory
                     return await self._load_directory(
-                        sftp_manager,
+                        self.sftp_manager,
                         self.sftp_config,
                         remote_path,
+                        bundle,
                         storage,
                         ctx,
                         recipe,
                     )
                 # File
                 return await self._load_file(
-                    sftp_manager, self.sftp_config, remote_path, storage, ctx, recipe
+                    self.sftp_manager,
+                    self.sftp_config,
+                    remote_path,
+                    bundle,
+                    storage,
+                    ctx,
+                    recipe,
                 )
             except Exception as e:
                 logger.exception(
@@ -111,45 +118,42 @@ class SftpBundleLoader(LoaderStrategy):
                     remote_path=remote_path,
                     error=str(e),
                 )
-                return []
+                raise
 
         except Exception as e:
             logger.exception(
                 "ERROR_LOADING_SFTP_REQUEST",
-                url=request.get("url", "unknown"),
+                url=str(bundle.meta.get("primary_url", "unknown")),
                 error=str(e),
             )
-            return []
+            raise
 
     async def _load_file(
         self,
         sftp_manager: SftpManager,
         sftp_config: SftpProtocolConfig,
         remote_path: str,
+        bundle: BundleRef,
         storage: Storage,
         _ctx: FetchRunContext,
         recipe: DataRegistryFetcherConfig,
-    ) -> list[BundleRef]:
+    ) -> BundleLoadResult:
         """Load a single file from SFTP."""
         try:
             # Get file info
             stat = await sftp_manager.stat(sftp_config, _ctx, remote_path)
 
-            # Create bundle reference
-            bundle_ref = BundleRef(
-                primary_url=f"sftp://{self.remote_dir}/{remote_path}",
-                resources_count=1,
-                meta={
-                    "size": stat.st_size,
-                    "modified": stat.st_mtime,
-                    "permissions": (
-                        oct(stat.st_mode) if stat.st_mode is not None else None
-                    ),
-                },
-            )
+            # Update incoming bundle request_meta with file details
+            bundle.request_meta.update({
+                "url": f"sftp://{self.remote_dir}/{remote_path}",
+                "resources_count": 1,
+                "size": stat.st_size,
+                "modified": stat.st_mtime,
+                "permissions": (oct(stat.st_mode) if stat.st_mode is not None else None),
+            })
 
             # Create logger with BID context for tracing
-            bid_logger = logger.bind(bid=str(bundle_ref.bid))
+            bid_logger = logger.bind(bid=str(bundle.bid))
 
             # Stream to storage using new BundleStorageContext interface
             if not storage:
@@ -158,7 +162,7 @@ class SftpBundleLoader(LoaderStrategy):
             bid_logger.debug("STREAMING_FILE_TO_STORAGE", remote_path=remote_path)
 
             # 1. Start bundle and get context
-            bundle_context = await storage.start_bundle(bundle_ref, recipe)
+            bundle_context = await storage.start_bundle(bundle, recipe)
 
             try:
                 # 2. Add file resource
@@ -195,21 +199,32 @@ class SftpBundleLoader(LoaderStrategy):
                 remote_path=remote_path,
                 error=str(e),
             )
-            return []
+            raise
         else:
-            return [bundle_ref]
+            return BundleLoadResult(
+                bundle=bundle,
+                bundle_meta=bundle.request_meta,
+                resources=[
+                    {
+                        "url": f"sftp://{self.remote_dir}/{remote_path}",
+                        "content_type": "application/octet-stream",
+                        "status_code": 200,
+                    }
+                ],
+            )
 
     async def _load_directory(
         self,
         sftp_manager: SftpManager,
         sftp_config: SftpProtocolConfig,
         remote_path: str,
+        bundle: BundleRef,
         storage: Storage,
         ctx: FetchRunContext,
         recipe: DataRegistryFetcherConfig,
-    ) -> list[BundleRef]:
+    ) -> BundleLoadResult:
         """Load all files in a directory from SFTP."""
-        bundle_refs = []
+        resources_meta: list[dict[str, object]] = []
 
         try:
             # List files in directory
@@ -226,10 +241,10 @@ class SftpBundleLoader(LoaderStrategy):
                     continue
 
                 # Load the file
-                file_bundles = await self._load_file(
-                    sftp_manager, sftp_config, file_path, storage, ctx, recipe
+                file_result = await self._load_file(
+                    sftp_manager, sftp_config, file_path, bundle, storage, ctx, recipe
                 )
-                bundle_refs.extend(file_bundles)
+                resources_meta.extend(file_result.resources)
 
         except Exception as e:
             logger.exception(
@@ -238,7 +253,11 @@ class SftpBundleLoader(LoaderStrategy):
                 error=str(e),
             )
 
-        return bundle_refs
+        if not resources_meta:
+            raise RuntimeError("No files matched pattern in directory")
+        return BundleLoadResult(
+            bundle=bundle, bundle_meta=bundle.request_meta, resources=resources_meta
+        )
 
     def _matches_pattern(self, filename: str) -> bool:
         """Check if filename matches the pattern."""

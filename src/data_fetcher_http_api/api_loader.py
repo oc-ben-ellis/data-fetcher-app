@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, Union, cast
 import structlog
 
 from data_fetcher_core.core import (
+    BundleLoadResult,
     BundleRef,
     DataRegistryFetcherConfig,
     FetchRunContext,
-    RequestMeta,
 )
 from data_fetcher_http.http_config import HttpProtocolConfig
 from data_fetcher_http.http_manager import HttpManager
@@ -49,11 +49,11 @@ class HttpBundleLoader:
 
     async def load(
         self,
-        request: RequestMeta,
+        bundle: BundleRef,
         storage: Storage,
         ctx: FetchRunContext,
         recipe: DataRegistryFetcherConfig,
-    ) -> list[BundleRef]:
+    ) -> BundleLoadResult:
         """Load data from API endpoint using BundleStorageContext.
 
         Args:
@@ -69,10 +69,9 @@ class HttpBundleLoader:
             raise StorageRequiredError
 
         try:
+            url = str(bundle.request_meta.get("url", ""))
             logger.debug(
-                "LOADING_API_REQUEST",
-                url=request["url"],
-                meta_load_name=self.meta_load_name,
+                "LOADING_API_REQUEST", url=url, meta_load_name=self.meta_load_name
             )
 
             # Make HTTP request (authentication is handled by HttpManager)
@@ -80,59 +79,55 @@ class HttpBundleLoader:
                 self.http_config,
                 ctx.app_config,
                 "GET",
-                request["url"],
-                headers=request.get("headers", {}),
+                url,
+                headers={},
                 follow_redirects=self.follow_redirects,
             )
 
             logger.debug(
                 "RECEIVED_HTTP_RESPONSE",
-                url=request["url"],
+                url=url,
                 status_code=response.status_code,
                 content_type=response.headers.get("content-type"),
                 content_length=response.headers.get("content-length"),
             )
 
             # Handle errors if custom error handler is provided
-            if self.error_handler and not self.error_handler(
-                request.url, response.status_code
-            ):
+            if self.error_handler and not self.error_handler(url, response.status_code):
                 logger.warning(
                     "REQUEST_REJECTED_BY_ERROR_HANDLER",
-                    url=request.url,
+                    url=url,
                     status_code=response.status_code,
                 )
-                return []
+                raise RuntimeError("Error handler rejected response")
 
-            # Create bundle reference
-            bundle_ref = BundleRef(
-                primary_url=request["url"],
-                resources_count=1,
-                meta={
-                    "status_code": response.status_code,
-                    "content_type": response.headers.get("content-type"),
-                    "content_length": response.headers.get("content-length"),
-                },
-            )
+            # Update bundle request_meta
+            bundle.request_meta.update({
+                "status_code": response.status_code,
+                "content_type": response.headers.get("content-type"),
+                "content_length": response.headers.get("content-length"),
+                "resources_count": 1,
+            })
 
             # Create logger with BID context for tracing
-            bid_logger = logger.bind(bid=str(bundle_ref.bid))
+            bid_logger = logger.bind(bid=str(bundle.bid))
 
             # Use new BundleStorageContext interface
-            bid_logger.debug("STREAMING_RESPONSE_TO_STORAGE", url=request["url"])
+            bid_logger.debug("STREAMING_RESPONSE_TO_STORAGE", url=url)
 
             # 1. Start bundle and get context
-            bundle_context = await storage.start_bundle(bundle_ref, recipe)
+            bundle_context = await storage.start_bundle(bundle, recipe)
 
             try:
                 # 2. Add primary resource
+                primary_meta = {
+                    "url": url,
+                    "content_type": response.headers.get("content-type"),
+                    "status_code": response.status_code,
+                }
                 await bundle_context.add_resource(
-                    resource_name=request["url"],
-                    metadata={
-                        "url": request["url"],
-                        "content_type": response.headers.get("content-type"),
-                        "status_code": response.status_code,
-                    },
+                    resource_name=url,
+                    metadata=primary_meta,
                     stream=cast("AsyncGenerator[bytes]", response.aiter_bytes()),
                 )
 
@@ -146,22 +141,34 @@ class HttpBundleLoader:
                 bid_logger.exception("Error in bundle processing", error=str(e))
                 raise
 
-            bid_logger.debug("SUCCESSFULLY_STREAMED_TO_STORAGE", url=request["url"])
+            bid_logger.debug("SUCCESSFULLY_STREAMED_TO_STORAGE", url=url)
 
             bid_logger.info(
                 "API_REQUEST_LOADED_SUCCESSFULLY",
-                url=request["url"],
+                url=url,
                 status_code=response.status_code,
-                bundle_ref=bundle_ref,
+                bundle_ref=bundle,
             )
 
         except Exception as e:
             logger.exception(
-                "REQUEST_LOADING_ERROR", url=request.get("url", "unknown"), error=str(e)
+                "REQUEST_LOADING_ERROR",
+                url=str(bundle.request_meta.get("url", "unknown")),
+                error=str(e),
             )
-            return []
+            raise
         else:
-            return [bundle_ref]
+            return BundleLoadResult(
+                bundle=bundle,
+                 bundle_meta=bundle.request_meta,
+                resources=[
+                    {
+                        "url": url,
+                        "content_type": response.headers.get("content-type"),
+                        "status_code": response.status_code,
+                    }
+                ],
+            )
 
 
 @dataclass

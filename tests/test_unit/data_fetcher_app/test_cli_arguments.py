@@ -201,12 +201,20 @@ class TestMainAsyncFactoryForwarding:
             "storage": "s3",
             "kvstore": "redis",
             "run_id": "rid",
-            "factory_kwargs": {"s3_bucket": "buck", "s3_prefix": "pre/", "redis_host": "rh"},
+            "factory_kwargs": {
+                "s3_bucket": "buck",
+                "s3_prefix": "pre/",
+                "redis_host": "rh",
+            },
             "config_dir": "./mocks/us_fl/config",
             "stage": "raw",
         }
 
-        with patch.dict(os.environ, {"OC_DATA_PIPELINE_STORAGE_S3_URL": "s3://bucket/path"}, clear=False):
+        with patch.dict(
+            os.environ,
+            {"OC_DATA_PIPELINE_STORAGE_S3_URL": "s3://bucket/path"},
+            clear=False,
+        ):
             with pytest.raises(Exception):
                 await main_async(args)
 
@@ -248,7 +256,9 @@ class TestAwsProfilePropagation:
                 pass
             except Exception as e:
                 # Unexpected exceptions should fail the test
-                pytest.fail(f"Unexpected exception during credential retrieval: {type(e).__name__}: {e}")
+                pytest.fail(
+                    f"Unexpected exception during credential retrieval: {type(e).__name__}: {e}"
+                )
 
             # Verify profile preference
             assert sess_mock.call_args.kwargs.get("profile_name") == "cred-prof"
@@ -277,7 +287,9 @@ class TestAwsProfilePropagation:
                 pass
             except Exception as e:
                 # Unexpected exceptions should fail the test
-                pytest.fail(f"Unexpected exception during credential retrieval: {type(e).__name__}: {e}")
+                pytest.fail(
+                    f"Unexpected exception during credential retrieval: {type(e).__name__}: {e}"
+                )
 
             assert sess_mock.call_args.kwargs.get("profile_name") == "global-prof"
 

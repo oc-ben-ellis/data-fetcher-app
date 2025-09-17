@@ -4,7 +4,7 @@ This module defines the Storage protocol that all storage implementations
 must follow for bundle lifecycle management.
 """
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, Any
 
 if TYPE_CHECKING:
     from data_fetcher_core.core import BundleRef, DataRegistryFetcherConfig
@@ -32,5 +32,12 @@ class Storage(Protocol):
 
         Raises:
             Exception: If bundle initialization fails.
+        """
+        ...
+
+    def bundle_found(self, metadata: dict[str, Any]) -> str:
+        """Mint or return a BID for a newly discovered bundle.
+
+        Implementations may persist discovery metadata or simply return a stub value.
         """
         ...

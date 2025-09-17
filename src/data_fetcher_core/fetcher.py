@@ -11,10 +11,11 @@ import structlog
 from openc_python_common.observability.log_util import observe_around
 
 from data_fetcher_core.core import (
+    BundleLoadResult,
+    BundleRef,
     DataRegistryFetcherConfig,
     FetchPlan,
     FetchRunContext,
-    RequestMeta,
 )
 from data_fetcher_core.exceptions import (
     ConfigurationError,
@@ -22,7 +23,7 @@ from data_fetcher_core.exceptions import (
     NetworkError,
     ResourceError,
 )
-from data_fetcher_core.queue import KVStoreQueue, RequestMetaSerializer, RequestQueue
+from data_fetcher_core.queue import BundleRefSerializer, KVStoreQueue, RequestQueue
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -120,7 +121,7 @@ class Fetcher:
         queue: RequestQueue = KVStoreQueue(
             kv_store=run_ctx.app_config.kv_store,  # type: ignore[union-attr]
             namespace=f"fetch:{run_ctx.run_id}",
-            serializer=RequestMetaSerializer(),
+            serializer=BundleRefSerializer(),
         )
 
         # Coordination primitives
@@ -222,6 +223,7 @@ class Fetcher:
 
                 # Try to get bundle refs from current locator
                 if current_locator_index < len(config.locators):
+
                     provider = config.locators[current_locator_index]
 
                     locator_logger.debug(
@@ -336,7 +338,7 @@ class Fetcher:
         initial_size = await queue.size()
         worker_logger.info("WORKER_STARTED_WITH_QUEUE_SIZE", queue_size=initial_size)
 
-        req: RequestMeta | None = None
+        bundle_ref: BundleRef | None = None
         while True:
             try:
                 # Get next request from persistent queue
@@ -352,53 +354,51 @@ class Fetcher:
                     await asyncio.sleep(0.1)
                     continue
 
-                req = requests[0]
-
-                # Ensure we have a request dict with a url
-                if not isinstance(req, dict) or "url" not in req:
+                bundle_ref = requests[0]
+                if not isinstance(bundle_ref, BundleRef):
                     worker_logger.error(
-                        "Invalid request type in queue",
-                        request_type=type(req).__name__,
+                        "Invalid queue item type",
+                        item_type=type(bundle_ref).__name__,
                         worker_id=worker_id,
                     )
                     continue
 
                 # Process the request
                 with observe_around(
-                    worker_logger.bind(url=req.get("url", "unknown")),
+                    worker_logger.bind(bid=str(getattr(bundle_ref, "bid", "unknown"))),
                     "WORKER_PROCESS_URL",
                     worker_id=worker_id,
                 ):
-                    await self._process_request(req, config, run_ctx)
+                    await self._process_request(bundle_ref, config, run_ctx)
 
             except Exception as e:
-                url = (req or {}).get("url", "unknown")  # type: ignore[index]
+                bid_str = str(getattr(bundle_ref, "bid", "unknown"))
                 if isinstance(e, ConfigurationError | FatalError):
                     worker_logger.exception(
                         "WORKER_FATAL_ERROR",
                         error_type=type(e).__name__,
                         worker_id=worker_id,
-                        url=url,
+                        bid=bid_str,
                     )
                 else:
                     worker_logger.exception(
                         "WORKER_ERROR",
                         error_type=type(e).__name__,
                         worker_id=worker_id,
-                        url=url,
+                        bid=bid_str,
                     )
 
         worker_logger.debug("WORKER_COMPLETED")
 
     async def _process_request(
         self,
-        req: RequestMeta,
+        bundle: BundleRef,
         config: DataRegistryFetcherConfig,
         run_ctx: FetchRunContext,
     ) -> None:
         """Process a single request through the pipeline."""
         try:
-            logger.debug("REQUEST_PROCESSING", url=req.get("url", "unknown"))
+            logger.debug("REQUEST_PROCESSING", bid=str(bundle.bid))
 
             # 1. LOAD (Streaming Data Collection)
             if not config.loader:
@@ -414,14 +414,15 @@ class Fetcher:
 
             logger.debug(
                 "REQUEST_LOADING_WITH_LOADER",
-                url=req.get("url", "unknown"),
                 loader_type=type(config.loader).__name__,
             )
-            bundle_refs = await config.loader.load(req, storage, run_ctx, config)
+            load_result: BundleLoadResult = await config.loader.load(
+                bundle, storage, run_ctx, config
+            )
             logger.debug(
                 "REQUEST_LOADED_SUCCESSFULLY",
-                url=req.get("url", "unknown"),
-                bundle_count=len(bundle_refs),
+                bid=str(bundle.bid),
+                bundle_resources=len(load_result.resources),
             )
 
             # 2. Notify providers that URL was processed
@@ -429,41 +430,39 @@ class Fetcher:
                 if hasattr(provider, "handle_url_processed"):
                     logger.debug(
                         "PROVIDER_NOTIFICATION_URL_PROCESSED",
-                        url=req.get("url", "unknown"),
+                        bid=str(bundle.bid),
                         provider_type=type(provider).__name__,
                     )
-                    await provider.handle_url_processed(req, bundle_refs, run_ctx)
+                    await provider.handle_url_processed(bundle, load_result, run_ctx)
 
-            logger.debug("REQUEST_PROCESSING_COMPLETED", url=req.get("url", "unknown"))
+            logger.debug("REQUEST_PROCESSING_COMPLETED", bid=str(bundle.bid))
             run_ctx.processed_count += 1
 
         except Exception as e:
             # Create appropriate error message based on error type
             if isinstance(e, NetworkError | ResourceError):
-                error_msg = f"Network/Resource error processing request {req.get('url', 'unknown')}: {e!s}"
+                error_msg = (
+                    f"Network/Resource error processing bundle {bundle.bid!s}: {e!s}"
+                )
                 logger.warning(
                     "REQUEST_PROCESSING_NETWORK_ERROR",
-                    url=req.get("url", "unknown"),
+                    bid=str(bundle.bid),
                     error=str(e),
                     error_type=type(e).__name__,
                 )
             elif isinstance(e, ConfigurationError | FatalError):
-                error_msg = (
-                    f"Fatal error processing request {req.get('url', 'unknown')}: {e!s}"
-                )
+                error_msg = f"Fatal error processing bundle {bundle.bid!s}: {e!s}"
                 logger.exception(
                     "REQUEST_PROCESSING_FATAL_ERROR",
-                    url=req.get("url", "unknown"),
+                    bid=str(bundle.bid),
                     error=str(e),
                     error_type=type(e).__name__,
                 )
             else:
-                error_msg = (
-                    f"Error processing request {req.get('url', 'unknown')}: {e!s}"
-                )
+                error_msg = f"Error processing bundle {bundle.bid!s}: {e!s}"
                 logger.warning(
                     "REQUEST_PROCESSING_ERROR",
-                    url=req.get("url", "unknown"),
+                    bid=str(bundle.bid),
                     error=str(e),
                     error_type=type(e).__name__,
                 )

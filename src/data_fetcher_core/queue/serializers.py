@@ -8,7 +8,7 @@ import json
 
 from yarl import URL
 
-from data_fetcher_core.core import RequestMeta
+from data_fetcher_core.core import BundleRef, RequestMeta
 
 from .base import Serializer
 
@@ -84,3 +84,20 @@ class RequestMetaSerializer(JSONSerializer):
             "headers": data_dict.get("headers", {}),
             "flags": data_dict.get("flags", {}),
         }
+
+
+class BundleRefSerializer(JSONSerializer):
+    """Serializer for `BundleRef` objects using simple dict representation."""
+
+    def dumps(self, obj: object) -> str:
+        if isinstance(obj, BundleRef):
+            data = {"bid": str(obj.bid), "request_meta": obj.request_meta}
+            return json.dumps(data, default=str)
+        return super().dumps(obj)
+
+    def loads(self, data: str) -> BundleRef:
+        data_dict = json.loads(data)
+        return BundleRef.from_dict({
+            "bid": data_dict.get("bid"),
+            "request_meta": data_dict.get("request_meta", {}),
+        })

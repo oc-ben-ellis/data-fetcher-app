@@ -8,7 +8,6 @@ import pytest
 
 from data_fetcher_core.storage.builder import StorageBuilder
 from data_fetcher_core.storage.decorators import UnzipResourceDecorator
-from data_fetcher_core.storage.file_storage import FileStorage
 from data_fetcher_core.storage.pipeline_bus_storage import DataPipelineBusStorage
 
 
@@ -143,7 +142,7 @@ class TestStorageBuilderUpdates:
     ) -> None:
         """Test that PipelineStorage with both decorators works correctly."""
         from data_fetcher_core.storage.decorators import TarGzResourceDecorator
-        
+
         # Use skip_validation=True for testing
         result = (
             storage_builder.pipeline_bus_storage(skip_validation=True)
@@ -196,7 +195,7 @@ class TestStorageBuilderUpdates:
         # Use skip_validation=True for testing
         result1 = storage_builder.pipeline_bus_storage(skip_validation=True).build()
         result2 = storage_builder.pipeline_bus_storage(skip_validation=True).build()
-        
+
         assert result1 is not None
         assert result2 is not None
         # Both should be wrapped with UnzipResourceDecorator by default

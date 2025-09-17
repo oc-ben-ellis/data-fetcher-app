@@ -193,9 +193,7 @@ class TestKVStoreQueue:
     async def test_clear_operation(self, queue: KVStoreQueue) -> None:
         """Test queue clear operation."""
         # Add some items
-        requests = [
-            {"url": str(URL(f"https://example.com/{i}"))} for i in range(3)
-        ]
+        requests = [{"url": str(URL(f"https://example.com/{i}"))} for i in range(3)]
         await queue.enqueue(requests)
         assert await queue.size() == 3
 

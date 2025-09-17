@@ -5,18 +5,16 @@ factory functions to build the application's dependencies into a single
 cohesive module.
 """
 
-from dataclasses import dataclass
 from typing import TypedDict, Unpack, cast
 
 import environ
 from openc_python_common.envargs import args_to_config_class
 
+from data_fetcher_core.config import FetcherConfig
 from data_fetcher_core.credentials import (
-    CredentialProvider,
     create_credential_provider,
 )
 from data_fetcher_core.kv_store import (
-    KeyValueStore,
     create_kv_store,
 )
 from data_fetcher_core.storage import Storage, create_storage_config_instance
@@ -60,15 +58,6 @@ class ConfigKwargs(TypedDict, total=False):
     serializer: str
     default_ttl: int
     data_registry_id: str
-
-
-@dataclass
-class FetcherConfig:
-    """Fetcher configuration container."""
-
-    credential_provider: CredentialProvider
-    kv_store: KeyValueStore
-    storage: Storage
 
 
 async def create_fetcher_app_config(

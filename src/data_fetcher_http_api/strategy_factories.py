@@ -11,12 +11,12 @@ from oc_pipeline_bus.strategy_registry import (
     StrategyFactory,
 )
 
+from data_fetcher_core.strategy_types import LoaderStrategy, LocatorStrategy
+from data_fetcher_http.http_manager import HttpManager
 from data_fetcher_http_api.api_bundle_locators import (
     PaginationHttpBundleLocator,
 )
 from data_fetcher_http_api.api_loader import HttpBundleLoader
-from data_fetcher_http.http_manager import HttpManager
-from data_fetcher_core.strategy_types import BundleLoader, BundleLocator
 
 
 class HttpBundleLoaderFactory(StrategyFactory):
@@ -175,11 +175,15 @@ def register_http_strategies(registry, http_manager) -> None:
         registry: StrategyFactoryRegistry instance to register with
     """
     # Register loader factory against base interface
-    registry.register(BundleLoader, "http_loader", HttpBundleLoaderFactory(http_manager=http_manager))
+    registry.register(
+        LoaderStrategy,
+        "http_loader",
+        HttpBundleLoaderFactory(http_manager=http_manager),
+    )
 
     # Register locator factories
     registry.register(
-        BundleLocator,
+        LocatorStrategy,
         "pagination_locator",
         PaginationHttpBundleLocatorFactory(http_manager=http_manager),
     )

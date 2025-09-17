@@ -6,9 +6,10 @@ enabling resumable operations without re-querying remote data providers.
 
 from .base import RequestQueue, Serializer
 from .kv_store_queue import KVStoreQueue
-from .serializers import JSONSerializer, RequestMetaSerializer
+from .serializers import BundleRefSerializer, JSONSerializer, RequestMetaSerializer
 
 __all__ = [
+    "BundleRefSerializer",
     "JSONSerializer",
     "KVStoreQueue",
     "RequestMetaSerializer",

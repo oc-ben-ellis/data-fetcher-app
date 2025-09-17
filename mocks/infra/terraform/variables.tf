@@ -3,7 +3,7 @@ variable "aws_endpoint" { default = "http://localhost:4566" }
 variable "aws_access_key" { default = "test" }
 variable "aws_secret_key" { default = "test" }
 variable "bucket_name" { default = "local-config" }
-variable "queue_name" { default = "fetcher-pipeline-queue" }
+variable "queue_name" { default = "data-pipeline-orchestration-queue" }
 variable "pipeline_bucket_name" { default = "oc-local-data-pipeline" }
 variable "config_bucket_name" {
   description = "Name of the S3 bucket for configuration files"

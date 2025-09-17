@@ -12,14 +12,14 @@ from oc_pipeline_bus.strategy_registry import (
     StrategyFactory,
 )
 
+from data_fetcher_core.strategy_types import LocatorStrategy
+from data_fetcher_http.http_manager import HttpManager
 from data_fetcher_http_api.api_bundle_locators import (
     PaginationHttpBundleLocator,
 )
 from data_fetcher_http_api.api_pagination_bundle_locators import (
     CursorPaginationStrategy,
 )
-from data_fetcher_http.http_manager import HttpManager
-from data_fetcher_core.strategy_types import BundleLocator
 
 
 class SirenProviderFactory(StrategyFactory):
@@ -250,17 +250,19 @@ def register_fr_strategies(registry, http_manager) -> None:
     Args:
         registry: StrategyFactoryRegistry instance to register with
     """
-    from data_fetcher_http_api.api_bundle_locators import PaginationHttpBundleLocator
-
     # Register FR-specific locator factories against base interface
     registry.register(
-        BundleLocator, "siren_provider", SirenProviderFactory(http_manager=http_manager)
+        LocatorStrategy,
+        "siren_provider",
+        SirenProviderFactory(http_manager=http_manager),
     )
 
-    registry.register(BundleLocator, "gap_provider", GapProviderFactory(http_manager=http_manager))
+    registry.register(
+        LocatorStrategy, "gap_provider", GapProviderFactory(http_manager=http_manager)
+    )
 
     registry.register(
-        BundleLocator,
+        LocatorStrategy,
         "failed_companies_provider",
         FailedCompaniesProviderFactory(http_manager=http_manager),
     )

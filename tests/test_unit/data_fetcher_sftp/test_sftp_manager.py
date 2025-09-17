@@ -104,15 +104,15 @@ class TestSftpManager:
             # Validate connection was created correctly
             assert conn == mock_conn_instance
             mock_connection.assert_called_once()
-            
+
             # Validate that connection was called with correct parameters
             call_args = mock_connection.call_args
             assert call_args is not None
             # Verify that credentials were passed correctly
-            assert call_args.kwargs.get('host') == mock_credentials.host
-            assert call_args.kwargs.get('username') == mock_credentials.username
-            assert call_args.kwargs.get('password') == mock_credentials.password
-            assert call_args.kwargs.get('port') == mock_credentials.port
+            assert call_args.kwargs.get("host") == mock_credentials.host
+            assert call_args.kwargs.get("username") == mock_credentials.username
+            assert call_args.kwargs.get("password") == mock_credentials.password
+            assert call_args.kwargs.get("port") == mock_credentials.port
 
     @pytest.mark.asyncio
     async def test_sftp_manager_close_all_success(

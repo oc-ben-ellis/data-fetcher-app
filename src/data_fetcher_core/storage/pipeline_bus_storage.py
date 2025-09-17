@@ -64,6 +64,13 @@ class DataPipelineBusStorage:
         )
         return context
 
+    def bundle_found(self, metadata: dict[str, Any]) -> str:
+        """Mint a BID using the underlying pipeline bus and return it.
+
+        Adds clearer error context if the underlying SQS queue is missing.
+        """
+        return self.pipeline_bus.bundle_found(metadata)
+
     async def _add_resource_to_bundle(
         self,
         bundle_ref: "BundleRef",
@@ -156,7 +163,9 @@ class DataPipelineBusStorage:
 
         # Execute locator completion callbacks
         for locator in recipe.locators:
-            if locator is not None and getattr(locator, "on_bundle_complete_hook", None):
+            if locator is not None and getattr(
+                locator, "on_bundle_complete_hook", None
+            ):
                 try:
                     await locator.on_bundle_complete_hook(bundle_ref)
                     logger.debug(

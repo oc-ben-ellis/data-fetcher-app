@@ -9,9 +9,10 @@ import functools
 import random
 import time
 from collections.abc import Callable
-import structlog
 from dataclasses import dataclass
 from typing import Any, TypeVar
+
+import structlog
 
 # Type variables for generic retry functions
 T = TypeVar("T")

@@ -4,14 +4,15 @@ This module provides factories for creating filter functions that can be used
 by bundle locators to filter files based on various criteria.
 """
 
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from oc_pipeline_bus.strategy_registry import (
     InvalidArgumentStrategyException,
     StrategyFactory,
 )
+
 from data_fetcher_core.strategies.types import FileFilter
 
 

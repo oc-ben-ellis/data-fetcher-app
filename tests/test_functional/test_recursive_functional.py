@@ -78,7 +78,9 @@ def localstack_session() -> dict[str, str]:
         pytest.skip(f"LocalStack not reachable: {type(e).__name__}: {e}")
     except Exception as e:
         # For other exceptions, fail the test as they indicate unexpected issues
-        pytest.fail(f"Unexpected error connecting to LocalStack: {type(e).__name__}: {e}")
+        pytest.fail(
+            f"Unexpected error connecting to LocalStack: {type(e).__name__}: {e}"
+        )
     if bucket not in existing:
         params = {"Bucket": bucket}
         if region != "us-east-1":

@@ -5,17 +5,20 @@ file pattern matching, date-based filtering, and remote directory traversal.
 """
 
 import fnmatch
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
 
-from data_fetcher_core.core import BundleRef, FetchRunContext, RequestMeta
-from data_fetcher_sftp.sftp_manager import SftpManager
+from data_fetcher_core.core import BundleRef, FetchRunContext
+from data_fetcher_core.strategy_types import (
+    LocatorStrategy,
+    FilterStrategyBase,
+    FileSortStrategyBase,
+)
 from data_fetcher_sftp.sftp_config import SftpProtocolConfig
-from data_fetcher_core.strategy_types import LocatorStrategy
+from data_fetcher_sftp.sftp_manager import SftpManager
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
@@ -44,9 +47,8 @@ class DirectorySftpBundleLocator(LocatorStrategy):
     remote_dir: str = "/"
     filename_pattern: str = "*"
     max_files: int | None = None
-    file_filter: Callable[[str], bool] | None = None
-    sort_key: Callable[[str, float | int | None], Any] | None = None
-    sort_reverse: bool = True
+    file_filter: FilterStrategyBase | None = None
+    file_sort: FileSortStrategyBase | None = None
     state_management_prefix: str = "sftp_directory_provider"
 
     def __post_init__(self) -> None:
@@ -104,8 +106,7 @@ class DirectorySftpBundleLocator(LocatorStrategy):
 
     async def _save_processing_result(
         self,
-        request: RequestMeta,
-        bundle_refs: list[BundleRef],
+        bundle: BundleRef,
         context: FetchRunContext,
         *,
         success: bool = True,
@@ -116,19 +117,18 @@ class DirectorySftpBundleLocator(LocatorStrategy):
             raise ValueError(error_message)
         store = context.app_config.kv_store
 
-        remote_path = request["url"].replace("sftp://", "")
+        remote_path = str(bundle.request_meta.get("url", "")).replace("sftp://", "")
         result_key = f"{self.state_management_prefix}:results:{self.remote_dir}:{hash(remote_path)}"
         result_data = {
             "remote_path": remote_path,
             "timestamp": datetime.now(UTC).isoformat(),
             "success": success,
-            "bundle_count": len(bundle_refs),
-            "bundle_refs": [str(ref) for ref in bundle_refs],
+            "bundle_bid": str(bundle.bid),
         }
         await store.put(result_key, result_data, ttl=timedelta(days=30))
 
     async def _save_error_state(
-        self, request: RequestMeta, error: str, context: FetchRunContext
+        self, bundle: BundleRef, error: str, context: FetchRunContext
     ) -> None:
         """Save error state for retry logic."""
         if not context.app_config or not context.app_config.kv_store:
@@ -136,7 +136,7 @@ class DirectorySftpBundleLocator(LocatorStrategy):
             raise ValueError(error_message)
         store = context.app_config.kv_store
 
-        remote_path = request["url"].replace("sftp://", "")
+        remote_path = str(bundle.request_meta.get("url", "")).replace("sftp://", "")
         error_key = f"{self.state_management_prefix}:errors:{self.remote_dir}:{hash(remote_path)}"
         error_data = {
             "remote_path": remote_path,
@@ -148,7 +148,7 @@ class DirectorySftpBundleLocator(LocatorStrategy):
 
     async def get_next_bundle_refs(
         self, ctx: FetchRunContext, bundle_refs_needed: int
-    ) -> list[RequestMeta]:
+    ) -> list[BundleRef]:
         """Get the next batch of SFTP URLs to process."""
         logger.info(
             "GET_NEXT_BUNDLE_REFS_STARTING",
@@ -168,7 +168,7 @@ class DirectorySftpBundleLocator(LocatorStrategy):
             processed_files_contents=list(self._processed_files),
         )
 
-        urls: list[RequestMeta] = []
+        urls: list[BundleRef] = []
         while self._file_queue and len(urls) < bundle_refs_needed:
             if self.max_files and len(self._processed_files) >= self.max_files:
                 logger.info("MAX_FILES_LIMIT_HIT", max_files=self.max_files)
@@ -179,40 +179,49 @@ class DirectorySftpBundleLocator(LocatorStrategy):
 
             if file_path not in self._processed_files:
                 logger.info("NEW_FILE_ADDED_TO_PROCESSING", file_path=file_path)
-                urls.append({"url": f"sftp://{file_path}"})
+                if not ctx.app_config or not ctx.app_config.storage:
+                    raise ValueError("Storage is required in app_config for BID minting")
+                storage = ctx.app_config.storage
+                bid_str = storage.bundle_found({
+                    "source": "sftp",
+                    "primary_url": f"sftp://{file_path}",
+                    "config_id": getattr(ctx.app_config, "config_id", "sftp"),
+                })
+                urls.append(
+                    BundleRef(
+                        bid=bid_str,
+                        request_meta={"url": f"sftp://{file_path}", "resources_count": 0},
+                    )
+                )
                 self._processed_files.add(file_path)
             else:
                 logger.info("ALREADY_PROCESSED_FILE_SKIPPED", file_path=file_path)
 
-        logger.info(
-            "RETURNING_BUNDLE_REFS_FOR_PROCESSING",
-            bundle_ref_count=len(urls),
-            urls=[u["url"] for u in urls],
-        )
+        logger.info("RETURNING_BUNDLE_REFS_FOR_PROCESSING", bundle_ref_count=len(urls))
 
         # Save state after generating URLs
         await self._save_persistence_state(ctx)
         return urls
 
     async def handle_url_processed(
-        self, request: RequestMeta, bundle_refs: list[BundleRef], ctx: FetchRunContext
+        self, bundle: BundleRef, result: object, ctx: FetchRunContext
     ) -> None:
         """Handle when a URL has been processed."""
         # Mark as processed
-        remote_path = request["url"].replace("sftp://", "")
+        remote_path = str(bundle.request_meta.get("url", "")).replace("sftp://", "")
         self._processed_files.add(remote_path)
 
         # Save processing result
-        await self._save_processing_result(request, bundle_refs, ctx, success=True)
+        await self._save_processing_result(bundle, ctx, success=True)
 
         # Save state after processing
         await self._save_persistence_state(ctx)
 
     async def handle_url_error(
-        self, request: RequestMeta, error: str, context: FetchRunContext
+        self, bundle: BundleRef, error: str, context: FetchRunContext
     ) -> None:
         """Handle when a URL processing fails."""
-        await self._save_error_state(request, error, context)
+        await self._save_error_state(bundle, error, context)
         await self._save_persistence_state(context)
 
     async def _initialize(self, context: FetchRunContext) -> None:
@@ -236,19 +245,18 @@ class DirectorySftpBundleLocator(LocatorStrategy):
                     continue
 
                 # Apply custom filter if provided
-                if self.file_filter and not self.file_filter(filename):
+                if self.file_filter is not None and not self.file_filter.filter(filename):
                     continue
 
                 # Get file stats for sorting using SFTP manager
-                stat = await self.sftp_manager.stat(self.sftp_config, context, file_path)
+                stat = await self.sftp_manager.stat(
+                    self.sftp_config, context, file_path
+                )
                 file_info.append((file_path, stat.st_mtime))
 
-            # Sort files if sort_key is provided
-            sort_key_func = self.sort_key
-            if sort_key_func is not None:
-                file_info.sort(
-                    key=lambda x: sort_key_func(x[0], x[1]), reverse=self.sort_reverse
-                )
+            # Sort files using strategy if provided
+            if self.file_sort is not None:
+                file_info = self.file_sort.sort(file_info)
 
             # Add to queue
             for file_path, _ in file_info:
@@ -286,9 +294,11 @@ class FileSftpBundleLocator(LocatorStrategy):
 
     def __post_init__(self) -> None:
         """Initialize the file SFTP bundle locator state and internal variables."""
-        self._processed_files: dict[str, float] = {}  # file_path -> last_processed_mtime
+        self._processed_files: dict[
+            str, float
+        ] = {}  # file_path -> last_processed_mtime
         self._file_queue: list[str] = self.file_paths.copy()
-        
+
         # Validate required dependencies
         if not self.sftp_manager:
             raise ValueError("sftp_manager is required for FileSftpBundleLocator")
@@ -332,7 +342,7 @@ class FileSftpBundleLocator(LocatorStrategy):
 
             # Check if we've processed this file before
             last_processed_mtime = self._processed_files.get(file_path)
-            
+
             if last_processed_mtime is None:
                 # File has never been processed
                 logger.info(
@@ -341,7 +351,7 @@ class FileSftpBundleLocator(LocatorStrategy):
                     current_mtime=current_mtime,
                 )
                 return True
-            
+
             if current_mtime > last_processed_mtime:
                 # File has been modified since last processing
                 logger.info(
@@ -351,15 +361,14 @@ class FileSftpBundleLocator(LocatorStrategy):
                     last_processed_mtime=last_processed_mtime,
                 )
                 return True
-            else:
-                # File hasn't changed since last processing
-                logger.debug(
-                    "FILE_UNCHANGED_SINCE_LAST_PROCESSING",
-                    file_path=file_path,
-                    current_mtime=current_mtime,
-                    last_processed_mtime=last_processed_mtime,
-                )
-                return False
+            # File hasn't changed since last processing
+            logger.debug(
+                "FILE_UNCHANGED_SINCE_LAST_PROCESSING",
+                file_path=file_path,
+                current_mtime=current_mtime,
+                last_processed_mtime=last_processed_mtime,
+            )
+            return False
 
         except Exception as e:
             logger.exception(
@@ -385,8 +394,7 @@ class FileSftpBundleLocator(LocatorStrategy):
 
     async def _save_processing_result(
         self,
-        request: RequestMeta,
-        bundle_refs: list[BundleRef],
+        bundle: BundleRef,
         context: FetchRunContext,
         *,
         success: bool = True,
@@ -397,34 +405,41 @@ class FileSftpBundleLocator(LocatorStrategy):
             raise ValueError(error_message)
         store = context.app_config.kv_store
 
-        remote_path = request["url"].replace("sftp://", "")
+        remote_path = bundle.request_meta["url"].replace("sftp://", "")
         result_key = f"{self.state_management_prefix}:results:{hash(remote_path)}"
         result_data = {
             "remote_path": remote_path,
             "timestamp": datetime.now(UTC).isoformat(),
             "success": success,
-            "bundle_count": len(bundle_refs),
-            "bundle_refs": [str(ref) for ref in bundle_refs],
+            "bundle_bid": str(bundle.bid),
         }
         await store.put(result_key, result_data, ttl=timedelta(days=30))
 
     async def get_next_bundle_refs(
         self, ctx: FetchRunContext, bundle_refs_needed: int
-    ) -> list[RequestMeta]:
+    ) -> list[BundleRef]:
         """Get the next batch of SFTP URLs to process."""
         # Load persistence state on first call
         if not self._processed_files:
             await self._load_persistence_state(ctx)
 
-        urls: list[RequestMeta] = []
+        urls: list[BundleRef] = []
         while self._file_queue and len(urls) < bundle_refs_needed:
             file_path = self._file_queue.pop(0)
-            
+
             # Check if file needs processing based on modification time
             should_process = await self._should_process_file(file_path, ctx)
-            
+
             if should_process:
-                urls.append({"url": f"sftp://{file_path}"})
+                if not ctx.app_config or not ctx.app_config.storage:
+                    raise ValueError("Storage is required in app_config for BID minting")
+                storage = ctx.app_config.storage
+                bid_str = storage.bundle_found({
+                    "source": "sftp",
+                    "primary_url": f"sftp://{file_path}",
+                    "config_id": getattr(ctx.app_config, "config_id", "sftp"),
+                })
+                urls.append(BundleRef(bid=bid_str, request_meta={"url": f"sftp://{file_path}"}))
                 logger.info(
                     "FILE_ADDED_FOR_PROCESSING",
                     file_path=file_path,
@@ -435,23 +450,18 @@ class FileSftpBundleLocator(LocatorStrategy):
         return urls
 
     async def handle_url_processed(
-        self, request: RequestMeta, bundle_refs: list[BundleRef], ctx: FetchRunContext
+        self, bundle: BundleRef, result: object, ctx: FetchRunContext
     ) -> None:
         """Handle when a URL has been processed."""
-        remote_path = request["url"].replace("sftp://", "")
-        
+        remote_path = bundle.request_meta["url"].replace("sftp://", "")
+
         # Get current file modification time and store it
         try:
             stat = await self.sftp_manager.stat(self.sftp_config, ctx, remote_path)
             current_mtime = stat.st_mtime
             self._processed_files[remote_path] = current_mtime
-            
-            logger.info(
-                "FILE_PROCESSING_COMPLETED",
-                file_path=remote_path,
-                mtime=current_mtime,
-                bundle_count=len(bundle_refs),
-            )
+
+            logger.info("FILE_PROCESSING_COMPLETED", file_path=remote_path, mtime=current_mtime)
         except Exception as e:
             logger.exception(
                 "ERROR_GETTING_FILE_MODIFICATION_TIME_AFTER_PROCESSING",
@@ -462,13 +472,13 @@ class FileSftpBundleLocator(LocatorStrategy):
             self._processed_files[remote_path] = 0.0
 
         # Save processing result
-        await self._save_processing_result(request, bundle_refs, ctx, success=True)
+        await self._save_processing_result(bundle, ctx, success=True)
 
         # Save state after processing
         await self._save_persistence_state(ctx)
 
     async def handle_url_error(
-        self, request: RequestMeta, error: str, context: FetchRunContext
+        self, bundle: BundleRef, error: str, context: FetchRunContext
     ) -> None:
         """Handle when a URL processing fails."""
         if not context.app_config or not context.app_config.kv_store:
@@ -476,7 +486,7 @@ class FileSftpBundleLocator(LocatorStrategy):
             raise ValueError(error_message)
         store = context.app_config.kv_store
 
-        remote_path = request.url.replace("sftp://", "")
+        remote_path = bundle.request_meta["url"].replace("sftp://", "")
         error_key = f"{self.state_management_prefix}:errors:{hash(remote_path)}"
         error_data = {
             "remote_path": remote_path,

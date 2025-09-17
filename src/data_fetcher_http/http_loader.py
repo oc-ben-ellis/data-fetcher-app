@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Union, cast
 import structlog
 
 from data_fetcher_core.core import (
+    BundleLoadResult,
     BundleRef,
     DataRegistryFetcherConfig,
     FetchRunContext,
-    RequestMeta,
 )
 from data_fetcher_http.http_config import HttpProtocolConfig
 from data_fetcher_http.http_manager import HttpManager
@@ -40,11 +40,11 @@ class StreamingHttpBundleLoader:
 
     async def load(
         self,
-        request: RequestMeta,
+        bundle: BundleRef,
         storage: Storage | None,
         ctx: FetchRunContext,
         recipe: DataRegistryFetcherConfig,
-    ) -> list[BundleRef]:
+    ) -> BundleLoadResult:
         """Load data from HTTP endpoint with streaming support.
 
         Args:
@@ -58,48 +58,49 @@ class StreamingHttpBundleLoader:
         """
         try:
             # Make HTTP request
+            url = str(bundle.request_meta.get("url", ""))
             response = await self.http_manager.request(
                 self.http_config,
                 ctx.app_config,
                 "GET",
-                request["url"],
-                headers=request.get("headers", {}),
+                url,
+                headers={},
                 follow_redirects=self.follow_redirects,
             )
 
-            # Create bundle reference
-            bundle_ref = BundleRef(
-                primary_url=request["url"],
-                resources_count=1,
-                meta={
-                    "status_code": response.status_code,
-                    "content_type": response.headers.get("content-type"),
-                    "content_length": response.headers.get("content-length"),
-                },
-            )
+            # Update incoming bundle request_meta
+            bundle.request_meta.update({
+                "status_code": response.status_code,
+                "content_type": response.headers.get("content-type"),
+                "content_length": response.headers.get("content-length"),
+                "resources_count": 1,
+            })
 
             # Create logger with BID context for tracing
-            bid_logger = logger.bind(bid=str(bundle_ref.bid))
+            bid_logger = logger.bind(bid=str(bundle.bid))
 
             # Stream to storage
+            resources_meta: list[dict[str, object]] = []
             if storage:
-                bid_logger.debug(
-                    "STREAMING_HTTP_RESPONSE_TO_STORAGE", url=request["url"]
-                )
-                bundle_context = await storage.start_bundle(bundle_ref, recipe)
+                bid_logger.debug("STREAMING_HTTP_RESPONSE_TO_STORAGE", url=url)
+                bundle_context = await storage.start_bundle(bundle, recipe)
                 # BundleStorageContext doesn't support async with, so we use it directly
                 bundle = bundle_context
 
                 # Write primary resource
+                resource_meta = {
+                    "url": url,
+                    "content_type": response.headers.get("content-type"),
+                    "status_code": response.status_code,
+                }
                 await bundle.add_resource(
-                    resource_name=request["url"],
+                    resource_name=url,
                     metadata={
-                        "url": request["url"],
-                        "content_type": response.headers.get("content-type"),
-                        "status_code": response.status_code,
+                        **resource_meta,
                     },
                     stream=cast("AsyncGenerator[bytes]", response.aiter_bytes()),
                 )
+                resources_meta.append(resource_meta)
 
                 # Handle related resources (e.g., CSS, JS, images)
                 if self.max_related > 0:
@@ -112,26 +113,28 @@ class StreamingHttpBundleLoader:
                                 "GET",
                                 related_url,
                             )
+                            related_meta = {
+                                "url": related_url,
+                                "content_type": related_response.headers.get(
+                                    "content-type"
+                                ),
+                                "status_code": related_response.status_code,
+                            }
                             await bundle.add_resource(
                                 resource_name=related_url,
-                                metadata={
-                                    "url": related_url,
-                                    "content_type": related_response.headers.get(
-                                        "content-type"
-                                    ),
-                                    "status_code": related_response.status_code,
-                                },
+                                metadata=related_meta,
                                 stream=cast(
                                     "AsyncGenerator[bytes]",
                                     related_response.aiter_bytes(),
                                 ),
                             )
+                            resources_meta.append(related_meta)
                             # Increment resources_count if tracked in meta
                             try:
-                                current = int(bundle_ref.meta.get("resources_count", 0))
+                                current = int(bundle.request_meta.get("resources_count", 0))
                             except (TypeError, ValueError):
                                 current = 0
-                            bundle_ref.meta["resources_count"] = current + 1
+                            bundle.request_meta["resources_count"] = current + 1
                         except Exception as e:  # noqa: BLE001
                             bid_logger.warning(
                                 "ERROR_FETCHING_RELATED_RESOURCE",
@@ -139,18 +142,20 @@ class StreamingHttpBundleLoader:
                                 error=str(e),
                             )
                 bid_logger.debug(
-                    "SUCCESSFULLY_STREAMED_HTTP_RESPONSE_TO_STORAGE", url=request["url"]
+                    "SUCCESSFULLY_STREAMED_HTTP_RESPONSE_TO_STORAGE", url=url
                 )
 
         except Exception as e:
             logger.exception(
                 "ERROR_LOADING_HTTP_REQUEST",
-                url=request.get("url", "unknown"),
+                url=str(bundle.request_meta.get("url", "unknown")),
                 error=str(e),
             )
-            return []
+            raise
         else:
-            return [bundle_ref]
+            return BundleLoadResult(
+                bundle=bundle, bundle_meta=bundle.request_meta, resources=resources_meta
+            )
 
     def _extract_related_urls(self, response: object) -> list[str]:  # noqa: ARG002
         """Extract related URLs from HTML content."""

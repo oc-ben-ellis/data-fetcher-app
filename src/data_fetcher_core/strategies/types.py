@@ -7,5 +7,3 @@ from typing import Protocol, runtime_checkable
 class FileFilter(Protocol):
     def __call__(self, filename: str) -> bool:  # pragma: no cover - structural
         ...
-
-

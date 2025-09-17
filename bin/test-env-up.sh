@@ -250,7 +250,7 @@ AWS_REGION=$(terraform -chdir "$TF_DIR" output -raw aws_region_out 2>/dev/null |
 PIPELINE_BUCKET=$(terraform -chdir "$MOCKS_TF_DIR" output -raw pipeline_bucket_name 2>/dev/null || echo "oc-local-data-pipeline")
 CONFIG_BUCKET=$(terraform -chdir "$MOCKS_TF_DIR" output -raw config_bucket_name 2>/dev/null || echo "oc-local-data-config")
 DATA_REGISTRY_ID=$(terraform -chdir "$MOCKS_TF_DIR" output -raw data_registry_id 2>/dev/null || echo "us_fl")
-ORCH_SQS_URL="${AWS_ENDPOINT_URL}/000000000000/data-pipeline-orchestration"
+ORCH_SQS_URL="${AWS_ENDPOINT_URL:-http://${HOST_ADDR}:${PORT}}/000000000000/data-pipeline-orchestration"
 
 # If only env vars are requested, output them in export format and exit
 if [ "$ENV_VARS_ONLY" -eq 1 ]; then

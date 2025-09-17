@@ -10,8 +10,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from oc_pipeline_bus.config import Strategy, Annotated
-from data_fetcher_core.strategy_types import BundleLoader, BundleLocator
+from oc_pipeline_bus.config import Annotated
+
+from data_fetcher_core.strategy_types import LoaderStrategy, LocatorStrategy
 
 if TYPE_CHECKING:
     from data_fetcher_core.core_config.config_factory import FetcherConfig
@@ -31,20 +32,28 @@ class BundleRef:
     """
 
     bid: Bid
-    meta: dict[str, Any]
+    request_meta: "RequestMeta"
 
     def __init__(
         self,
-        bid: Bid | None = None,
-        meta: dict[str, Any] | None = None,
+        bid: Bid | str | None = None,
+        request_meta: "RequestMeta | None" = None,
         **kwargs: object,
     ) -> None:
-        self.bid = bid or Bid()  # Default construct when not provided
-        self.meta = dict(meta or {})
-        # Fold any legacy kwargs into meta for compatibility
-        for key in ("primary_url", "resources_count", "storage_key"):
-            if key in kwargs and kwargs[key] is not None:
-                self.meta[key] = kwargs[key]
+        # Enforce that bid is provided
+        if bid is None:
+            raise TypeError("BundleRef requires a 'bid' (str or Bid)")
+        self.bid = bid if isinstance(bid, Bid) else Bid(bid)
+        # Start with provided request_meta or empty
+        rm: RequestMeta = dict(request_meta or {})
+        # Back-compat: fold legacy kwargs into request_meta
+        if "primary_url" in kwargs and kwargs["primary_url"] is not None:
+            rm.setdefault("url", kwargs["primary_url"])  # type: ignore[index]
+        if "resources_count" in kwargs and kwargs["resources_count"] is not None:
+            rm.setdefault("resources_count", kwargs["resources_count"])  # type: ignore[index]
+        if "storage_key" in kwargs and kwargs["storage_key"] is not None:
+            rm.setdefault("storage_key", kwargs["storage_key"])  # type: ignore[index]
+        self.request_meta = rm
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> BundleRef:
@@ -68,14 +77,16 @@ class BundleRef:
             error_message = "BundleRef data must contain 'bid' field"
             raise BundleRefValidationError(error_message)
 
-        # Validate meta dict is present; specific keys are optional and may include
-        # 'primary_url' and 'resources_count'
-        if "meta" not in data:
-            error_message = "BundleRef data must contain 'meta' field"
+        # Accept either 'request_meta' (preferred) or 'meta' (legacy)
+        if "request_meta" in data:
+            meta = data["request_meta"]
+        elif "meta" in data:
+            meta = data["meta"]
+        else:
+            error_message = "BundleRef data must contain 'request_meta' (or legacy 'meta') field"
             raise BundleRefValidationError(error_message)
-        meta = data["meta"]
         if not isinstance(meta, dict):
-            error_message = "meta must be a dictionary"
+            error_message = "request_meta must be a dictionary"
             raise BundleRefValidationError(error_message)
 
         # Validate BID format
@@ -89,8 +100,21 @@ class BundleRef:
 
         return cls(
             bid=bid,
-            meta=meta,
+            request_meta=meta,
         )
+
+
+@dataclass
+class BundleLoadResult:
+    """Result of loading a bundle.
+
+    Contains the original `BundleRef`, aggregate bundle metadata, and
+    per-resource metadata entries produced during loading.
+    """
+
+    bundle: BundleRef
+    bundle_meta: dict[str, Any]
+    resources: list[dict[str, Any]]
 
 
 @dataclass
@@ -138,14 +162,14 @@ class ProtocolConfig(ABC):
 class DataRegistryFetcherConfig:
     """YAML-based fetcher configuration using strategy factory registry."""
 
-    loader: Annotated[BundleLoader, "strategy"]
-    locators: list[ Annotated[BundleLocator, "strategy"]]
+    loader: Annotated[LoaderStrategy, "strategy"]
+    locators: list[Annotated[LocatorStrategy, "strategy"]]
     concurrency: int = 10
     target_queue_size: int = 100
     # Optional fields for backward compatibility with storage hooks
     config_id: str = ""
     # Protocol configurations for resolving relative configs
-    protocols: dict[str, dict[str, str]] = field(default_factory=dict)
+    # protocols: dict[str, dict[str, str]] = field(default_factory=dict)
 
 
 @dataclass

@@ -40,7 +40,9 @@ class StorageBuilder:
         self._s3_endpoint_url = endpoint_url
         return self
 
-    def pipeline_bus_storage(self, pipeline_bus: object | None = None) -> "StorageBuilder":
+    def pipeline_bus_storage(
+        self, pipeline_bus: object | None = None
+    ) -> "StorageBuilder":
         """Configure Pipeline Bus storage."""
         self._use_pipeline_bus = True
         self._pipeline_bus = pipeline_bus
@@ -75,7 +77,9 @@ class StorageBuilder:
             # Use Pipeline Bus storage
             if self._pipeline_bus is not None:
                 # Use injected pipeline bus
-                base_storage: object = DataPipelineBusStorage(pipeline_bus=self._pipeline_bus)
+                base_storage: object = DataPipelineBusStorage(
+                    pipeline_bus=self._pipeline_bus
+                )
             else:
                 base_storage = DataPipelineBusStorage()
         elif self._s3_bucket:

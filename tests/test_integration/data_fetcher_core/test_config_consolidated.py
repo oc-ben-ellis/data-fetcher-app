@@ -1,6 +1,6 @@
 """Consolidated configuration loading integration tests.
 
-This module combines the best tests from test_config_integration.py, 
+This module combines the best tests from test_config_integration.py,
 test_basic_config_pytest.py, and test_core_integration_pytest.py to provide
 comprehensive coverage without duplication.
 
@@ -15,15 +15,14 @@ The consolidated tests cover:
 
 import tempfile
 from pathlib import Path
-from typing import Any
 
 import pytest
 import yaml
+from oc_pipeline_bus.config import DataPipelineConfig
+from oc_pipeline_bus.strategy_registry import StrategyFactoryRegistry
 
 from data_fetcher_core.core import DataRegistryFetcherConfig
 from data_fetcher_core.strategy_registration import create_strategy_registry
-from oc_pipeline_bus.config import DataPipelineConfig
-from oc_pipeline_bus.strategy_registry import StrategyFactoryRegistry
 
 
 class TestConfigConsolidated:
@@ -134,48 +133,48 @@ security:
         """Create a temporary directory with sample configuration files."""
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir)
-            
+
             # Create main config file
             main_config_path = config_path / "config.yaml"
             main_config_path.write_text(sample_config_yaml)
-            
+
             # Create HTTP protocol config
             http_config_path = config_path / "http_config.yaml"
             http_config_path.write_text(sample_http_config_yaml)
-            
+
             # Create SFTP config file
             sftp_config_path = config_path / "sftp_config.yaml"
             sftp_config_path.write_text(sample_sftp_config_yaml)
-            
+
             # Create SFTP protocol config
             sftp_protocol_path = config_path / "sftp_protocol.yaml"
             sftp_protocol_path.write_text(sample_sftp_protocol_yaml)
-            
+
             yield config_path
 
     # ===== BASIC IMPORTS AND CLASS CREATION TESTS =====
-    
+
     def test_basic_imports_and_attributes(self) -> None:
         """Test that basic imports work and classes have expected attributes."""
         # Test pipeline-bus imports
         from oc_pipeline_bus.config import DataPipelineConfig
         from oc_pipeline_bus.strategy_registry import StrategyFactoryRegistry
-        
+
         # Test fetcher core imports
         from data_fetcher_core.core import DataRegistryFetcherConfig
-        
+
         # Verify that imported classes have expected attributes
-        assert hasattr(DataPipelineConfig, '__init__')
-        assert hasattr(StrategyFactoryRegistry, '__init__')
-        assert hasattr(DataRegistryFetcherConfig, '__init__')
+        assert hasattr(DataPipelineConfig, "__init__")
+        assert hasattr(StrategyFactoryRegistry, "__init__")
+        assert hasattr(DataRegistryFetcherConfig, "__init__")
 
     def test_strategy_registry_creation(self) -> None:
         """Test that strategy registry can be created and has expected attributes."""
         registry = StrategyFactoryRegistry()
         assert registry is not None
-        assert hasattr(registry, '_factories')
+        assert hasattr(registry, "_factories")
         assert len(registry._factories) >= 0
-        
+
         # Test that we can iterate over factories
         for strategy_type, factories in registry._factories.items():
             assert strategy_type is not None
@@ -186,9 +185,9 @@ security:
         """Test that DataRegistryFetcherConfig can be created with defaults."""
         config = DataRegistryFetcherConfig(
             loader={"test_loader": {"param": "value"}},
-            locators=[{"test_locator": {"param": "value"}}]
+            locators=[{"test_locator": {"param": "value"}}],
         )
-        
+
         assert config is not None
         assert "test_loader" in config.loader
         assert len(config.locators) == 1
@@ -198,7 +197,7 @@ security:
         assert config.protocols == {}  # default empty dict
 
     # ===== CONFIG LOADER INITIALIZATION TESTS =====
-    
+
     def test_config_loader_initialization_with_registry(self) -> None:
         """Test that DataPipelineConfig can be initialized with strategy registry."""
         strategy_registry = create_strategy_registry()
@@ -206,9 +205,9 @@ security:
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=strategy_registry
+            strategy_registry=strategy_registry,
         )
-        
+
         assert config_loader is not None
         assert config_loader.strategy_registry is not None
 
@@ -217,9 +216,9 @@ security:
         config_loader = DataPipelineConfig(
             config_bucket="test-bucket",
             step="fetcher",
-            data_registry_id="test-registry"
+            data_registry_id="test-registry",
         )
-        
+
         assert config_loader is not None
         assert config_loader.strategy_registry is not None
 
@@ -230,30 +229,31 @@ security:
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=registry
+            strategy_registry=registry,
         )
         assert config_loader is not None
         assert config_loader.strategy_registry is registry
 
     # ===== METHOD SIGNATURE AND INTERFACE TESTS =====
-    
+
     def test_create_strategy_from_config_method_signature(self) -> None:
         """Test that _create_strategy_from_config has correct signature."""
         config_loader = DataPipelineConfig(
             config_bucket="test-bucket",
             step="fetcher",
-            data_registry_id="test-registry"
+            data_registry_id="test-registry",
         )
-        
+
         # Check method signature
         import inspect
+
         sig = inspect.signature(config_loader._create_strategy_from_config)
         params = list(sig.parameters.keys())
-        
+
         # Should have exactly 3 parameters: strategy_type, strategy_id, strategy_config
         assert len(params) == 3
         assert params[0] == "strategy_type"
-        assert params[1] == "strategy_id" 
+        assert params[1] == "strategy_id"
         assert params[2] == "strategy_config"
 
     def test_strategy_creation_with_empty_config(self) -> None:
@@ -263,16 +263,16 @@ security:
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=registry
+            strategy_registry=registry,
         )
-        
+
         # Try to create a strategy with empty config - should fail gracefully
         try:
             # This should fail because we don't have the right strategy type or config
             strategy = config_loader._create_strategy_from_config(
                 strategy_type=object,  # Invalid strategy type
                 strategy_id="nonexistent",
-                strategy_config={}
+                strategy_config={},
             )
             # If it doesn't fail, that's also okay - depends on implementation
         except Exception:
@@ -280,7 +280,7 @@ security:
             pass
 
     # ===== YAML PARSING AND BASIC FILE OPERATIONS =====
-    
+
     def test_yaml_parsing(self) -> None:
         """Test that YAML can be parsed correctly."""
         sample_yaml = """
@@ -293,21 +293,21 @@ locators:
   - test_locator:
       param: value
 """
-        
+
         # Parse YAML
         config_data = yaml.safe_load(sample_yaml)
-        
+
         # Verify structure
-        assert config_data['concurrency'] == 5
-        assert config_data['target_queue_size'] == 50
-        assert 'loader' in config_data
-        assert 'locators' in config_data
+        assert config_data["concurrency"] == 5
+        assert config_data["target_queue_size"] == 50
+        assert "loader" in config_data
+        assert "locators" in config_data
 
     def test_basic_file_operations(self) -> None:
         """Test basic file operations for config files."""
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "test_config.yaml"
-            
+
             # Write config file
             sample_config = """
 concurrency: 3
@@ -318,14 +318,14 @@ loader:
 """
             config_path.write_text(sample_config)
             assert config_path.exists()
-            
+
             # Read config file
             content = config_path.read_text()
             assert "concurrency: 3" in content
             assert "file_loader" in content
 
     # ===== COMPREHENSIVE CONFIGURATION LOADING TESTS =====
-    
+
     def test_load_config_from_yaml_file(self, temp_config_dir: Path) -> None:
         """Test loading configuration from a YAML file."""
         strategy_registry = create_strategy_registry()
@@ -333,16 +333,16 @@ loader:
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=strategy_registry
+            strategy_registry=strategy_registry,
         )
-        
+
         config_path = temp_config_dir / "config.yaml"
         config = config_loader.load_config_from_dir(
-            DataRegistryFetcherConfig, 
+            DataRegistryFetcherConfig,
             str(config_path.parent),
-            filename=config_path.name
+            filename=config_path.name,
         )
-        
+
         assert config is not None
         assert isinstance(config, DataRegistryFetcherConfig)
         assert config.config_id == "test_source"
@@ -358,28 +358,28 @@ loader:
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=strategy_registry
+            strategy_registry=strategy_registry,
         )
-        
+
         config_path = temp_config_dir / "config.yaml"
         config = config_loader.load_config_from_dir(
-            DataRegistryFetcherConfig, 
+            DataRegistryFetcherConfig,
             str(config_path.parent),
-            filename=config_path.name
+            filename=config_path.name,
         )
-        
+
         # Verify that the loader has the correct configuration
         assert config.loader is not None
-        assert hasattr(config.loader, 'meta_load_name')
+        assert hasattr(config.loader, "meta_load_name")
         assert config.loader.meta_load_name == "test_http_loader"
         assert config.loader.http_config == "test_http"
-        
+
         # Verify that locators have correct configurations
         assert len(config.locators) == 1
-        
+
         # Check locator (pagination)
         pagination_locator = config.locators[0]
-        assert hasattr(pagination_locator, 'base_url')
+        assert hasattr(pagination_locator, "base_url")
         assert pagination_locator.base_url == "https://api.example.com/data"
         assert pagination_locator.date_start == "2023-01-01"
         assert pagination_locator.max_records_per_page == 100
@@ -391,31 +391,31 @@ loader:
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=strategy_registry
+            strategy_registry=strategy_registry,
         )
-        
+
         config_path = temp_config_dir / "sftp_config.yaml"
         config = config_loader.load_config_from_dir(
-            DataRegistryFetcherConfig, 
+            DataRegistryFetcherConfig,
             str(config_path.parent),
-            filename=config_path.name
+            filename=config_path.name,
         )
-        
+
         assert config is not None
         assert config.config_id == "test_sftp_source"
         assert config.concurrency == 2
         assert config.target_queue_size == 25
-        
+
         # Verify SFTP loader configuration
         assert config.loader is not None
-        assert hasattr(config.loader, 'meta_load_name')
+        assert hasattr(config.loader, "meta_load_name")
         assert config.loader.meta_load_name == "test_sftp_loader"
         assert config.loader.sftp_config == "test_sftp"
-        
+
         # Verify SFTP locator configuration
         assert len(config.locators) == 1
         sftp_locator = config.locators[0]
-        assert hasattr(sftp_locator, 'remote_dir')
+        assert hasattr(sftp_locator, "remote_dir")
         assert sftp_locator.remote_dir == "/data"
         assert sftp_locator.filename_pattern == "*.txt"
         assert sftp_locator.max_files == 10
@@ -427,16 +427,16 @@ loader:
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=strategy_registry
+            strategy_registry=strategy_registry,
         )
-        
+
         config_path = temp_config_dir / "config.yaml"
         config = config_loader.load_config_from_dir(
-            DataRegistryFetcherConfig, 
+            DataRegistryFetcherConfig,
             str(config_path.parent),
-            filename=config_path.name
+            filename=config_path.name,
         )
-        
+
         # Verify protocols are loaded
         assert config.protocols is not None
         assert "http" in config.protocols
@@ -472,37 +472,37 @@ protocols:
   sftp:
     test_sftp: sftp_protocol.yaml
 """
-        
+
         config_path = temp_config_dir / "config_with_filters.yaml"
         config_path.write_text(config_with_filters)
-        
+
         strategy_registry = create_strategy_registry()
         config_loader = DataPipelineConfig(
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=strategy_registry
+            strategy_registry=strategy_registry,
         )
-        
+
         config = config_loader.load_config_from_dir(
-            DataRegistryFetcherConfig, 
+            DataRegistryFetcherConfig,
             str(config_path.parent),
-            filename=config_path.name
+            filename=config_path.name,
         )
-        
+
         assert config is not None
-        
+
         # Verify filter configuration
         locator = config.locators[0]
-        assert hasattr(locator, 'file_filter')
+        assert hasattr(locator, "file_filter")
         file_filter = locator.file_filter
-        
+
         assert file_filter["type"] == "date_filter"
         assert file_filter["start_date"] == "2023-01-01"
         assert file_filter["date_pattern"] == "YYYY-MM-DD"
 
     # ===== ERROR HANDLING AND EDGE CASES =====
-    
+
     def test_config_validation_errors(self, temp_config_dir: Path) -> None:
         """Test that configuration validation works correctly."""
         strategy_registry = create_strategy_registry()
@@ -510,9 +510,9 @@ protocols:
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=strategy_registry
+            strategy_registry=strategy_registry,
         )
-        
+
         # Create invalid config
         invalid_config = """
 config_id: test_source
@@ -526,17 +526,17 @@ loader:
 
 locators: []
 """
-        
+
         invalid_config_path = temp_config_dir / "invalid_config.yaml"
         invalid_config_path.write_text(invalid_config)
-        
+
         # This should raise an error because invalid_loader is not registered
         with pytest.raises(Exception):  # Should be InvalidArgumentStrategyException
             config_loader.load_config_from_file(
-                DataRegistryFetcherConfig, 
-                invalid_config_path, 
+                DataRegistryFetcherConfig,
+                invalid_config_path,
                 data_registry_id="test_source",
-                step="fetcher"
+                step="fetcher",
             )
 
     def test_config_loading_with_missing_files(self, temp_config_dir: Path) -> None:
@@ -559,25 +559,25 @@ protocols:
   http:
     missing_config: non_existent.yaml
 """
-        
+
         config_path = temp_config_dir / "config_missing.yaml"
         config_path.write_text(config_with_missing_ref)
-        
+
         strategy_registry = create_strategy_registry()
         config_loader = DataPipelineConfig(
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=strategy_registry
+            strategy_registry=strategy_registry,
         )
-        
+
         # This should raise an error when trying to load the missing file
         with pytest.raises(Exception):  # Should be FileNotFoundError or similar
             config_loader.load_config_from_file(
-                DataRegistryFetcherConfig, 
-                config_path, 
+                DataRegistryFetcherConfig,
+                config_path,
                 data_registry_id="test_source",
-                step="fetcher"
+                step="fetcher",
             )
 
     def test_config_loading_with_invalid_yaml(self, temp_config_dir: Path) -> None:
@@ -594,25 +594,25 @@ loader:
     http_config: "test_http
 locators: []
 """
-        
+
         config_path = temp_config_dir / "invalid_yaml.yaml"
         config_path.write_text(invalid_yaml)
-        
+
         strategy_registry = create_strategy_registry()
         config_loader = DataPipelineConfig(
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=strategy_registry
+            strategy_registry=strategy_registry,
         )
-        
+
         # This should raise a YAML parsing error
         with pytest.raises(Exception):  # Should be yaml.YAMLError
             config_loader.load_config_from_file(
-                DataRegistryFetcherConfig, 
-                config_path, 
+                DataRegistryFetcherConfig,
+                config_path,
                 data_registry_id="test_source",
-                step="fetcher"
+                step="fetcher",
             )
 
     def test_config_loading_with_empty_locators(self, temp_config_dir: Path) -> None:
@@ -634,24 +634,24 @@ protocols:
   http:
     test_http: http_config.yaml
 """
-        
+
         config_path = temp_config_dir / "empty_locators.yaml"
         config_path.write_text(config_empty_locators)
-        
+
         strategy_registry = create_strategy_registry()
         config_loader = DataPipelineConfig(
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=strategy_registry
+            strategy_registry=strategy_registry,
         )
-        
+
         config = config_loader.load_config_from_dir(
-            DataRegistryFetcherConfig, 
+            DataRegistryFetcherConfig,
             str(config_path.parent),
-            filename=config_path.name
+            filename=config_path.name,
         )
-        
+
         assert config is not None
         assert config.locators == []
 
@@ -671,27 +671,29 @@ protocols:
   http:
     test_http: http_config.yaml
 """
-        
+
         config_path = temp_config_dir / "minimal_config.yaml"
         config_path.write_text(config_minimal)
-        
+
         strategy_registry = create_strategy_registry()
         config_loader = DataPipelineConfig(
             config_bucket="test-bucket",
             step="fetcher",
             data_registry_id="test-registry",
-            strategy_registry=strategy_registry
+            strategy_registry=strategy_registry,
         )
-        
+
         config = config_loader.load_config_from_dir(
-            DataRegistryFetcherConfig, 
+            DataRegistryFetcherConfig,
             str(config_path.parent),
-            filename=config_path.name
+            filename=config_path.name,
         )
-        
+
         assert config is not None
         # Check that defaults are applied
         assert config.concurrency == 10  # Default from DataRegistryFetcherConfig
         assert config.target_queue_size == 100  # Default from DataRegistryFetcherConfig
         assert config.config_id == "test_source"  # From config file
-        assert config.protocols == {"http": {"test_http": "http_config.yaml"}}  # From config file
+        assert config.protocols == {
+            "http": {"test_http": "http_config.yaml"}
+        }  # From config file

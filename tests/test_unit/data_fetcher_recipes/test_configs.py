@@ -16,8 +16,9 @@ class TestConfigModules:
             # Test that the modules can be imported
             import data_fetcher_recipes.fr
             import data_fetcher_recipes.us_fl
+
             # If we get here, imports worked
-            assert hasattr(data_fetcher_recipes.fr, '__name__')
-            assert hasattr(data_fetcher_recipes.us_fl, '__name__')
+            assert hasattr(data_fetcher_recipes.fr, "__name__")
+            assert hasattr(data_fetcher_recipes.us_fl, "__name__")
         except ImportError as e:
             pytest.fail(f"Failed to import configuration modules: {e}")

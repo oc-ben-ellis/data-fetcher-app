@@ -12,8 +12,6 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 from wsgiref.simple_server import make_server
 
-from data_fetcher_http.http_manager import HttpManager
-from data_fetcher_sftp.sftp_manager import SftpManager
 import structlog
 
 # Recipe-based system has been replaced with YAML configuration
@@ -22,7 +20,6 @@ from openc_python_common.observability import (
     log_bind,
     observe_around,
 )
-from data_fetcher_core.logging import configure_logging, LoggingLevel, LoggingHandler, ConsoleMode
 
 # Recipes have been moved to YAML configuration system
 from data_fetcher_app.app_config import (
@@ -34,8 +31,15 @@ from data_fetcher_app.app_config import (
 from data_fetcher_app.health import create_health_app
 from data_fetcher_core.core import DataRegistryFetcherConfig, FetchPlan, FetchRunContext
 from data_fetcher_core.fetcher import Fetcher
-from data_fetcher_app.app_config import FetcherConfig
+from data_fetcher_core.logging import (
+    ConsoleMode,
+    LoggingHandler,
+    LoggingLevel,
+    configure_logging,
+)
 from data_fetcher_core.strategy_registration import create_strategy_registry
+from data_fetcher_http.http_manager import HttpManager
+from data_fetcher_sftp.sftp_manager import SftpManager
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -374,7 +378,9 @@ async def main_async(args: dict[str, Any]) -> None:
                 # Load YAML fetcher configuration directly via DataPipelineConfig
                 sftp_manager = SftpManager()
                 http_manager = HttpManager()
-                strategy_registry = create_strategy_registry(sftp_manager=sftp_manager, http_manager=http_manager)
+                strategy_registry = create_strategy_registry(
+                    sftp_manager=sftp_manager, http_manager=http_manager
+                )
                 pipeline_config = DataPipelineConfig(
                     strategy_registry=strategy_registry,
                     local_config_dir=config_dir,
