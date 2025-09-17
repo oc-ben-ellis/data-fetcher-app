@@ -1,7 +1,0 @@
-Mock daily data for 20230728_daily_data.txt
-Generated at 2023-07-28T10:00:00
-Sample corporate data content
-This is daily business registration data
-Contains licensing and corporate information
-Company: ABC Corp, License: FL123456, Date: 2023-07-28
-Company: XYZ LLC, License: FL789012, Date: 2023-07-28

@@ -17,9 +17,9 @@ The mock server provides the following directory structure:
 /home/testuser/
 ├── doc/
 │   ├── cor/                    # Daily files directory
-│   │   ├── 20230728_daily_data.txt
-│   │   ├── 20230729_daily_data.txt
-│   │   └── 20240101_daily_data.txt
+│   │   ├── 20250829c.txt
+│   │   ├── 20250913c.txt
+│   │   └── 20250915c.txt
 │   └── Quarterly/
 │       └── Cor/
 │           └── cordata.zip     # Quarterly archive
@@ -28,12 +28,18 @@ The mock server provides the following directory structure:
 ## Mock Data
 
 ### Daily Files
-- **20230728_daily_data.txt**: Start date file (should be included)
-- **20230729_daily_data.txt**: After start date (should be included)
-- **20240101_daily_data.txt**: Future date (should be included)
+- **20250829c.txt**: Oldest date file (08/29/2025) with Florida business registration data
+- **20250913c.txt**: Middle date file (09/13/2025) with Florida business registration data
+- **20250915c.txt**: Most recent date file (09/15/2025) with Florida business registration data
+
+Each daily file contains business entity registration records in fixed-width format including:
+- Document numbers (starting with L, P, F, M prefixes)
+- Entity names and types
+- Address information
+- Registered agent details
 
 ### Quarterly File
-- **cordata.zip**: Quarterly corporate data archive
+- **cordata.zip**: Quarterly corporate data archive for Q3 2025 (July-September)
 
 ## Usage
 
@@ -54,7 +60,7 @@ docker run -p 2222:22 us_fl_sftp_mock
 sftp -P 2222 testuser@localhost
 
 # Or using scp
-scp -P 2222 testuser@localhost:/doc/cor/20230728_daily_data.txt ./
+scp -P 2222 testuser@localhost:/doc/cor/20250829c.txt ./
 ```
 
 ### Using with Docker Compose
