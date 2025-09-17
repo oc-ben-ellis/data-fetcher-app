@@ -86,8 +86,13 @@ cd ../../../
 ```
 
 This script creates:
-- Daily data files: `20230728_daily_data.txt`, `20230729_daily_data.txt`, `20240101_daily_data.txt`
+- Daily data files: `20250829c.txt`, `20250913c.txt`, `20250915c.txt` (format: YYYYMMDDc.txt)
+  - Contains Florida business registration records in fixed-width format
+  - Each record includes document number, entity name, address, registered agent information
+  - Data represents newly registered or modified business entities
 - Quarterly data file: `cordata.zip`
+  - Contains comprehensive quarterly business registration data
+  - Covers Q3 2025 (July 1 - September 30)
 - Proper directory structure: `/doc/cor/` and `/doc/Quarterly/Cor/`
 
 ## Step 3: Execute the Application
@@ -235,9 +240,9 @@ s3://oc-local-data-pipeline/
         ├── metadata/
         │   └── _completed.json
         └── content/
-            ├── 20230728_daily_data.txt
-            ├── 20230729_daily_data.txt
-            ├── 20240101_daily_data.txt
+            ├── 20250829c.txt
+            ├── 20250913c.txt
+            ├── 20250915c.txt
             └── cordata.zip
 ```
 
@@ -274,9 +279,9 @@ The `_completed.json` file should contain bundle completion metadata:
 The `_manifest.jsonl` file should contain one JSON line per file:
 
 ```json
-{"key": "content/20230728_daily_data.txt", "size": 1234, "hash": "sha256:..."}
-{"key": "content/20230729_daily_data.txt", "size": 1234, "hash": "sha256:..."}
-{"key": "content/20240101_daily_data.txt", "size": 1234, "hash": "sha256:..."}
+{"key": "content/20250829c.txt", "size": 1234, "hash": "sha256:..."}
+{"key": "content/20250913c.txt", "size": 1234, "hash": "sha256:..."}
+{"key": "content/20250915c.txt", "size": 1234, "hash": "sha256:..."}
 {"key": "content/cordata.zip", "size": 1234, "hash": "sha256:..."}
 ```
 
