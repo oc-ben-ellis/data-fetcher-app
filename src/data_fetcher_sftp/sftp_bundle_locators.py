@@ -7,15 +7,14 @@ file pattern matching, date-based filtering, and remote directory traversal.
 import fnmatch
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 import structlog
 
 from data_fetcher_core.core import BundleRef, FetchRunContext
 from data_fetcher_core.strategy_types import (
-    LocatorStrategy,
-    FilterStrategyBase,
     FileSortStrategyBase,
+    FilterStrategyBase,
+    LocatorStrategy,
 )
 from data_fetcher_sftp.sftp_config import SftpProtocolConfig
 from data_fetcher_sftp.sftp_manager import SftpManager
@@ -180,17 +179,24 @@ class DirectorySftpBundleLocator(LocatorStrategy):
             if file_path not in self._processed_files:
                 logger.info("NEW_FILE_ADDED_TO_PROCESSING", file_path=file_path)
                 if not ctx.app_config or not ctx.app_config.storage:
-                    raise ValueError("Storage is required in app_config for BID minting")
+                    raise ValueError(
+                        "Storage is required in app_config for BID minting"
+                    )
                 storage = ctx.app_config.storage
-                bid_str = storage.bundle_found({
-                    "source": "sftp",
-                    "primary_url": f"sftp://{file_path}",
-                    "config_id": getattr(ctx.app_config, "config_id", "sftp"),
-                })
+                bid_str = storage.bundle_found(
+                    {
+                        "source": "sftp",
+                        "primary_url": f"sftp://{file_path}",
+                        "config_id": getattr(ctx.app_config, "config_id", "sftp"),
+                    }
+                )
                 urls.append(
                     BundleRef(
                         bid=bid_str,
-                        request_meta={"url": f"sftp://{file_path}", "resources_count": 0},
+                        request_meta={
+                            "url": f"sftp://{file_path}",
+                            "resources_count": 0,
+                        },
                     )
                 )
                 self._processed_files.add(file_path)
@@ -245,7 +251,9 @@ class DirectorySftpBundleLocator(LocatorStrategy):
                     continue
 
                 # Apply custom filter if provided
-                if self.file_filter is not None and not self.file_filter.filter(filename):
+                if self.file_filter is not None and not self.file_filter.filter(
+                    filename
+                ):
                     continue
 
                 # Get file stats for sorting using SFTP manager
@@ -432,14 +440,20 @@ class FileSftpBundleLocator(LocatorStrategy):
 
             if should_process:
                 if not ctx.app_config or not ctx.app_config.storage:
-                    raise ValueError("Storage is required in app_config for BID minting")
+                    raise ValueError(
+                        "Storage is required in app_config for BID minting"
+                    )
                 storage = ctx.app_config.storage
-                bid_str = storage.bundle_found({
-                    "source": "sftp",
-                    "primary_url": f"sftp://{file_path}",
-                    "config_id": getattr(ctx.app_config, "config_id", "sftp"),
-                })
-                urls.append(BundleRef(bid=bid_str, request_meta={"url": f"sftp://{file_path}"}))
+                bid_str = storage.bundle_found(
+                    {
+                        "source": "sftp",
+                        "primary_url": f"sftp://{file_path}",
+                        "config_id": getattr(ctx.app_config, "config_id", "sftp"),
+                    }
+                )
+                urls.append(
+                    BundleRef(bid=bid_str, request_meta={"url": f"sftp://{file_path}"})
+                )
                 logger.info(
                     "FILE_ADDED_FOR_PROCESSING",
                     file_path=file_path,
@@ -461,7 +475,9 @@ class FileSftpBundleLocator(LocatorStrategy):
             current_mtime = stat.st_mtime
             self._processed_files[remote_path] = current_mtime
 
-            logger.info("FILE_PROCESSING_COMPLETED", file_path=remote_path, mtime=current_mtime)
+            logger.info(
+                "FILE_PROCESSING_COMPLETED", file_path=remote_path, mtime=current_mtime
+            )
         except Exception as e:
             logger.exception(
                 "ERROR_GETTING_FILE_MODIFICATION_TIME_AFTER_PROCESSING",

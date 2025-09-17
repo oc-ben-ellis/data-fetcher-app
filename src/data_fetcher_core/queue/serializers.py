@@ -95,8 +95,6 @@ class BundleRefSerializer(JSONSerializer):
             data = {
                 "bid": str(obj.bid),
                 "request_meta": dict(obj.request_meta),
-                # Optionally include bundle_meta placeholder for forward-compat
-                # "bundle_meta": {},
             }
             return json.dumps(data, default=str)
         return super().dumps(obj)
@@ -108,9 +106,11 @@ class BundleRefSerializer(JSONSerializer):
         if not isinstance(request_meta, dict):
             try:
                 request_meta = dict(request_meta)  # type: ignore[arg-type]
-            except Exception:
+            except (TypeError, ValueError, AttributeError):
                 request_meta = {}
-        return BundleRef.from_dict({
-            "bid": data_dict.get("bid"),
-            "request_meta": request_meta,
-        })
+        return BundleRef.from_dict(
+            {
+                "bid": data_dict.get("bid"),
+                "request_meta": request_meta,
+            }
+        )

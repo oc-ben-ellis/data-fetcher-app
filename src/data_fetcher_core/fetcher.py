@@ -223,7 +223,6 @@ class Fetcher:
 
                 # Try to get bundle refs from current locator
                 if current_locator_index < len(config.locators):
-
                     provider = config.locators[current_locator_index]
 
                     locator_logger.debug(
@@ -495,11 +494,11 @@ def run_fetcher(config_name: str, **kwargs: object) -> FetchResult:
     # Extract known FetchPlan parameters from kwargs
     concurrency = kwargs.get("concurrency", 1)
     if not isinstance(concurrency, int):
-        raise TypeError("Invalid concurrency type")  # noqa: TRY003
+        raise TypeError("Invalid concurrency type")
 
     target_queue_size = kwargs.get("target_queue_size", 100)
     if not isinstance(target_queue_size, int):
-        raise TypeError("Invalid target_queue_size type")  # noqa: TRY003
+        raise TypeError("Invalid target_queue_size type")
 
     plan = FetchPlan(
         config=config,

@@ -13,8 +13,8 @@ from oc_pipeline_bus.strategy_registry import (
 )
 
 from data_fetcher_core.strategy_types import (
-    FilterStrategyBase,
     FileSortStrategyBase,
+    FilterStrategyBase,
     LoaderStrategy,
     LocatorStrategy,
 )
@@ -362,8 +362,12 @@ def register_sftp_strategies(registry, sftp_manager: SftpManager) -> None:
     )
 
     # Register file sort strategies
-    registry.register(FileSortStrategyBase, "mtime", ModifiedTimeFileSortStrategyFactory())
-    registry.register(FileSortStrategyBase, "lex", LexicographicalFileSortStrategyFactory())
+    registry.register(
+        FileSortStrategyBase, "mtime", ModifiedTimeFileSortStrategyFactory()
+    )
+    registry.register(
+        FileSortStrategyBase, "lex", LexicographicalFileSortStrategyFactory()
+    )
     # Register file filter strategies
     registry.register(FilterStrategyBase, "date_filter", DateFilterStrategyFactory())
 
@@ -382,7 +386,9 @@ class ModifiedTimeFileSortStrategy(FileSortStrategyBase):
     def __init__(self, reverse: bool = False) -> None:
         self._reverse = reverse
 
-    def sort(self, items: list[tuple[str, float | int | None]]) -> list[tuple[str, float | int | None]]:
+    def sort(
+        self, items: list[tuple[str, float | int | None]]
+    ) -> list[tuple[str, float | int | None]]:
         # None mtimes go last in ascending, last in descending as well for stability
         def key_fn(item: tuple[str, float | int | None]) -> tuple[int, float]:
             path, mtime = item
@@ -400,10 +406,9 @@ class ModifiedTimeFileSortStrategyFactory(StrategyFactory):
     registry registration typically fixes this via constructor wiring.
     """
 
-    def __init__(self) -> None:
-        ...
+    def __init__(self) -> None: ...
 
-    def validate(self, params: Any) -> None:  # noqa: D401
+    def validate(self, params: Any) -> None:
         # No required parameters
         return
 
@@ -417,7 +422,7 @@ class ModifiedTimeFileSortStrategyFactory(StrategyFactory):
             reverse = False
         return ModifiedTimeFileSortStrategy(reverse=reverse)
 
-    def get_config_type(self, params: Any) -> type | None:  # noqa: D401
+    def get_config_type(self, params: Any) -> type | None:
         # Return dataclass type for nested processing
         return MtimeSortConfig
 
@@ -431,14 +436,16 @@ class LexicographicalFileSortStrategy(FileSortStrategyBase):
     def __init__(self, reverse: bool = False) -> None:
         self._reverse = reverse
 
-    def sort(self, items: list[tuple[str, float | int | None]]) -> list[tuple[str, float | int | None]]:
+    def sort(
+        self, items: list[tuple[str, float | int | None]]
+    ) -> list[tuple[str, float | int | None]]:
         return sorted(items, key=lambda x: (x[0] is None, x[0]), reverse=self._reverse)
 
 
 class LexicographicalFileSortStrategyFactory(StrategyFactory):
     """Factory for LexicographicalFileSortStrategy."""
 
-    def validate(self, params: Any) -> None:  # noqa: D401
+    def validate(self, params: Any) -> None:
         # No required params
         return
 
@@ -451,7 +458,7 @@ class LexicographicalFileSortStrategyFactory(StrategyFactory):
             reverse = False
         return LexicographicalFileSortStrategy(reverse=reverse)
 
-    def get_config_type(self, params: Any) -> type | None:  # noqa: D401
+    def get_config_type(self, params: Any) -> type | None:
         # Return dataclass type for nested processing
         return LexSortConfig
 
@@ -483,10 +490,9 @@ class DateFilterStrategy(FilterStrategyBase):
                     digits.append(ch)
                     if len(digits) == 8:
                         break
-                else:
-                    # reset if we break a contiguous block
-                    if digits:
-                        digits = []
+                # reset if we break a contiguous block
+                elif digits:
+                    digits = []
             if len(digits) != 8:
                 return False
             date_str = "".join(digits)
@@ -498,7 +504,7 @@ class DateFilterStrategy(FilterStrategyBase):
 class DateFilterStrategyFactory(StrategyFactory):
     """Factory for DateFilterStrategy."""
 
-    def validate(self, params: Any) -> None:  # noqa: D401
+    def validate(self, params: Any) -> None:
         # Require start_date; date_pattern optional
         if is_dataclass(params):
             if not getattr(params, "start_date", None):
@@ -516,11 +522,10 @@ class DateFilterStrategyFactory(StrategyFactory):
                     "date_filter",
                     params,
                 )
-        return
 
     def create(self, params: Any) -> DateFilterStrategy:
         if is_dataclass(params):
-            start_date = str(getattr(params, "start_date"))
+            start_date = str(params.start_date)
             date_pattern = str(getattr(params, "date_pattern", "YYYYMMDD"))
         elif isinstance(params, dict):
             start_date = str(params.get("start_date"))
@@ -531,7 +536,7 @@ class DateFilterStrategyFactory(StrategyFactory):
             date_pattern = "YYYYMMDD"
         return DateFilterStrategy(start_date=start_date, date_pattern=date_pattern)
 
-    def get_config_type(self, params: Any) -> type | None:  # noqa: D401
+    def get_config_type(self, params: Any) -> type | None:
         # Return dataclass type for nested processing
         return DateFilterConfig
 

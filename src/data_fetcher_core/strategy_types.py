@@ -28,7 +28,7 @@ class LoaderStrategy(ABC):
     async def load(
         self,
         bundle: "BundleRef",
-        storage: Any,
+        storage: "object",
         ctx: "FetchRunContext",
         recipe: "DataRegistryFetcherConfig",
     ) -> "BundleLoadResult":
@@ -56,7 +56,7 @@ class FilterStrategyBase(ABC):
     """
 
     @abstractmethod
-    def filter(self, data: Any) -> bool:
+    def filter(self, data: "object") -> bool:
         """Return True if the data should be included, False otherwise."""
 
 
@@ -74,8 +74,11 @@ class FileSortStrategyBase(ABC):
     """
 
     @abstractmethod
-    def sort(self, items: list[tuple[str, float | int | None]]) -> list[tuple[str, float | int | None]]:
+    def sort(
+        self, items: list[tuple[str, float | int | None]]
+    ) -> list[tuple[str, float | int | None]]:
         """Return a sorted list of (path, mtime) tuples according to strategy."""
+
 
 # Strategy configuration types (for YAML config)
 LoaderStrategyConfig = dict[str, Any]  # Configuration dict for loader strategies
