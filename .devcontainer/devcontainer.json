@@ -27,7 +27,8 @@
     "source=${env:HOME}/.gnupg,target=/home/vscode/.gnupg,type=bind,consistency=cached",
     "source=${env:XDG_RUNTIME_DIR}/gnupg/S.gpg-agent,target=/gnupg/S.gpg-agent,type=bind,consistency=cached",
     "source=${env:XDG_RUNTIME_DIR}/gnupg,target=/home/vscode/.gnupg-runtime,type=bind,consistency=cached",
-    "source=${env:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,readonly,consistency=cached"
+    "source=${env:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,readonly,consistency=cached",
+    "source=${env:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,readonly,consistency=cached"
 
   ],
   "containerEnv": {

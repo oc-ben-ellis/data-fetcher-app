@@ -23,6 +23,7 @@ services:
       - ${XDG_RUNTIME_DIR}/gnupg/S.gpg-agent:/gnupg/S.gpg-agent
       - ${XDG_RUNTIME_DIR}/gnupg:/home/vscode/.gnupg-runtime
       - ${HOME}/.gitconfig:/home/vscode/.gitconfig:ro
+      - ${HOME}/.ssh:/home/vscode/.ssh:ro 
     working_dir: /code
     restart: unless-stopped
     environment:
