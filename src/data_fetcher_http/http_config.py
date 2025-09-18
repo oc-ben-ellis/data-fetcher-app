@@ -23,6 +23,10 @@ class HttpProtocolConfig(ProtocolConfig):
     rate_limit_requests_per_second: float = 10.0
     max_retries: int = 3
     authentication_mechanism: AuthenticationMechanism | None = None
+    # Pool configuration and baseline
+    pool_min_size: int = 0
+    pool_max_size: int = 10
+    base_url: str | None = None
 
     def __post_init__(self) -> None:
         """Initialize default values if not provided."""

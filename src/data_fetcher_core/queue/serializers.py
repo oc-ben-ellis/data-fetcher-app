@@ -106,8 +106,8 @@ class BundleRefSerializer(JSONSerializer):
         if not isinstance(request_meta, dict):
             try:
                 request_meta = dict(request_meta)  # type: ignore[arg-type]
-            except (TypeError, ValueError, AttributeError):
-                request_meta = {}
+            except (TypeError, ValueError, AttributeError) as e:
+                raise ValueError(f"Failed to convert request_meta to dict: {e}") from e
         return BundleRef.from_dict(
             {
                 "bid": data_dict.get("bid"),

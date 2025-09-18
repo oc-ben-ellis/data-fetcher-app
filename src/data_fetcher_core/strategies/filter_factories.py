@@ -78,9 +78,11 @@ class DateFilterFactory(StrategyFactory):
                     ):
                         return True
                 return False
-            except Exception:
-                # If we can't parse the date, process the file
-                return True
+            except Exception as e:
+                # If we can't parse the date, raise an error to avoid silent failures
+                raise ValueError(
+                    f"Failed to parse date from filename '{filename}': {e}"
+                ) from e
 
         return date_filter
 

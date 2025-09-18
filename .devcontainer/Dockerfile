@@ -11,7 +11,6 @@ RUN apk add --no-cache \
     pkgconfig \
     build-base \
     shadow \
-    sudo \
     tzdata \
     unzip \
     jq \
@@ -81,40 +80,55 @@ WORKDIR "/code"
 RUN mkdir -p "/opt/poetry-cache"
 ENV POETRY_CACHE_DIR=/opt/poetry-cache
 
-RUN addgroup -S appuser \
-    && adduser -S -G appuser -h /home/appuser -s /bin/bash appuser \
-    && mkdir -p /home/appuser \
-    && chown -R appuser:appuser /home/appuser
-RUN chgrp appuser "/opt/poetry-cache" && chmod g+w "/opt/poetry-cache"
+# Build args
+ARG USER_UID=1000
+ARG USER_GID=1000
+# Set this to your host's docker socket GID using export DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
+ARG DOCKER_GID=999
 
-# install a base layer with our dependencies as these will change less frequently
-COPY pyproject.toml ./
-# Copy local wheel files
-# Allow missing wheels dir in devcontainer context; copy if present
-COPY .devcontainer/wheels/ /tmp/wheels/
-# Fix ownership of copied files
-RUN chown -R appuser:appuser /code /tmp/wheels
-# Install dependencies without lock file to avoid local repository references
-# Install local wheels first using poetry
-RUN /bin/bash -lc 'source /etc/profile && poetry install --no-ansi --no-interaction --only=main --no-root'
-RUN if [ -d /tmp/wheels ] && ls -1 /tmp/wheels/*.whl >/dev/null 2>&1; then \
-      /bin/bash -lc 'source /etc/profile && poetry run pip install /tmp/wheels/*.whl'; \
-    fi
+# Create primary group and user with fixed IDs
+RUN addgroup -S -g "$USER_GID" vscode && \
+    adduser  -S -G vscode -h /home/vscode -s /bin/bash -u "$USER_UID" vscode && \
+    mkdir -p /home/vscode && chown -R vscode:vscode /home/vscode
+
+# Create docker group with host docker.sock GID and add vscode
+RUN addgroup -g "$DOCKER_GID" docker && \
+    adduser vscode docker
+
+# Ensure pyenv directories are writable by non-root user (vscode)
+RUN chown -R vscode:vscode /opt/pyenv \
+    && chmod -R g+w /opt/pyenv
+
 
 # copy over our actual code
 COPY ./ ./
+
+
+# Install local wheels in poetry environment
+RUN if [ -d /tmp/wheels ] && ls -1 /tmp/wheels/*.whl >/dev/null 2>&1; then \
+      echo "Installing wheels from /tmp/wheels:" && \
+      ls -la /tmp/wheels/ && \
+      /bin/bash -lc 'source /etc/profile && poetry run pip install /tmp/wheels/*.whl' && \
+      echo "Wheel installation completed"; \
+    else \
+      echo "No wheels found in /tmp/wheels"; \
+    fi
 
 # Install the package itself (without --no-root)
 # Regenerate lock to reflect updated dependency pins, then install
 RUN /bin/bash -lc 'source /etc/profile && poetry lock --no-ansi --no-interaction' && \
     /bin/bash -lc 'source /etc/profile && poetry install --no-ansi --no-interaction --only=main'
 
+# Fix poetry cache permissions
+RUN chown -R vscode:vscode /opt/poetry-cache && \
+    chmod -R 755 /opt/poetry-cache
+
 ENV SHELL=/bin/bash \
     GPG_TTY=/dev/tty
 
-USER appuser
+USER vscode
 
 # Ensure user-local bin is on PATH for poetry and tools
-ENV PATH=/home/appuser/.local/bin:/opt/pyenv/bin:/opt/pyenv/shims:$PATH
+ENV PATH=/home/vscode/.local/bin:/opt/pyenv/bin:/opt/pyenv/shims:$PATH
 
-CMD ["sleep", "infinity"]
+CMD ["sh", "-c", "while true; do sleep 3600; done"]

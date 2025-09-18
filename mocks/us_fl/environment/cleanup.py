@@ -39,7 +39,7 @@ def main() -> None:
             container_id,
             "sh",
             "-lc",
-            "rm -rf /home/test/data/* && mkdir -p /home/test/data/doc/cor /home/test/data/doc/Quarterly/Cor",
+            "rm -rf /home/test/doc/* && mkdir -p /home/test/doc/cor /home/test/doc/Quarterly/Cor",
         ],
         check=True,
         text=True,

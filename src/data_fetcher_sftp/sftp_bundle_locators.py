@@ -234,9 +234,10 @@ class DirectorySftpBundleLocator(LocatorStrategy):
         """Initialize by listing files in the remote directory."""
         try:
             # List files in directory using SFTP manager
-            files = await self.sftp_manager.listdir(
-                self.sftp_config, context, self.remote_dir
-            )
+            async with await self.sftp_manager.get_connection(
+                self.sftp_config, context
+            ) as conn:
+                files = await conn.listdir(self.remote_dir)
 
             # Collect file information
             file_info: list[tuple[str, float | int | None]] = []
@@ -257,9 +258,7 @@ class DirectorySftpBundleLocator(LocatorStrategy):
                     continue
 
                 # Get file stats for sorting using SFTP manager
-                stat = await self.sftp_manager.stat(
-                    self.sftp_config, context, file_path
-                )
+                stat = await conn.stat(file_path)
                 file_info.append((file_path, stat.st_mtime))
 
             # Sort files using strategy if provided
@@ -334,9 +333,10 @@ class FileSftpBundleLocator(LocatorStrategy):
         """Check if a file should be processed based on modification time."""
         try:
             # Check if file exists on SFTP server
-            file_exists = await self.sftp_manager.exists(
-                self.sftp_config, ctx, file_path
-            )
+            async with await self.sftp_manager.get_connection(
+                self.sftp_config, ctx
+            ) as conn:
+                file_exists = await conn.exists(file_path)
             if not file_exists:
                 logger.warning(
                     "FILE_NOT_FOUND_ON_SFTP_SERVER",
@@ -345,7 +345,7 @@ class FileSftpBundleLocator(LocatorStrategy):
                 return False
 
             # Get current file modification time
-            stat = await self.sftp_manager.stat(self.sftp_config, ctx, file_path)
+            stat = await conn.stat(file_path)
             current_mtime = stat.st_mtime
 
             # Check if we've processed this file before
@@ -384,8 +384,10 @@ class FileSftpBundleLocator(LocatorStrategy):
                 file_path=file_path,
                 error=str(e),
             )
-            # On error, don't process the file to avoid repeated failures
-            return False
+            # On error, raise to avoid silent failures
+            raise RuntimeError(
+                f"Failed to check file modification time for '{file_path}': {e}"
+            ) from e
 
     async def _save_persistence_state(self, context: FetchRunContext) -> None:
         """Save persistence state to kvstore."""
@@ -471,7 +473,10 @@ class FileSftpBundleLocator(LocatorStrategy):
 
         # Get current file modification time and store it
         try:
-            stat = await self.sftp_manager.stat(self.sftp_config, ctx, remote_path)
+            async with await self.sftp_manager.get_connection(
+                self.sftp_config, ctx
+            ) as conn:
+                stat = await conn.stat(remote_path)
             current_mtime = stat.st_mtime
             self._processed_files[remote_path] = current_mtime
 
@@ -484,8 +489,10 @@ class FileSftpBundleLocator(LocatorStrategy):
                 file_path=remote_path,
                 error=str(e),
             )
-            # Still mark as processed to avoid reprocessing, but without mtime
-            self._processed_files[remote_path] = 0.0
+            # On error, raise to avoid silent failures
+            raise RuntimeError(
+                f"Failed to get file modification time after processing '{remote_path}': {e}"
+            ) from e
 
         # Save processing result
         await self._save_processing_result(bundle, ctx, success=True)

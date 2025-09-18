@@ -133,6 +133,9 @@ class FileStorage:
                     bid=str(bundle_ref.bid),
                     config_id=recipe.config_id,
                 )
+                raise RuntimeError(
+                    f"Loader completion callback failed for bundle {bundle_ref.bid}: {e}"
+                ) from e
 
         # Execute locator completion callbacks
         for locator in recipe.locators:
@@ -154,6 +157,9 @@ class FileStorage:
                         bid=str(bundle_ref.bid),
                         config_id=recipe.config_id,
                     )
+                    raise RuntimeError(
+                        f"Locator completion callback failed for bundle {bundle_ref.bid}: {e}"
+                    ) from e
 
 
 class FileStorageBundle:

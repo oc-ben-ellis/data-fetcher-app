@@ -1,0 +1,9 @@
+{
+  "bid": "bid:v1:fr:20250907120000:a1b2c3d4",
+  "completed_at": "2025-09-07T12:01:30Z",
+  "resources_count": 1,
+  "meta": {
+    "processing_time_seconds": 90,
+    "total_bytes_processed": 2048576
+  }
+}

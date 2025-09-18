@@ -15,7 +15,7 @@ DATA_REGISTRY_IDS = [
 
 
 FETCHER_DIR = Path(__file__).resolve().parents[2]
-PROJECT_ROOT = FETCHER_DIR.parents[1]
+PROJECT_ROOT = FETCHER_DIR
 MOCKS_DIR = FETCHER_DIR / "mocks"
 
 
@@ -43,41 +43,40 @@ def localstack_session() -> dict[str, str]:
     if not up_script.exists():
         pytest.skip("test-env-up.sh not found")
 
-    # Let the script find a free port automatically
-    context_name = "pytest"
-    port_env = os.environ.get("CONFIG_TEST_ENV_LOCALSTACK_PORT", "")
-    args = ["bash", str(up_script), context_name]
-    if port_env:
-        args.append(str(port_env))
-
-    # Start localstack and infra terraform, but don't fail the test if terraform fails
+    # Start LocalStack and infra; capture exported env vars for this session
     try:
-        subprocess.run(
-            args,
+        result = subprocess.run(
+            ["bash", str(up_script), "--env-vars-only", "pytest"],
             check=True,
             cwd=FETCHER_DIR,
             text=True,
             capture_output=True,
             timeout=900,
         )
-    except subprocess.CalledProcessError:
-        # Proceed optimistically; LocalStack container may be up even if terraform failed
-        pass
+        # Parse export lines like: export KEY=value
+        for line in (result.stdout or "").splitlines():
+            if line.startswith("export ") and "=" in line:
+                key, value = line[7:].split("=", 1)
+                os.environ[key] = value
+    except subprocess.CalledProcessError as e:
+        pytest.fail(f"test-env-up.sh failed: {e.stderr}")
 
-    # Determine actual port: prefer env exported by script; otherwise default 4566
-    port = os.environ.get("CONFIG_TEST_ENV_LOCALSTACK_PORT", port_env or "4566")
-    endpoint = f"http://localhost:{port}"
+    # Prefer AWS_ENDPOINT_URL if provided; otherwise derive from port
+    endpoint = os.environ.get("AWS_ENDPOINT_URL")
+    if not endpoint:
+        port = os.environ.get("CONFIG_TEST_ENV_LOCALSTACK_PORT", "4566")
+        host = os.environ.get("CONFIG_TEST_ENV_LOCALSTACK_HOST", "localhost")
+        endpoint = f"http://{host}:{port}"
 
-    # Ensure config bucket exists
+    # Ensure config and storage buckets exist (idempotent)
     s3 = _aws_client("s3", endpoint)
-    bucket = os.environ.get("OC_DATA_PIPELINE_CONFIG_S3_BUCKET", "local-config")
+    bucket = os.environ.get("OC_DATA_PIPELINE_CONFIG_S3_BUCKET", "oc-local-data-config")
     region = os.environ.get("AWS_DEFAULT_REGION", "eu-west-2")
     try:
         existing = [b["Name"] for b in s3.list_buckets().get("Buckets", [])]
     except (ConnectionError, OSError, TimeoutError) as e:
         pytest.skip(f"LocalStack not reachable: {type(e).__name__}: {e}")
     except Exception as e:
-        # For other exceptions, fail the test as they indicate unexpected issues
         pytest.fail(
             f"Unexpected error connecting to LocalStack: {type(e).__name__}: {e}"
         )
@@ -87,8 +86,9 @@ def localstack_session() -> dict[str, str]:
             params["CreateBucketConfiguration"] = {"LocationConstraint": region}
         s3.create_bucket(**params)
 
-    # Ensure storage bucket exists
-    storage_bucket = "oc-local-data-pipeline"
+    storage_bucket = os.environ.get(
+        "OC_DATA_PIPELINE_STORAGE_S3_URL", "s3://oc-local-data-pipeline"
+    ).split("//", 1)[-1]
     try:
         existing = [b["Name"] for b in s3.list_buckets().get("Buckets", [])]
     except Exception:
@@ -99,34 +99,14 @@ def localstack_session() -> dict[str, str]:
             params["CreateBucketConfiguration"] = {"LocationConstraint": region}
         s3.create_bucket(**params)
 
-    # Read fetcher service terraform outputs for redis host/port
-    tf_dir = FETCHER_DIR / "infra" / "terraform"
-    redis_host = "localhost"
-    redis_port = "6379"
-    try:
-        proc = subprocess.run(
-            ["terraform", "output", "-json"],
-            check=True,
-            cwd=str(tf_dir),
-            text=True,
-            capture_output=True,
-            timeout=60,
-        )
-        import json as _json
-
-        outs = _json.loads(proc.stdout or "{}")
-        if isinstance(outs, dict):
-            if "redis_host" in outs and isinstance(outs["redis_host"], dict):
-                redis_host = str(outs["redis_host"].get("value", redis_host))
-            if "redis_port" in outs and isinstance(outs["redis_port"], dict):
-                redis_port = str(outs["redis_port"].get("value", redis_port))
-    except Exception:
-        pass
+    # Read redis from env if provided by script
+    redis_host = os.environ.get("OC_KV_STORE_REDIS_HOST", "localhost")
+    redis_port = os.environ.get("OC_KV_STORE_REDIS_PORT", "6379")
 
     return {
         "endpoint": endpoint,
         "bucket": bucket,
-        "storage_bucket": "oc-local-data-pipeline",
+        "storage_bucket": storage_bucket,
         "redis_host": redis_host,
         "redis_port": redis_port,
     }
@@ -335,6 +315,8 @@ def _run_app_container(
         *compose_cmd,
         "run",
         "--rm",
+        "--user",
+        "1000:1000",
         "-e",
         f"CONFIG_TEST_ENV_LOCALSTACK_PORT={port}",
         "-e",
@@ -345,17 +327,11 @@ def _run_app_container(
         "OC_DATA_PIPELINE_STAGE=raw",
         "-e",
         "OC_DATA_PIPELINE_STEP=fetcher",
-        "-e",
-        f"DATA_FETCHER_APP_DATA_REGISTRY_ID={registry_id}",
-        "-e",
-        "DATA_FETCHER_APP_STAGE=raw",
-        "-e",
-        "DATA_FETCHER_APP_STEP=fetcher",
-        "-e",
-        "DATA_FETCHER_APP_CONFIG_DIR=/tmp/config",
         # Ensure KV store is configured for Redis and reachable from container
         "-e",
         "DATA_FETCHER_APP_KVSTORE=memory",
+        "-e",
+        "DATA_FETCHER_APP_LOG_LEVEL=DEBUG",
         "-e",
         "PYTHONPATH=/code/src",
         # Back-compat vars used by some components
