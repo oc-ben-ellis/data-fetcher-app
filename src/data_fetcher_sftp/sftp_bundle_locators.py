@@ -49,59 +49,34 @@ class DirectorySftpBundleLocator(LocatorStrategy):
     file_filter: FilterStrategyBase | None = None
     file_sort: FileSortStrategyBase | None = None
     state_management_prefix: str = "sftp_directory_provider"
+    processed_files_ttl: timedelta | None = None
+    processing_results_ttl: timedelta | None = None
+    error_state_ttl: timedelta | None = None
 
     def __post_init__(self) -> None:
         """Initialize the directory SFTP bundle locator state and internal variables."""
-        self._processed_files: set[str] = set()
         self._file_queue: list[str] = []
-        self._initialized: bool = False
 
-    async def _load_persistence_state(self, context: FetchRunContext) -> None:
-        """Load persistence state from kvstore."""
+    async def _is_file_processed(self, file_path: str, context: FetchRunContext) -> bool:
+        """Check if a single file is processed without loading all files into memory."""
         if not context.app_config or not context.app_config.kv_store:
-            error_message = "No kv_store available in context - persistence is required for this locator"
-            raise ValueError(error_message)
+            return False
+        
         store = context.app_config.kv_store
+        processed_key = f"{self.state_management_prefix}:processed:{self.remote_dir}:{file_path}"
+        return await store.exists(processed_key)
 
-        # Load processed files
-        processed_files_key = (
-            f"{self.state_management_prefix}:processed_files:{self.remote_dir}"
-        )
-        processed_files_data = await store.get(processed_files_key, [])
-        if isinstance(processed_files_data, list):
-            self._processed_files = set(processed_files_data)
-        else:
-            self._processed_files = set()
-
-        # Load file queue if available
-        queue_key = f"{self.state_management_prefix}:file_queue:{self.remote_dir}"
-        queue_data = await store.get(queue_key, [])
-        if queue_data and isinstance(queue_data, list):
-            self._file_queue = queue_data
-            self._initialized = True
-
-    async def _save_persistence_state(self, context: FetchRunContext) -> None:
-        """Save persistence state to kvstore."""
+    async def _mark_file_processed(self, file_path: str, context: FetchRunContext) -> None:
+        """Mark a single file as processed."""
         if not context.app_config or not context.app_config.kv_store:
-            error_message = "No kv_store available in context - persistence is required for this locator"
-            raise ValueError(error_message)
+            return
+        
         store = context.app_config.kv_store
+        processed_key = f"{self.state_management_prefix}:processed:{self.remote_dir}:{file_path}"
+        await store.put(processed_key, True, ttl=self.processed_files_ttl)
 
-        # Save processed files
-        processed_files_key = (
-            f"{self.state_management_prefix}:processed_files:{self.remote_dir}"
-        )
-        await store.put(
-            processed_files_key, list(self._processed_files), ttl=timedelta(days=7)
-        )
 
-        # Save file queue
-        queue_key = f"{self.state_management_prefix}:file_queue:{self.remote_dir}"
-        await store.put(queue_key, self._file_queue, ttl=timedelta(days=7))
 
-        # Save initialization state
-        init_key = f"{self.state_management_prefix}:initialized:{self.remote_dir}"
-        await store.put(init_key, self._initialized, ttl=timedelta(days=7))
 
     async def _save_processing_result(
         self,
@@ -124,7 +99,7 @@ class DirectorySftpBundleLocator(LocatorStrategy):
             "success": success,
             "bundle_bid": str(bundle.bid),
         }
-        await store.put(result_key, result_data, ttl=timedelta(days=30))
+        await store.put(result_key, result_data, ttl=self.processing_results_ttl)
 
     async def _save_error_state(
         self, bundle: BundleRef, error: str, context: FetchRunContext
@@ -143,7 +118,7 @@ class DirectorySftpBundleLocator(LocatorStrategy):
             "timestamp": datetime.now(UTC).isoformat(),
             "retry_count": 0,
         }
-        await store.put(error_key, error_data, ttl=timedelta(hours=24))
+        await store.put(error_key, error_data, ttl=self.error_state_ttl)
 
     async def get_next_bundle_refs(
         self, ctx: FetchRunContext, bundle_refs_needed: int
@@ -151,84 +126,70 @@ class DirectorySftpBundleLocator(LocatorStrategy):
         """Get the next batch of SFTP URLs to process."""
         logger.info(
             "GET_NEXT_BUNDLE_REFS_STARTING",
-            initialized=self._initialized,
+            initialized=len(self._file_queue) > 0,
             bundle_refs_needed=bundle_refs_needed,
         )
 
-        if not self._initialized:
-            await self._load_persistence_state(ctx)
-            if not self._initialized:
-                await self._initialize(ctx)
-
+        if not self._file_queue:
+            await self._initialize(ctx)
+        
         logger.info(
             "FILE_QUEUE_STATUS",
             file_queue_size=len(self._file_queue),
-            processed_files_size=len(self._processed_files),
-            processed_files_contents=list(self._processed_files),
         )
 
-        urls: list[BundleRef] = []
-        while self._file_queue and len(urls) < bundle_refs_needed:
-            if self.max_files and len(self._processed_files) >= self.max_files:
+        bundle_refs: list[BundleRef] = []
+        while self._file_queue and len(bundle_refs) < bundle_refs_needed:
+            if self.max_files and len(bundle_refs) >= self.max_files:
                 logger.info("MAX_FILES_LIMIT_HIT", max_files=self.max_files)
                 break
 
             file_path = self._file_queue.pop(0)
             logger.info("FILE_POPPED_FROM_QUEUE", file_path=file_path)
 
-            if file_path not in self._processed_files:
-                logger.info("NEW_FILE_ADDED_TO_PROCESSING", file_path=file_path)
-                if not ctx.app_config or not ctx.app_config.storage:
-                    raise ValueError(
-                        "Storage is required in app_config for BID minting"
-                    )
-                storage = ctx.app_config.storage
-                bid_str = storage.bundle_found(
-                    {
-                        "source": "sftp",
-                        "primary_url": f"sftp://{file_path}",
-                        "config_id": getattr(ctx.app_config, "config_id", "sftp"),
-                    }
+            logger.info("NEW_FILE_ADDED_TO_PROCESSING", file_path=file_path)
+            if not ctx.app_config or not ctx.app_config.storage:
+                raise ValueError(
+                    "Storage is required in app_config for BID minting"
                 )
-                urls.append(
-                    BundleRef(
-                        bid=bid_str,
-                        request_meta={
-                            "url": f"sftp://{file_path}",
-                            "resources_count": 0,
-                        },
-                    )
+            storage = ctx.app_config.storage
+            bid_str = storage.bundle_found(
+                {
+                    "source": "sftp",
+                    "primary_url": f"sftp://{file_path}",
+                    "config_id": getattr(ctx.app_config, "config_id", "sftp"),
+                }
+            )
+            bundle_refs.append(
+                BundleRef(
+                    bid=bid_str,
+                    request_meta={
+                        "url": f"sftp://{file_path}",
+                        "resources_count": 0,
+                    },
                 )
-                self._processed_files.add(file_path)
-            else:
-                logger.info("ALREADY_PROCESSED_FILE_SKIPPED", file_path=file_path)
+            )
 
-        logger.info("RETURNING_BUNDLE_REFS_FOR_PROCESSING", bundle_ref_count=len(urls))
+        logger.info("RETURNING_BUNDLE_REFS_FOR_PROCESSING", bundle_ref_count=len(bundle_refs))
 
-        # Save state after generating URLs
-        await self._save_persistence_state(ctx)
-        return urls
+        return bundle_refs
 
-    async def handle_url_processed(
+    async def handle_bundle_processed(
         self, bundle: BundleRef, result: object, ctx: FetchRunContext
     ) -> None:
-        """Handle when a URL has been processed."""
+        """Handle when a bundle has been processed."""
         # Mark as processed
         remote_path = str(bundle.request_meta.get("url", "")).replace("sftp://", "")
-        self._processed_files.add(remote_path)
+        await self._mark_file_processed(remote_path, ctx)
 
         # Save processing result
         await self._save_processing_result(bundle, ctx, success=True)
 
-        # Save state after processing
-        await self._save_persistence_state(ctx)
-
-    async def handle_url_error(
+    async def handle_bundle_error(
         self, bundle: BundleRef, error: str, context: FetchRunContext
     ) -> None:
-        """Handle when a URL processing fails."""
+        """Handle when a bundle processing fails."""
         await self._save_error_state(bundle, error, context)
-        await self._save_persistence_state(context)
 
     async def _initialize(self, context: FetchRunContext) -> None:
         """Initialize by listing files in the remote directory."""
@@ -265,11 +226,11 @@ class DirectorySftpBundleLocator(LocatorStrategy):
             if self.file_sort is not None:
                 file_info = self.file_sort.sort(file_info)
 
-            # Add to queue
+            # Add unprocessed files to in-memory queue
             for file_path, _ in file_info:
-                self._file_queue.append(file_path)
+                if not await self._is_file_processed(file_path, context):
+                    self._file_queue.append(file_path)
 
-            self._initialized = True
             logger.info(
                 "DIRECTORY_PROVIDER_INITIALIZED",
                 file_count=len(self._file_queue),
@@ -298,36 +259,40 @@ class FileSftpBundleLocator(LocatorStrategy):
     sftp_config: SftpProtocolConfig
     file_paths: list[str]
     state_management_prefix: str = "sftp_file_provider"
+    processed_files_ttl: timedelta | None = None
+    processing_results_ttl: timedelta | None = None
+    error_state_ttl: timedelta | None = None
 
     def __post_init__(self) -> None:
         """Initialize the file SFTP bundle locator state and internal variables."""
-        self._processed_files: dict[
-            str, float
-        ] = {}  # file_path -> last_processed_mtime
-        self._file_queue: list[str] = self.file_paths.copy()
-
+        self._file_queue: list[str] = []
+        
         # Validate required dependencies
         if not self.sftp_manager:
             raise ValueError("sftp_manager is required for FileSftpBundleLocator")
         if not self.sftp_config:
             raise ValueError("sftp_config is required for FileSftpBundleLocator")
 
-    async def _load_persistence_state(self, context: FetchRunContext) -> None:
-        """Load persistence state from kvstore."""
+    async def _get_file_processed_mtime(self, file_path: str, context: FetchRunContext) -> float | None:
+        """Get the last processed modification time for a file from KV store."""
         if not context.app_config or not context.app_config.kv_store:
-            raise NoKeyValueStoreError
+            return None
+        
         store = context.app_config.kv_store
+        processed_key = f"{self.state_management_prefix}:processed_mtime:{file_path}"
+        mtime_data = await store.get(processed_key)
+        return mtime_data if isinstance(mtime_data, (int, float)) else None
 
-        # Load processed files with their modification times
-        processed_files_key = f"{self.state_management_prefix}:processed_files"
-        processed_files_data = await store.get(processed_files_key, {})
-        if isinstance(processed_files_data, dict):
-            self._processed_files = processed_files_data
-        else:
-            self._processed_files = {}
+    async def _mark_file_processed_with_mtime(self, file_path: str, mtime: float, context: FetchRunContext) -> None:
+        """Mark a file as processed with its modification time in KV store."""
+        if not context.app_config or not context.app_config.kv_store:
+            return
+        
+        store = context.app_config.kv_store
+        processed_key = f"{self.state_management_prefix}:processed_mtime:{file_path}"
+        await store.put(processed_key, mtime, ttl=self.processed_files_ttl)
 
-        # Note: We don't filter the queue here anymore since we need to check
-        # modification times dynamically in get_next_bundle_refs
+
 
     async def _should_process_file(self, file_path: str, ctx: FetchRunContext) -> bool:
         """Check if a file should be processed based on modification time."""
@@ -349,7 +314,7 @@ class FileSftpBundleLocator(LocatorStrategy):
             current_mtime = stat.st_mtime
 
             # Check if we've processed this file before
-            last_processed_mtime = self._processed_files.get(file_path)
+            last_processed_mtime = await self._get_file_processed_mtime(file_path, ctx)
 
             if last_processed_mtime is None:
                 # File has never been processed
@@ -389,17 +354,17 @@ class FileSftpBundleLocator(LocatorStrategy):
                 f"Failed to check file modification time for '{file_path}': {e}"
             ) from e
 
-    async def _save_persistence_state(self, context: FetchRunContext) -> None:
-        """Save persistence state to kvstore."""
-        if not context.app_config or not context.app_config.kv_store:
-            error_message = "No kv_store available in context - persistence is required for this locator"
-            raise ValueError(error_message)
-        store = context.app_config.kv_store
+    async def _initialize(self, context: FetchRunContext) -> None:
+        """Initialize by building queue with unprocessed files."""
+        # Add unprocessed files to in-memory queue
+        for file_path in self.file_paths:
+            if await self._should_process_file(file_path, context):
+                self._file_queue.append(file_path)
 
-        # Save processed files with their modification times
-        processed_files_key = f"{self.state_management_prefix}:processed_files"
-        await store.put(
-            processed_files_key, self._processed_files, ttl=timedelta(days=7)
+        logger.info(
+            "FILE_PROVIDER_INITIALIZED",
+            file_count=len(self._file_queue),
+            total_files=len(self.file_paths),
         )
 
     async def _save_processing_result(
@@ -423,52 +388,56 @@ class FileSftpBundleLocator(LocatorStrategy):
             "success": success,
             "bundle_bid": str(bundle.bid),
         }
-        await store.put(result_key, result_data, ttl=timedelta(days=30))
+        await store.put(result_key, result_data, ttl=self.processing_results_ttl)
 
     async def get_next_bundle_refs(
         self, ctx: FetchRunContext, bundle_refs_needed: int
     ) -> list[BundleRef]:
         """Get the next batch of SFTP URLs to process."""
-        # Load persistence state on first call
-        if not self._processed_files:
-            await self._load_persistence_state(ctx)
+        logger.info(
+            "GET_NEXT_BUNDLE_REFS_STARTING",
+            initialized=len(self._file_queue) > 0,
+            bundle_refs_needed=bundle_refs_needed,
+        )
 
-        urls: list[BundleRef] = []
-        while self._file_queue and len(urls) < bundle_refs_needed:
+        if not self._file_queue:
+            await self._initialize(ctx)
+        
+        logger.info(
+            "FILE_QUEUE_STATUS",
+            file_queue_size=len(self._file_queue),
+        )
+
+        bundle_refs: list[BundleRef] = []
+        while self._file_queue and len(bundle_refs) < bundle_refs_needed:
             file_path = self._file_queue.pop(0)
+            logger.info("FILE_POPPED_FROM_QUEUE", file_path=file_path)
 
-            # Check if file needs processing based on modification time
-            should_process = await self._should_process_file(file_path, ctx)
-
-            if should_process:
-                if not ctx.app_config or not ctx.app_config.storage:
-                    raise ValueError(
-                        "Storage is required in app_config for BID minting"
-                    )
-                storage = ctx.app_config.storage
-                bid_str = storage.bundle_found(
-                    {
-                        "source": "sftp",
-                        "primary_url": f"sftp://{file_path}",
-                        "config_id": getattr(ctx.app_config, "config_id", "sftp"),
-                    }
+            logger.info("NEW_FILE_ADDED_TO_PROCESSING", file_path=file_path)
+            if not ctx.app_config or not ctx.app_config.storage:
+                raise ValueError(
+                    "Storage is required in app_config for BID minting"
                 )
-                urls.append(
-                    BundleRef(bid=bid_str, request_meta={"url": f"sftp://{file_path}"})
-                )
-                logger.info(
-                    "FILE_ADDED_FOR_PROCESSING",
-                    file_path=file_path,
-                )
+            storage = ctx.app_config.storage
+            bid_str = storage.bundle_found(
+                {
+                    "source": "sftp",
+                    "primary_url": f"sftp://{file_path}",
+                    "config_id": getattr(ctx.app_config, "config_id", "sftp"),
+                }
+            )
+            bundle_refs.append(
+                BundleRef(bid=bid_str, request_meta={"url": f"sftp://{file_path}"})
+            )
 
-        # Save state after generating URLs
-        await self._save_persistence_state(ctx)
-        return urls
+        logger.info("RETURNING_BUNDLE_REFS_FOR_PROCESSING", bundle_ref_count=len(bundle_refs))
 
-    async def handle_url_processed(
+        return bundle_refs
+
+    async def handle_bundle_processed(
         self, bundle: BundleRef, result: object, ctx: FetchRunContext
     ) -> None:
-        """Handle when a URL has been processed."""
+        """Handle when a bundle has been processed."""
         remote_path = bundle.request_meta["url"].replace("sftp://", "")
 
         # Get current file modification time and store it
@@ -478,7 +447,7 @@ class FileSftpBundleLocator(LocatorStrategy):
             ) as conn:
                 stat = await conn.stat(remote_path)
             current_mtime = stat.st_mtime
-            self._processed_files[remote_path] = current_mtime
+            await self._mark_file_processed_with_mtime(remote_path, current_mtime, ctx)
 
             logger.info(
                 "FILE_PROCESSING_COMPLETED", file_path=remote_path, mtime=current_mtime
@@ -497,13 +466,10 @@ class FileSftpBundleLocator(LocatorStrategy):
         # Save processing result
         await self._save_processing_result(bundle, ctx, success=True)
 
-        # Save state after processing
-        await self._save_persistence_state(ctx)
-
-    async def handle_url_error(
+    async def handle_bundle_error(
         self, bundle: BundleRef, error: str, context: FetchRunContext
     ) -> None:
-        """Handle when a URL processing fails."""
+        """Handle when a bundle processing fails."""
         if not context.app_config or not context.app_config.kv_store:
             error_message = "No kv_store available in context - error state saving is required for this locator"
             raise ValueError(error_message)
@@ -517,4 +483,4 @@ class FileSftpBundleLocator(LocatorStrategy):
             "timestamp": datetime.now(UTC).isoformat(),
             "retry_count": 0,
         }
-        await store.put(error_key, error_data, ttl=timedelta(hours=24))
+        await store.put(error_key, error_data, ttl=self.error_state_ttl)

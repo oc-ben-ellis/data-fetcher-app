@@ -43,9 +43,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    init: true
+    privileged: false
     volumes:
-      - .:/code
-    working_dir: /code
+      - .:/app
+    working_dir: /app
     environment:
       - DOCKER_BUILDKIT=1
       - POETRY_VIRTUALENVS_CREATE=false
@@ -64,6 +66,7 @@ services:
       - OC_KV_STORE_REDIS_HOST=host.docker.internal
       - OC_KV_STORE_REDIS_PORT=${OC_KV_STORE_REDIS_PORT:-6379}
       - OC_LOGGING_LEVEL=DEBUG
+    user: "appuser"
     networks:
       - build-network
     extra_hosts:

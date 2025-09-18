@@ -426,13 +426,13 @@ class Fetcher:
 
             # 2. Notify providers that URL was processed
             for provider in config.locators:
-                if hasattr(provider, "handle_url_processed"):
+                if hasattr(provider, "handle_bundle_processed"):
                     logger.debug(
                         "PROVIDER_NOTIFICATION_URL_PROCESSED",
                         bid=str(bundle.bid),
                         provider_type=type(provider).__name__,
                     )
-                    await provider.handle_url_processed(bundle, load_result, run_ctx)
+                    await provider.handle_bundle_processed(bundle, load_result, run_ctx)
 
             logger.debug("REQUEST_PROCESSING_COMPLETED", bid=str(bundle.bid))
             run_ctx.processed_count += 1

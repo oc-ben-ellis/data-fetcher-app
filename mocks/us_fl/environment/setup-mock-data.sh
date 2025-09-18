@@ -14,13 +14,13 @@ NC='\033[0m' # No Color
 echo -e "${GREEN}Setting up mock data for US Florida SFTP environment...${NC}"
 
 # Check if docker-compose is running
-if ! docker-compose ps | grep -q "Up"; then
+if ! docker-compose -f mocks/us_fl/environment/docker-compose.yml ps | grep -q "Up"; then
     echo -e "${RED}Error: Docker containers are not running. Please run 'docker-compose up -d' first.${NC}"
     exit 1
 fi
 
 # Get the container name
-CONTAINER_NAME=$(docker-compose ps -q sftp-server)
+CONTAINER_NAME=$(docker-compose -f mocks/us_fl/environment/docker-compose.yml ps -q sftp-server)
 
 if [ -z "$CONTAINER_NAME" ]; then
     echo -e "${RED}Error: SFTP server container not found. Please check docker-compose status.${NC}"

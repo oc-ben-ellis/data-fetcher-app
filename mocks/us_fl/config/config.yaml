@@ -32,5 +32,5 @@ fetcher_settings:
     connect_timeout: 20.0
     read_timeout: 300.0
 protocols:
-  us_fl_sftp:
-    us_fl: sftp_config.yaml
+  sftp:
+    us_fl_sftp: sftp_config.yaml

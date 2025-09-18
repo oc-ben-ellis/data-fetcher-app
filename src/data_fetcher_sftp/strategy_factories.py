@@ -5,6 +5,7 @@ StrategyFactoryRegistry to enable YAML-based configuration loading.
 """
 
 from dataclasses import asdict, dataclass, is_dataclass
+from datetime import timedelta
 from typing import Annotated, Any
 
 from oc_pipeline_bus.strategy_registry import (
@@ -53,6 +54,9 @@ class SftpDirectoryLocatorConfig:
     file_filter: Annotated[FilterStrategyBase, "strategy"] = None
     file_sort: Annotated[FileSortStrategyBase, "strategy"] = None
     state_management_prefix: str = "sftp_directory_provider"
+    processed_files_ttl: timedelta | None = None
+    processing_results_ttl: timedelta | None = None
+    error_state_ttl: timedelta | None = None
 
 
 @dataclass
@@ -65,6 +69,9 @@ class SftpFileLocatorConfig:
     ]
     file_paths: list[str]
     state_management_prefix: str = "sftp_file_provider"
+    processed_files_ttl: timedelta | None = None
+    processing_results_ttl: timedelta | None = None
+    error_state_ttl: timedelta | None = None
 
 
 @dataclass
@@ -281,6 +288,9 @@ class DirectorySftpBundleLocatorFactory(StrategyFactory):
             state_management_prefix = getattr(
                 params, "state_management_prefix", "sftp_directory_provider"
             )
+            processed_files_ttl = getattr(params, "processed_files_ttl", None)
+            processing_results_ttl = getattr(params, "processing_results_ttl", None)
+            error_state_ttl = getattr(params, "error_state_ttl", None)
         else:
             sftp_config = params["sftp_config"]
             remote_dir = params["remote_dir"]
@@ -291,6 +301,9 @@ class DirectorySftpBundleLocatorFactory(StrategyFactory):
             state_management_prefix = params.get(
                 "state_management_prefix", "sftp_directory_provider"
             )
+            processed_files_ttl = params.get("processed_files_ttl", None)
+            processing_results_ttl = params.get("processing_results_ttl", None)
+            error_state_ttl = params.get("error_state_ttl", None)
 
         return DirectorySftpBundleLocator(
             sftp_manager=self.sftp_manager,
@@ -301,6 +314,9 @@ class DirectorySftpBundleLocatorFactory(StrategyFactory):
             file_filter=file_filter,
             file_sort=file_sort,
             state_management_prefix=state_management_prefix,
+            processed_files_ttl=processed_files_ttl,
+            processing_results_ttl=processing_results_ttl,
+            error_state_ttl=error_state_ttl,
         )
 
     def get_config_type(self, params: dict[str, Any]) -> type | None:
@@ -387,18 +403,27 @@ class FileSftpBundleLocatorFactory(StrategyFactory):
             state_management_prefix = getattr(
                 params, "state_management_prefix", "sftp_file_provider"
             )
+            processed_files_ttl = getattr(params, "processed_files_ttl", None)
+            processing_results_ttl = getattr(params, "processing_results_ttl", None)
+            error_state_ttl = getattr(params, "error_state_ttl", None)
         else:
             sftp_config = params["sftp_config"]
             file_paths = params["file_paths"]
             state_management_prefix = params.get(
                 "state_management_prefix", "sftp_file_provider"
             )
+            processed_files_ttl = params.get("processed_files_ttl", None)
+            processing_results_ttl = params.get("processing_results_ttl", None)
+            error_state_ttl = params.get("error_state_ttl", None)
 
         return FileSftpBundleLocator(
             sftp_manager=self.sftp_manager,
             sftp_config=sftp_config,
             file_paths=file_paths,
             state_management_prefix=state_management_prefix,
+            processed_files_ttl=processed_files_ttl,
+            processing_results_ttl=processing_results_ttl,
+            error_state_ttl=error_state_ttl,
         )
 
     def get_config_type(self, params: dict[str, Any]) -> type | None:

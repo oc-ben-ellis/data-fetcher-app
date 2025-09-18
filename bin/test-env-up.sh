@@ -19,6 +19,13 @@ for arg in "$@"; do
   esac
 done
 
+# Check if --env-vars-only flag is provided
+if [ "$ENV_VARS_ONLY" -ne 1 ]; then
+  echo "This script should be called with the --env-vars-only flag." >&2
+  echo "Please use: eval \$(./bin/test-env-up.sh --env-vars-only)" >&2
+  exit 1
+fi
+
 # If env-vars-only is requested, redirect normal stdout to stderr so only the
 # final export lines (explicitly sent to FD 3) appear on stdout for eval.
 if [ "$ENV_VARS_ONLY" -eq 1 ]; then
@@ -27,7 +34,7 @@ if [ "$ENV_VARS_ONLY" -eq 1 ]; then
 fi
 
 # Usage: test-env-up.sh [context_name] [port]
-# - context_name: optional; if not provided, generated as lsctx-<random>
+# - context_name: optional; if not provided, generated as <random>
 # - port: optional; if not provided, first available port starting at 4566 is used
 
 if ! command -v docker &>/dev/null; then
@@ -46,7 +53,7 @@ if ! command -v terraform &>/dev/null; then
 fi
 
 generate_context() {
-  echo "lsctx-$(head -c 8 /dev/urandom | tr -dc 'a-z0-9' | head -c 8)"
+  echo "$(openssl rand -hex 4)"
 }
 
 is_port_free() {
@@ -92,8 +99,6 @@ else
 fi
 
 CONTAINER_NAME="localstack-${CTX_NAME}"
-DATA_DIR="tmp/.localstack"
-mkdir -p "./${DATA_DIR}"
 
 # Clean up any existing container with the same name
 echo "Cleaning up any existing container with name ${CONTAINER_NAME}..."
@@ -128,7 +133,6 @@ if ! docker run -d --rm \
   -e LS_LOG=info \
   -e DEBUG=0 \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
-  -v "$(pwd)/${DATA_DIR}:/var/lib/localstack" \
   localstack/localstack:latest >/dev/null; then
   echo "Failed to start LocalStack container. Check Docker is running and you have permissions." >&2
   exit 1
@@ -252,25 +256,42 @@ CONFIG_BUCKET=$(terraform -chdir "$MOCKS_TF_DIR" output -raw config_bucket_name 
 DATA_REGISTRY_ID=$(terraform -chdir "$MOCKS_TF_DIR" output -raw data_registry_id 2>/dev/null || echo "us_fl")
 ORCH_SQS_URL="${AWS_ENDPOINT_URL:-http://${HOST_ADDR}:${PORT}}/000000000000/data-pipeline-orchestration"
 
+export AWS_ACCESS_KEY_ID=test
+export AWS_SECRET_ACCESS_KEY=test
+export AWS_DEFAULT_REGION=${AWS_REGION}
+export AWS_ENDPOINT_URL=http://${HOST_ADDR}:${PORT}
+export CONFIG_TEST_ENV_CONTEXT=${CTX_NAME}
+export CONFIG_TEST_ENV_LOCALSTACK_PORT=${PORT}
+export CONFIG_TEST_ENV_LOCALSTACK_HOST=${HOST_ADDR}
+export OC_KV_STORE_TYPE=redis
+export OC_KV_STORE_REDIS_HOST=${REDIS_HOST}
+export OC_KV_STORE_REDIS_PORT=${REDIS_PORT}
+export OC_DATA_PIPELINE_CONFIG_S3_BUCKET=${CONFIG_BUCKET}
+export OC_DATA_PIPELINE_STORAGE_S3_URL=${PIPELINE_BUCKET}
+export OC_DATA_PIPELINE_STAGE=raw
+export OC_DATA_PIPELINE_STEP=fetch
+export OC_DATA_PIPELINE_DATA_REGISTRY_ID=${DATA_REGISTRY_ID}
+export OC_DATA_PIPELINE_ORCHESTRATION_SQS_URL=${ORCH_SQS_URL}
+
 # If only env vars are requested, output them in export format and exit
 if [ "$ENV_VARS_ONLY" -eq 1 ]; then
   {
-    echo "export AWS_ACCESS_KEY_ID=test"
-    echo "export AWS_SECRET_ACCESS_KEY=test"
-    echo "export AWS_DEFAULT_REGION=${AWS_REGION}"
-    echo "export AWS_ENDPOINT_URL=http://${HOST_ADDR}:${PORT}"
-    echo "export CONFIG_TEST_ENV_CONTEXT=${CTX_NAME}"
-    echo "export CONFIG_TEST_ENV_LOCALSTACK_PORT=${PORT}"
+    echo "export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}"
+    echo "export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}"
+    echo "export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}"
+    echo "export AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL}"
+    echo "export CONFIG_TEST_ENV_CONTEXT=${CONFIG_TEST_ENV_CONTEXT}"
+    echo "export CONFIG_TEST_ENV_LOCALSTACK_PORT=${CONFIG_TEST_ENV_LOCALSTACK_PORT}"
     echo "export CONFIG_TEST_ENV_LOCALSTACK_HOST=${HOST_ADDR}"
-    echo "export OC_KV_STORE_TYPE=redis"
-    echo "export OC_KV_STORE_REDIS_HOST=${REDIS_HOST}"
+    echo "export OC_KV_STORE_TYPE=${OC_KV_STORE_TYPE}"
+    echo "export OC_KV_STORE_REDIS_HOST=${OC_KV_STORE_REDIS_HOST}"
     echo "export OC_KV_STORE_REDIS_PORT=${REDIS_PORT}"
-    echo "export OC_DATA_PIPELINE_CONFIG_S3_BUCKET=${CONFIG_BUCKET}"
-    echo "export OC_DATA_PIPELINE_STORAGE_S3_URL=s3://${PIPELINE_BUCKET}"
-    echo "export OC_DATA_PIPELINE_STAGE=raw"
-    echo "export OC_DATA_PIPELINE_STEP=fetch"
-    echo "export OC_DATA_PIPELINE_DATA_REGISTRY_ID=${DATA_REGISTRY_ID}"
-    echo "export OC_DATA_PIPELINE_ORCHESTRATION_SQS_URL=${ORCH_SQS_URL}"
+    echo "export OC_DATA_PIPELINE_CONFIG_S3_BUCKET=${OC_DATA_PIPELINE_CONFIG_S3_BUCKET}"
+    echo "export OC_DATA_PIPELINE_STORAGE_S3_URL=s3://${OC_DATA_PIPELINE_STORAGE_S3_URL}"
+    echo "export OC_DATA_PIPELINE_STAGE=${OC_DATA_PIPELINE_STAGE}"
+    echo "export OC_DATA_PIPELINE_STEP=${OC_DATA_PIPELINE_STEP}"
+    echo "export OC_DATA_PIPELINE_DATA_REGISTRY_ID=${OC_DATA_PIPELINE_DATA_REGISTRY_ID}"
+    echo "export OC_DATA_PIPELINE_ORCHESTRATION_SQS_URL=${OC_DATA_PIPELINE_ORCHESTRATION_SQS_URL}"
   } >&3
   exit 0
 fi
@@ -278,41 +299,37 @@ fi
 cat <<HINTS
 
 # Local AWS/SDK env variables for LocalStack and Context variables for this session :
-  export AWS_ACCESS_KEY_ID=test
-  export AWS_SECRET_ACCESS_KEY=test
+  export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+  export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
   export AWS_DEFAULT_REGION=${AWS_REGION}
-  export AWS_ENDPOINT_URL=http://${HOST_ADDR}:${PORT}
-  export CONFIG_TEST_ENV_CONTEXT=${CTX_NAME}
-  export CONFIG_TEST_ENV_LOCALSTACK_PORT=${PORT}
-  export CONFIG_TEST_ENV_LOCALSTACK_HOST=${HOST_ADDR}
+  export AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL}
+  export CONFIG_TEST_ENV_CONTEXT=${CONFIG_TEST_ENV_CONTEXT}
+  export CONFIG_TEST_ENV_LOCALSTACK_PORT=${CONFIG_TEST_ENV_LOCALSTACK_PORT}
+  export CONFIG_TEST_ENV_LOCALSTACK_HOST=${CONFIG_TEST_ENV_LOCALSTACK_HOST}
 
 # Redis for functional tests (Docker provider):
-  export OC_KV_STORE_TYPE=redis
-  export OC_KV_STORE_REDIS_HOST=${REDIS_HOST}
-  export OC_KV_STORE_REDIS_PORT=${REDIS_PORT}
+  export OC_KV_STORE_TYPE=${OC_KV_STORE_TYPE}
+  export OC_KV_STORE_REDIS_HOST=${OC_KV_STORE_REDIS_HOST}
+  export OC_KV_STORE_REDIS_PORT=${OC_KV_STORE_REDIS_PORT}
 
 # Data pipeline defaults for mocks/us_fl
-  export OC_DATA_PIPELINE_CONFIG_S3_BUCKET=${CONFIG_BUCKET}
-  export OC_DATA_PIPELINE_STORAGE_S3_URL=s3://${PIPELINE_BUCKET}
-  export OC_DATA_PIPELINE_STAGE=raw
-  export OC_DATA_PIPELINE_STEP=fetch
-  export OC_DATA_PIPELINE_DATA_REGISTRY_ID=${DATA_REGISTRY_ID}
-  export OC_DATA_PIPELINE_ORCHESTRATION_SQS_URL=${ORCH_SQS_URL}
-
-Alternative way to get env vars:
-  # This will print the env vars to stdout for eval
-  eval \$(./bin/test-env-up.sh --env-vars-only)
+  export OC_DATA_PIPELINE_CONFIG_S3_BUCKET=${OC_DATA_PIPELINE_CONFIG_S3_BUCKET}
+  export OC_DATA_PIPELINE_STORAGE_S3_URL=${OC_DATA_PIPELINE_STORAGE_S3_URL}
+  export OC_DATA_PIPELINE_STAGE=${OC_DATA_PIPELINE_STAGE}
+  export OC_DATA_PIPELINE_STEP=${OC_DATA_PIPELINE_STEP}
+  export OC_DATA_PIPELINE_DATA_REGISTRY_ID=${OC_DATA_PIPELINE_DATA_REGISTRY_ID}
+  export OC_DATA_PIPELINE_ORCHESTRATION_SQS_URL=${OC_DATA_PIPELINE_ORCHESTRATION_SQS_URL}
 
 AWS CLI examples (against LocalStack):
-  aws --endpoint-url http://${HOST_ADDR}:${PORT} s3 ls
-  aws --endpoint-url http://${HOST_ADDR}:${PORT} sqs list-queues
+  aws --endpoint-url ${AWS_ENDPOINT_URL} s3 ls
+  aws --endpoint-url ${AWS_ENDPOINT_URL} sqs list-queues
 
 Redis examples:
   # Test connectivity
-  redis-cli -h ${REDIS_HOST} -p ${REDIS_PORT} PING
+  redis-cli -h ${OC_KV_STORE_REDIS_HOST} -p ${OC_KV_STORE_REDIS_PORT} PING
 
   # Set and get a key
-  redis-cli -h ${REDIS_HOST} -p ${REDIS_PORT} SET test:ping pong
-  redis-cli -h ${REDIS_HOST} -p ${REDIS_PORT} GET test:ping
+  redis-cli -h ${OC_KV_STORE_REDIS_HOST} -p ${OC_KV_STORE_REDIS_PORT} SET test:ping pong
+  redis-cli -h ${OC_KV_STORE_REDIS_HOST} -p ${OC_KV_STORE_REDIS_PORT} GET test:ping
 
-HINTS
+HINTS 1>&2

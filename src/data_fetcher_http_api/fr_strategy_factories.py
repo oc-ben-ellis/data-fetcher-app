@@ -5,7 +5,8 @@ like complex pagination locators, reverse pagination locators, and single URL lo
 """
 
 from collections.abc import Callable
-from typing import Any
+from dataclasses import dataclass
+from typing import Annotated, Any
 
 from oc_pipeline_bus.strategy_registry import (
     InvalidArgumentStrategyException,
@@ -13,6 +14,7 @@ from oc_pipeline_bus.strategy_registry import (
 )
 
 from data_fetcher_core.strategy_types import LocatorStrategy
+from data_fetcher_http.http_config import HttpProtocolConfig
 from data_fetcher_http.http_manager import HttpManager
 from data_fetcher_http_api.api_bundle_locators import (
     PaginationHttpBundleLocator,
@@ -20,6 +22,60 @@ from data_fetcher_http_api.api_bundle_locators import (
 from data_fetcher_http_api.api_pagination_bundle_locators import (
     CursorPaginationStrategy,
 )
+
+
+@dataclass
+class SirenProviderConfig:
+    """Configuration for SIREN provider locator."""
+
+    # value is an alias like "test_http" → resolve to filename via protocols.http.{value} → load into HttpProtocolConfig
+    http_config: Annotated[
+        HttpProtocolConfig, "path:protocols.http.{value}", "relative_config"
+    ]
+    base_url: str
+    date_start: str
+    date_end: str | None = None
+    max_records_per_page: int = 1000
+    rate_limit_requests_per_second: float = 2.0
+    query_params: dict[str, Any] | None = None
+    headers: dict[str, str] | None = None
+    state_management_prefix: str = "siren_provider"
+
+
+@dataclass
+class GapProviderConfig:
+    """Configuration for GAP provider locator."""
+
+    # value is an alias like "test_http" → resolve to filename via protocols.http.{value} → load into HttpProtocolConfig
+    http_config: Annotated[
+        HttpProtocolConfig, "path:protocols.http.{value}", "relative_config"
+    ]
+    base_url: str
+    date_start: str
+    date_end: str | None = None
+    max_records_per_page: int = 1000
+    rate_limit_requests_per_second: float = 2.0
+    query_params: dict[str, Any] | None = None
+    headers: dict[str, str] | None = None
+    state_management_prefix: str = "gap_provider"
+
+
+@dataclass
+class FailedCompaniesProviderConfig:
+    """Configuration for Failed Companies provider locator."""
+
+    # value is an alias like "test_http" → resolve to filename via protocols.http.{value} → load into HttpProtocolConfig
+    http_config: Annotated[
+        HttpProtocolConfig, "path:protocols.http.{value}", "relative_config"
+    ]
+    base_url: str
+    date_start: str
+    date_end: str | None = None
+    max_records_per_page: int = 1000
+    rate_limit_requests_per_second: float = 2.0
+    query_params: dict[str, Any] | None = None
+    headers: dict[str, str] | None = None
+    state_management_prefix: str = "failed_companies_provider"
 
 
 class SirenProviderFactory(StrategyFactory):
@@ -43,9 +99,28 @@ class SirenProviderFactory(StrategyFactory):
                     params,
                 )
 
-    def create(self, params: dict[str, Any]) -> PaginationHttpBundleLocator:
+    def create(self, params: Any) -> PaginationHttpBundleLocator:
         """Create a SIREN provider locator."""
-        http_config = params["http_config"]
+        # The http_config parameter will be resolved by DataPipelineConfig
+        # and passed as an actual HttpProtocolConfig object
+        if hasattr(params, 'http_config'):
+            # params is a dataclass instance
+            http_config = params.http_config
+            base_url = params.base_url
+            date_start = params.date_start
+            date_end = getattr(params, 'date_end', None)
+            max_records_per_page = getattr(params, 'max_records_per_page', 1000)
+            rate_limit_requests_per_second = getattr(params, 'rate_limit_requests_per_second', 2.0)
+            headers = getattr(params, 'headers', {})
+        else:
+            # params is a dictionary
+            http_config = params["http_config"]
+            base_url = params["base_url"]
+            date_start = params["date_start"]
+            date_end = params.get("date_end")
+            max_records_per_page = params.get("max_records_per_page", 1000)
+            rate_limit_requests_per_second = params.get("rate_limit_requests_per_second", 2.0)
+            headers = params.get("headers", {})
 
         # Create query builder
         query_builder = self._create_sirene_query_builder()
@@ -65,18 +140,27 @@ class SirenProviderFactory(StrategyFactory):
             http_manager=self.http_manager,
             http_config=http_config,
             store=None,  # Will be set from context
-            base_url=params["base_url"],
-            date_start=params["date_start"],
-            date_end=params.get("date_end"),
-            max_records_per_page=params.get("max_records_per_page", 1000),
-            rate_limit_requests_per_second=params.get(
-                "rate_limit_requests_per_second", 2.0
-            ),
-            headers=params.get("headers", {}),
+            base_url=base_url,
+            date_start=date_start,
+            date_end=date_end,
+            max_records_per_page=max_records_per_page,
+            rate_limit_requests_per_second=rate_limit_requests_per_second,
+            headers=headers,
             query_builder=query_builder,
             pagination_strategy=pagination_strategy,
             narrowing_strategy=narrowing_strategy,
         )
+
+    def get_config_type(self, params: dict[str, Any]) -> type | None:
+        """Get the configuration type for further processing.
+
+        Args:
+            params: Dictionary of parameters that may contain nested configurations
+
+        Returns:
+            SirenProviderConfig - for processing http_config relative config
+        """
+        return SirenProviderConfig
 
     def _create_sirene_query_builder(self) -> Callable[[str, str | None], str]:
         """Create a query builder for Sirene API."""
@@ -136,9 +220,28 @@ class GapProviderFactory(StrategyFactory):
                     params,
                 )
 
-    def create(self, params: dict[str, Any]) -> PaginationHttpBundleLocator:
+    def create(self, params: Any) -> PaginationHttpBundleLocator:
         """Create a gap provider locator."""
-        http_config = params["http_config"]
+        # The http_config parameter will be resolved by DataPipelineConfig
+        # and passed as an actual HttpProtocolConfig object
+        if hasattr(params, 'http_config'):
+            # params is a dataclass instance
+            http_config = params.http_config
+            base_url = params.base_url
+            date_start = params.date_start
+            date_end = getattr(params, 'date_end', None)
+            max_records_per_page = getattr(params, 'max_records_per_page', 1000)
+            rate_limit_requests_per_second = getattr(params, 'rate_limit_requests_per_second', 2.0)
+            headers = getattr(params, 'headers', {})
+        else:
+            # params is a dictionary
+            http_config = params["http_config"]
+            base_url = params["base_url"]
+            date_start = params["date_start"]
+            date_end = params.get("date_end")
+            max_records_per_page = params.get("max_records_per_page", 1000)
+            rate_limit_requests_per_second = params.get("rate_limit_requests_per_second", 2.0)
+            headers = params.get("headers", {})
 
         # Create query builder
         query_builder = self._create_sirene_query_builder()
@@ -158,18 +261,27 @@ class GapProviderFactory(StrategyFactory):
             http_manager=self.http_manager,
             http_config=http_config,
             store=None,  # Will be set from context
-            base_url=params["base_url"],
-            date_start=params["date_start"],
-            date_end=params.get("date_end"),
-            max_records_per_page=params.get("max_records_per_page", 1000),
-            rate_limit_requests_per_second=params.get(
-                "rate_limit_requests_per_second", 2.0
-            ),
-            headers=params.get("headers", {}),
+            base_url=base_url,
+            date_start=date_start,
+            date_end=date_end,
+            max_records_per_page=max_records_per_page,
+            rate_limit_requests_per_second=rate_limit_requests_per_second,
+            headers=headers,
             query_builder=query_builder,
             pagination_strategy=pagination_strategy,
             narrowing_strategy=narrowing_strategy,
         )
+
+    def get_config_type(self, params: dict[str, Any]) -> type | None:
+        """Get the configuration type for further processing.
+
+        Args:
+            params: Dictionary of parameters that may contain nested configurations
+
+        Returns:
+            GapProviderConfig - for processing http_config relative config
+        """
+        return GapProviderConfig
 
     def _create_sirene_query_builder(self) -> Callable[[str, str | None], str]:
         """Create a query builder for Sirene API."""
@@ -229,9 +341,20 @@ class FailedCompaniesProviderFactory(StrategyFactory):
                     params,
                 )
 
-    def create(self, params: dict[str, Any]) -> PaginationHttpBundleLocator:
+    def create(self, params: Any) -> PaginationHttpBundleLocator:
         """Create a failed companies provider locator."""
-        http_config = params["http_config"]
+        # The http_config parameter will be resolved by DataPipelineConfig
+        # and passed as an actual HttpProtocolConfig object
+        if hasattr(params, 'http_config'):
+            # params is a dataclass instance
+            http_config = params.http_config
+            urls = getattr(params, 'urls', [])
+            headers = getattr(params, 'headers', {})
+        else:
+            # params is a dictionary
+            http_config = params["http_config"]
+            urls = params.get("urls", [])
+            headers = params.get("headers", {})
 
         return PaginationHttpBundleLocator(
             http_manager=self.http_manager,
@@ -239,9 +362,20 @@ class FailedCompaniesProviderFactory(StrategyFactory):
             store=None,  # Will be set from context
             base_url="",  # Not used for single URL locators
             date_start="",  # Not used for single URL locators
-            urls=params.get("urls", []),
-            headers=params.get("headers", {}),
+            urls=urls,
+            headers=headers,
         )
+
+    def get_config_type(self, params: dict[str, Any]) -> type | None:
+        """Get the configuration type for further processing.
+
+        Args:
+            params: Dictionary of parameters that may contain nested configurations
+
+        Returns:
+            FailedCompaniesProviderConfig - for processing http_config relative config
+        """
+        return FailedCompaniesProviderConfig
 
 
 def register_fr_strategies(registry, http_manager) -> None:

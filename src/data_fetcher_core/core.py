@@ -168,15 +168,16 @@ class ProtocolConfig(ABC):
             A string identifying the protocol type (e.g., 'http', 'sftp').
         """
 
+# Defined a constant here to stop formatter messing up the Annotated type hint
+strategy = "strategy"
 
 @dataclass
 class DataRegistryFetcherConfig:
     """YAML-based fetcher configuration using strategy factory registry."""
 
-    # fmt: off
     loader: Annotated[LoaderStrategy, strategy]
     locators: list[Annotated[LocatorStrategy, strategy]]
-    # fmt: on
+
     concurrency: int = 10
     target_queue_size: int = 100
     # Optional fields for backward compatibility with storage hooks
