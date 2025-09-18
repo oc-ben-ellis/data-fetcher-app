@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 
@@ -41,28 +42,81 @@ def _assert_s3_objects(endpoint: str, registry_id: str) -> None:
     if not keys:
         raise AssertionError(f"No raw objects found under s3://{bucket}/{base_prefix}")
 
+    # Find all completed bundle metadata files
     completed = [k for k in keys if k.endswith("metadata/_completed.json")]
     if not completed:
         raise AssertionError("No completed bundle metadata found in raw stage")
+    
+    # Expect exactly 4 bundles
+    if len(completed) != 4:
+        raise AssertionError(f"Expected exactly 4 bundles, but found {len(completed)}")
 
-    bundle_meta_prefix = completed[0].rsplit("metadata/_completed.json", 1)[0]
-    manifest_key = f"{bundle_meta_prefix}_manifest.jsonl"
-    if manifest_key not in keys:
-        keys = _list_keys(s3, bucket, base_prefix)
+    # Validate each bundle structure
+    for completed_key in completed:
+        bundle_meta_prefix = completed_key.rsplit("metadata/_completed.json", 1)[0]
+        
+        # Check for manifest file
+        manifest_key = f"{bundle_meta_prefix}_manifest.jsonl"
         if manifest_key not in keys:
-            raise AssertionError("_manifest.jsonl missing for completed bundle")
+            keys = _list_keys(s3, bucket, base_prefix)
+            if manifest_key not in keys:
+                raise AssertionError(f"_manifest.jsonl missing for bundle at {bundle_meta_prefix}")
 
-    content_prefix = bundle_meta_prefix.replace("metadata/", "content/")
-    content_keys = [
-        k for k in keys if k.startswith(content_prefix) and not k.endswith("/")
-    ]
-    if not content_keys:
-        raise AssertionError("No bundle content objects found in raw stage")
+        # Check for content files
+        content_prefix = bundle_meta_prefix.replace("metadata/", "content/")
+        content_keys = [
+            k for k in keys if k.startswith(content_prefix) and not k.endswith("/")
+        ]
+        if not content_keys:
+            raise AssertionError(f"No bundle content objects found for bundle at {content_prefix}")
 
+        # Validate _completed.json structure
+        try:
+            response = s3.get_object(Bucket=bucket, Key=completed_key)
+            metadata = json.loads(response['Body'].read().decode('utf-8'))
+            
+            # Check required fields
+            required_fields = ['bundle_hash', 'source', 'run_id', 'resources_count']
+            for field in required_fields:
+                if field not in metadata:
+                    raise AssertionError(f"Missing required field '{field}' in {completed_key}")
+            
+            # Validate source is sftp
+            if metadata.get('source') != 'sftp':
+                raise AssertionError(f"Expected source to be 'sftp' in {completed_key}, got '{metadata.get('source')}'")
+                
+            # Validate resources_count is 1 (each bundle should contain 1 file)
+            if metadata.get('resources_count') != 1:
+                raise AssertionError(f"Expected resources_count to be 1 in {completed_key}, got {metadata.get('resources_count')}")
+                
+        except Exception as e:
+            raise AssertionError(f"Failed to validate bundle metadata in {completed_key}: {e}")
+
+    # Validate bundle hashes
     bundle_hashes_prefix = f"raw/{registry_id}/bundle_hashes/"
     hash_keys = _list_keys(s3, bucket, bundle_hashes_prefix)
+    
+    # Should have _latest file
     if not any(k.endswith("_latest") for k in hash_keys):
         raise AssertionError("bundle_hashes/_latest not found")
+    
+    # Should have exactly 4 bundle hash files (plus _latest = 5 total)
+    hash_files = [k for k in hash_keys if not k.endswith("_latest")]
+    if len(hash_files) != 4:
+        raise AssertionError(f"Expected exactly 4 bundle hash files, but found {len(hash_files)}")
+    
+    # Validate _latest points to one of the bundle hashes
+    try:
+        latest_response = s3.get_object(Bucket=bucket, Key=f"{bundle_hashes_prefix}_latest")
+        latest_hash = latest_response['Body'].read().decode('utf-8').strip()
+        
+        # Check if the latest hash file exists
+        latest_hash_key = f"{bundle_hashes_prefix}{latest_hash}"
+        if latest_hash_key not in hash_keys:
+            raise AssertionError(f"_latest points to non-existent hash file: {latest_hash}")
+            
+    except Exception as e:
+        raise AssertionError(f"Failed to validate _latest bundle hash: {e}")
 
 
 def _assert_sqs_message(endpoint: str) -> None:

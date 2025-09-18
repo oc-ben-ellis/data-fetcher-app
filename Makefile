@@ -1,11 +1,11 @@
 SHELL=/bin/bash
 DOCKER=BUILDKIT_PROGRESS=plain docker
-DOCKER_COMPOSE=USER_ID=$$(id -u) GROUP_ID=$$(id -g) BUILDKIT_PROGRESS=plain docker compose
+DOCKER_COMPOSE=USER_ID=$$(id -u) GROUP_ID=$$(id -g) BUILDKIT_PROGRESS=plain docker-compose
 GIT_REPOSITORY_NAME=$$(basename `git rev-parse --show-toplevel`)
 GIT_COMMIT_ID=$$(git rev-parse --short HEAD)
 
 # Allocate a TTY for colorful output when stdout is a terminal
-TTY_FLAG:=$(shell if [ -t 1 ]; then echo ; else echo -t; fi)
+TTY_FLAG:=$(shell if [ -t 1 ]; then echo -t; else echo ; fi)
 
 # Default parameter values
 AWS_PROFILE ?= oc-management-dev
@@ -54,7 +54,7 @@ TEST_WORKERS ?= auto
 
 .PHONY: all-checks build/for-deployment format lint test test/unit test/integration test/functional test/not-in-parallel test/parallel test/with-coverage test/snapshot-update run run/with-observability
 .PHONY: lint/ruff lint/mypy help examples debug docs docs/open headers pre-commit pre-commit/init pre-commit/run pre-commit/run-all
-.PHONY: setup build-pipeline clean-pipeline
+.PHONY: setup build-pipeline clean-pipeline ensure-in-docker ensure-docker-compose
 
 all-checks: format lint test/with-coverage
 
@@ -66,10 +66,33 @@ build/for-deployment:
 # Check docker-compose availability, mounts, ensure devcontainer running and ready
 ensure-docker-compose:
 	@if [ "$(MODE)" != "local" ]; then \
-		if ! docker compose version >/dev/null 2>&1; then \
-			echo "Error: docker compose (v2) not found. Please install Docker Desktop or docker-compose-plugin."; \
+		if [ -z "$$DOCKER_GID" ]; then \
+			echo ""; \
+			echo "❌ Error: DOCKER_GID environment variable is not set."; \
+			echo ""; \
+			echo "🔧 To fix this, run the following command to add DOCKER_GID to your shell configuration:"; \
+			echo ""; \
+			echo "   DOCKER_GID_LINE='export DOCKER_GID=\$$(stat -c \"%g\" /var/run/docker.sock); export UID=\$$(id -u); export GID=\$$(id -g)'; \\"; \
+			echo "   for rc in ~/.bashrc ~/.zshrc; do \\"; \
+			echo "     [ -f \"\$$rc\" ] || touch \"\$$rc\"; \\"; \
+			echo "     sed -i '/export DOCKER_GID=/d' \"\$$rc\"; \\"; \
+			echo "     printf '%s\\n' \"\$$DOCKER_GID_LINE\" >> \"\$$rc\"; \\"; \
+			echo "   done"; \
+			echo ""; \
+			echo "   You may have to restart your IDE before you can open the devcontainer."; \
+			echo ""; \
+			echo "   Or manually run: export DOCKER_GID=\$$(stat -c \"%g\" /var/run/docker.sock); export UID=\$$(id -u); export GID=\$$(id -g)"; \
+			echo ""; \
+			echo "   Then restart your shell or run: source ~/.bashrc (or ~/.zshrc)"; \
+			echo ""; \
 			exit 1; \
 		fi; \
+		\
+		if ! docker-compose version >/dev/null 2>&1; then \
+			echo "Error: docker-compose (v1) not found. Please install docker-compose v1 (Note: docker V2 (docker compose) is not supported)."; \
+			exit 1; \
+		fi; \
+		\
 		MISSING_DIRS=""; \
 		REQUIRED_DIRS="$$HOME/.gnupg $$HOME/.ssh $$HOME/.aws"; \
 		for dir in $$REQUIRED_DIRS; do \
@@ -103,11 +126,9 @@ ensure-docker-compose:
 		$(DOCKER_COMPOSE) exec $(TTY_FLAG) dev-container bash -lc 'poetry run ruff --version >/dev/null 2>&1 || poetry install --no-root'; \
 	fi
 
-
-
 format: ensure-docker-compose
-	-$(call run_in_container,ruff format .)
-	-$(call run_in_container,ruff check --fix .)
+	$(call run_in_container,ruff format .)
+	$(call run_in_container,ruff check --fix .)
 
 headers: ensure-docker-compose
 	@echo "Adding standard headers to Python files..."

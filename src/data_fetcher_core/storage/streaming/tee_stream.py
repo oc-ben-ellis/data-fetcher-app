@@ -80,21 +80,30 @@ class TeeStream:
             async for chunk in self.source_stream:
                 # Send chunk to all active consumers
                 for queue in self.consumers:
-                    try:
-                        queue.put_nowait(chunk)
-                    except asyncio.QueueFull:
-                        # Consumer is not keeping up, skip this chunk for them
-                        logger.warning(
-                            "Consumer queue full, dropping chunk",
-                            queue_size=queue.qsize(),
-                            max_size=self.max_queue_size,
-                        )
+                    max_retries = 10
+                    retry_delay = 0.1  # 100ms
+
+                    for attempt in range(max_retries):
+                        try:
+                            queue.put_nowait(chunk)
+                            break  # Success, move to next queue
+                        except asyncio.QueueFull:
+                            if attempt == max_retries - 1:
+                                # Final attempt failed, raise error
+                                raise RuntimeError(
+                                    f"Consumer queue full after {max_retries} retries. "
+                                    f"Queue size: {queue.qsize()}, max size: {self.max_queue_size}. "
+                                    f"Consumer may be stuck or too slow."
+                                )
+                            # Wait before retrying
+                            await asyncio.sleep(retry_delay)
 
                 # Small yield to prevent blocking
                 await asyncio.sleep(0)
 
         except Exception as e:
             logger.exception("Error in tee stream source", error=str(e))
+            raise
         finally:
             # Signal end of stream to all consumers
             for queue in self.consumers:
@@ -164,14 +173,18 @@ class StreamingZipReader:
                         if not chunk:
                             break
                         yield chunk
-            except KeyError:
+            except KeyError as e:
                 logger.warning("File not found in ZIP", filename=filename)
-                return
+                raise FileNotFoundError(
+                    f"File '{filename}' not found in ZIP archive"
+                ) from e
             except Exception as e:
                 logger.exception(
                     "Error reading file from ZIP", filename=filename, error=str(e)
                 )
-                return
+                raise RuntimeError(
+                    f"Failed to read file '{filename}' from ZIP archive: {e}"
+                ) from e
 
         return _file_stream()
 

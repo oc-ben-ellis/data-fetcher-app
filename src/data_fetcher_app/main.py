@@ -98,11 +98,11 @@ def run_command(args: list[str] | None = None) -> None:
         # Validate configuration
         if config.data_registry_id is not None and config.stage is None:
             print("Error: --stage is required when --data-registry-id is specified")
-            sys.exit(1)
+            sys.exit(101)
 
         if config.data_registry_id is not None and config.step is None:
             print("Error: --step is required when --data-registry-id is specified")
-            sys.exit(1)
+            sys.exit(102)
 
         if (
             config.data_registry_id is not None
@@ -112,7 +112,7 @@ def run_command(args: list[str] | None = None) -> None:
             print(
                 "Error: --config-dir is required when --data-registry-id or --stage or --step is specified"
             )
-            sys.exit(1)
+            sys.exit(103)
 
         # Determine the data registry ID to use
         data_registry_id = config.data_registry_id
@@ -206,16 +206,16 @@ def run_command(args: list[str] | None = None) -> None:
         except KeyError as e:
             # Config-related errors (e.g., missing strategy IDs)
             logger.exception("RUN_COMMAND_CONFIG_ERROR", error=str(e))
-            sys.exit(2)
+            sys.exit(201)
         except Exception as e:
             # Catch-all to ensure errors are logged and correct exit code returned
             logger.exception("RUN_COMMAND_ERROR", error=str(e))
-            sys.exit(1)
+            sys.exit(202)
 
     except Exception as e:
         # Fail-fast for setup/argument parsing issues
         logger.exception("RUN_STARTUP_ERROR", error=str(e))
-        sys.exit(1)
+        sys.exit(203)
 
 
 def health_command(args: list[str] | None = None) -> None:
@@ -262,7 +262,7 @@ def health_command(args: list[str] | None = None) -> None:
     except Exception as e:
         print(f"Error: {e!s}")
         logger.exception("HEALTH_CHECK_SERVER_START_ERROR", error=str(e))
-        sys.exit(1)
+        sys.exit(301)
 
 
 def show_help() -> None:
@@ -308,7 +308,7 @@ def main() -> None:
     min_args = 2
     if len(sys.argv) < min_args:
         show_help()
-        sys.exit(1)
+        sys.exit(401)
 
     command = sys.argv[1]
     args = sys.argv[2:] if len(sys.argv) > min_args else []
@@ -326,7 +326,7 @@ def main() -> None:
     handler = dispatch.get(command)
     if handler is None:
         show_help()
-        sys.exit(1)
+        sys.exit(402)
     handler()  # type: ignore[no-untyped-call]
     sys.exit(0)
 
@@ -414,14 +414,14 @@ async def main_async(args: dict[str, Any]) -> None:
                 "UNKNOWN_CONFIG_ERROR",
                 data_registry_id=data_registry_id,
             )
-            raise
+            sys.exit(501)
         except Exception as e:
             logger.exception(
                 "FETCHER_RUN_ERROR",
                 data_registry_id=data_registry_id,
                 error=str(e),
             )
-            raise
+            sys.exit(502)
 
 
 if __name__ == "__main__":

@@ -91,7 +91,10 @@ class SftpBundleLoader(LoaderStrategy):
 
             # Check if it's a file or directory
             try:
-                stat = await self.sftp_manager.stat(self.sftp_config, ctx, remote_path)
+                async with await self.sftp_manager.get_connection(
+                    self.sftp_config, ctx
+                ) as conn:
+                    stat = await conn.stat(remote_path)
                 if stat.st_mode is not None and stat.st_mode & 0o40000:  # Directory
                     return await self._load_directory(
                         self.sftp_manager,
@@ -141,7 +144,8 @@ class SftpBundleLoader(LoaderStrategy):
         """Load a single file from SFTP."""
         try:
             # Get file info
-            stat = await sftp_manager.stat(sftp_config, _ctx, remote_path)
+            async with await sftp_manager.get_connection(sftp_config, _ctx) as conn:
+                stat = await conn.stat(remote_path)
 
             # Build immutable bundle_meta for the result; do not mutate request_meta
             bundle_meta = {
@@ -169,18 +173,17 @@ class SftpBundleLoader(LoaderStrategy):
 
             try:
                 # 2. Add file resource
-                with await sftp_manager.open(  # type: ignore[attr-defined]
-                    sftp_config, _ctx, remote_path, "rb"
-                ) as remote_file:
-                    await bundle_context.add_resource(
-                        resource_name=remote_path,  # Use the file path as resource name
-                        metadata={
-                            "url": f"sftp://{self.remote_dir}/{remote_path}",
-                            "content_type": "application/octet-stream",
-                            "status_code": 200,
-                        },
-                        stream=self._stream_from_file(remote_file),
-                    )
+                async with await sftp_manager.get_connection(sftp_config, _ctx) as conn:
+                    with await conn.open(remote_path, "rb") as remote_file:
+                        await bundle_context.add_resource(
+                            resource_name=remote_path,  # Use the file path as resource name
+                            metadata={
+                                "url": f"sftp://{self.remote_dir}/{remote_path}",
+                                "content_type": "application/octet-stream",
+                                "status_code": 200,
+                            },
+                            stream=self._stream_from_file(remote_file),
+                        )
 
                 # 3. Complete bundle
                 await bundle_context.complete(
@@ -231,7 +234,8 @@ class SftpBundleLoader(LoaderStrategy):
 
         try:
             # List files in directory
-            files = await sftp_manager.listdir(sftp_config, ctx, remote_path)
+            async with await sftp_manager.get_connection(sftp_config, ctx) as conn:
+                files = await conn.listdir(remote_path)
 
             for filename in files:
                 if filename in [".", ".."]:
@@ -255,6 +259,7 @@ class SftpBundleLoader(LoaderStrategy):
                 remote_path=remote_path,
                 error=str(e),
             )
+            raise RuntimeError(f"Failed to load directory '{remote_path}': {e}") from e
 
         if not resources_meta:
             raise RuntimeError("No files matched pattern in directory")

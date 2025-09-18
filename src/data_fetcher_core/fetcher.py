@@ -23,16 +23,10 @@ from data_fetcher_core.exceptions import (
     NetworkError,
     ResourceError,
 )
-from data_fetcher_core.queue import BundleRefSerializer, KVStoreQueue, RequestQueue
+from data_fetcher_core.queue import BundleRefSerializer, InMemoryQueue, RequestQueue
 
 # Get logger for this module
 logger = structlog.get_logger(__name__)
-
-
-def _raise_kv_store_required() -> None:
-    """Raise error for missing kv_store."""
-    error_message = "kv_store is required for persistent queue"
-    raise ConfigurationError(error_message, "queue")
 
 
 def _raise_bundle_loader_required() -> None:
@@ -114,13 +108,8 @@ class Fetcher:
             locators=len(plan.config.locators),
         )
 
-        # Create persistent queue using kv_store
-        if not run_ctx.app_config or not run_ctx.app_config.kv_store:
-            _raise_kv_store_required()
-
-        queue: RequestQueue = KVStoreQueue(
-            kv_store=run_ctx.app_config.kv_store,  # type: ignore[union-attr]
-            namespace=f"fetch:{run_ctx.run_id}",
+        # Create in-memory queue (persistence handled by locators)
+        queue: RequestQueue = InMemoryQueue(
             serializer=BundleRefSerializer(),
         )
 
@@ -426,13 +415,13 @@ class Fetcher:
 
             # 2. Notify providers that URL was processed
             for provider in config.locators:
-                if hasattr(provider, "handle_url_processed"):
+                if hasattr(provider, "handle_bundle_processed"):
                     logger.debug(
                         "PROVIDER_NOTIFICATION_URL_PROCESSED",
                         bid=str(bundle.bid),
                         provider_type=type(provider).__name__,
                     )
-                    await provider.handle_url_processed(bundle, load_result, run_ctx)
+                    await provider.handle_bundle_processed(bundle, load_result, run_ctx)
 
             logger.debug("REQUEST_PROCESSING_COMPLETED", bid=str(bundle.bid))
             run_ctx.processed_count += 1

@@ -273,7 +273,7 @@ class CachingFrontierProvider:
         # Return URLs to process
         return [{"url": f"{self.base_url}/page1"}]
 
-    async def handle_url_processed(self, request, bundle_refs, ctx):
+    async def handle_bundle_processed(self, request, bundle_refs, ctx):
 
         # Store processing results
         result_key = f"result:{request['url']}"

@@ -5,6 +5,7 @@ StrategyFactoryRegistry to enable YAML-based configuration loading.
 """
 
 from dataclasses import asdict, dataclass, is_dataclass
+from datetime import timedelta
 from typing import Annotated, Any
 
 from oc_pipeline_bus.strategy_registry import (
@@ -15,6 +16,7 @@ from oc_pipeline_bus.strategy_registry import (
 from data_fetcher_core.strategy_types import (
     FileSortStrategyBase,
     FilterStrategyBase,
+    GatingStrategy,
     LoaderStrategy,
     LocatorStrategy,
 )
@@ -23,6 +25,7 @@ from data_fetcher_sftp.sftp_bundle_locators import (
     FileSftpBundleLocator,
 )
 from data_fetcher_sftp.sftp_config import SftpProtocolConfig
+from data_fetcher_sftp.sftp_gating import OncePerIntervalGate, ScheduledDailyGate
 from data_fetcher_sftp.sftp_loader import SftpBundleLoader
 from data_fetcher_sftp.sftp_manager import SftpManager
 
@@ -42,7 +45,6 @@ class SftpLoaderConfig:
 class SftpDirectoryLocatorConfig:
     """Configuration for SFTP directory bundle locator."""
 
-    # Non-defaults first
     sftp_config: Annotated[
         SftpProtocolConfig, "path:protocols.sftp.{value}", "relative_config"
     ]
@@ -52,6 +54,9 @@ class SftpDirectoryLocatorConfig:
     file_filter: Annotated[FilterStrategyBase, "strategy"] = None
     file_sort: Annotated[FileSortStrategyBase, "strategy"] = None
     state_management_prefix: str = "sftp_directory_provider"
+    processed_files_ttl: timedelta | None = None
+    processing_results_ttl: timedelta | None = None
+    error_state_ttl: timedelta | None = None
 
 
 @dataclass
@@ -64,6 +69,82 @@ class SftpFileLocatorConfig:
     ]
     file_paths: list[str]
     state_management_prefix: str = "sftp_file_provider"
+    processed_files_ttl: timedelta | None = None
+    processing_results_ttl: timedelta | None = None
+    error_state_ttl: timedelta | None = None
+
+
+@dataclass
+class DailyGateConfig:
+    """Configuration for a daily gating strategy."""
+
+    time_of_day: str
+    tz: str = "UTC"
+    startup_skip_if_already_today: bool = True
+
+
+@dataclass
+class IntervalGateConfig:
+    """Configuration for an interval gating strategy."""
+
+    interval_seconds: int
+    jitter_seconds: int = 0
+
+
+class DailyGatingStrategyFactory(StrategyFactory):
+    """Factory for creating a daily scheduled gating strategy."""
+
+    def validate(self, params: Any) -> None:
+        params_dict = asdict(params) if is_dataclass(params) else params
+        if "time_of_day" not in params_dict:
+            raise InvalidArgumentStrategyException(
+                "Missing required parameter: time_of_day",
+                ScheduledDailyGate,
+                "daily_gate",
+                params,
+            )
+
+    def create(self, params: Any) -> GatingStrategy:
+        if is_dataclass(params):
+            time_of_day = str(params.time_of_day)
+            tz = str(getattr(params, "tz", "UTC"))
+            skip = bool(getattr(params, "startup_skip_if_already_today", True))
+        else:
+            time_of_day = str(params.get("time_of_day"))
+            tz = str(params.get("tz", "UTC"))
+            skip = bool(params.get("startup_skip_if_already_today", True))
+        return ScheduledDailyGate(
+            time_of_day=time_of_day, tz=tz, startup_skip_if_already_today=skip
+        )
+
+    def get_config_type(self, params: Any) -> type | None:
+        return DailyGateConfig
+
+
+class IntervalGatingStrategyFactory(StrategyFactory):
+    """Factory for creating an interval gating strategy."""
+
+    def validate(self, params: Any) -> None:
+        params_dict = asdict(params) if is_dataclass(params) else params
+        if "interval_seconds" not in params_dict:
+            raise InvalidArgumentStrategyException(
+                "Missing required parameter: interval_seconds",
+                OncePerIntervalGate,
+                "interval_gate",
+                params,
+            )
+
+    def create(self, params: Any) -> GatingStrategy:
+        if is_dataclass(params):
+            interval = int(params.interval_seconds)
+            jitter = int(getattr(params, "jitter_seconds", 0))
+        else:
+            interval = int(params.get("interval_seconds"))
+            jitter = int(params.get("jitter_seconds", 0))
+        return OncePerIntervalGate(interval_seconds=interval, jitter_seconds=jitter)
+
+    def get_config_type(self, params: Any) -> type | None:
+        return IntervalGateConfig
 
 
 class SftpBundleLoaderFactory(StrategyFactory):
@@ -207,6 +288,9 @@ class DirectorySftpBundleLocatorFactory(StrategyFactory):
             state_management_prefix = getattr(
                 params, "state_management_prefix", "sftp_directory_provider"
             )
+            processed_files_ttl = getattr(params, "processed_files_ttl", None)
+            processing_results_ttl = getattr(params, "processing_results_ttl", None)
+            error_state_ttl = getattr(params, "error_state_ttl", None)
         else:
             sftp_config = params["sftp_config"]
             remote_dir = params["remote_dir"]
@@ -217,6 +301,9 @@ class DirectorySftpBundleLocatorFactory(StrategyFactory):
             state_management_prefix = params.get(
                 "state_management_prefix", "sftp_directory_provider"
             )
+            processed_files_ttl = params.get("processed_files_ttl", None)
+            processing_results_ttl = params.get("processing_results_ttl", None)
+            error_state_ttl = params.get("error_state_ttl", None)
 
         return DirectorySftpBundleLocator(
             sftp_manager=self.sftp_manager,
@@ -227,6 +314,9 @@ class DirectorySftpBundleLocatorFactory(StrategyFactory):
             file_filter=file_filter,
             file_sort=file_sort,
             state_management_prefix=state_management_prefix,
+            processed_files_ttl=processed_files_ttl,
+            processing_results_ttl=processing_results_ttl,
+            error_state_ttl=error_state_ttl,
         )
 
     def get_config_type(self, params: dict[str, Any]) -> type | None:
@@ -313,18 +403,27 @@ class FileSftpBundleLocatorFactory(StrategyFactory):
             state_management_prefix = getattr(
                 params, "state_management_prefix", "sftp_file_provider"
             )
+            processed_files_ttl = getattr(params, "processed_files_ttl", None)
+            processing_results_ttl = getattr(params, "processing_results_ttl", None)
+            error_state_ttl = getattr(params, "error_state_ttl", None)
         else:
             sftp_config = params["sftp_config"]
             file_paths = params["file_paths"]
             state_management_prefix = params.get(
                 "state_management_prefix", "sftp_file_provider"
             )
+            processed_files_ttl = params.get("processed_files_ttl", None)
+            processing_results_ttl = params.get("processing_results_ttl", None)
+            error_state_ttl = params.get("error_state_ttl", None)
 
         return FileSftpBundleLocator(
             sftp_manager=self.sftp_manager,
             sftp_config=sftp_config,
             file_paths=file_paths,
             state_management_prefix=state_management_prefix,
+            processed_files_ttl=processed_files_ttl,
+            processing_results_ttl=processing_results_ttl,
+            error_state_ttl=error_state_ttl,
         )
 
     def get_config_type(self, params: dict[str, Any]) -> type | None:
@@ -361,6 +460,8 @@ def register_sftp_strategies(registry, sftp_manager: SftpManager) -> None:
         LocatorStrategy, "sftp_file", FileSftpBundleLocatorFactory(sftp_manager)
     )
 
+    # removed registration for sftp_folder_based
+
     # Register file sort strategies
     registry.register(
         FileSortStrategyBase, "mtime", ModifiedTimeFileSortStrategyFactory()
@@ -370,6 +471,10 @@ def register_sftp_strategies(registry, sftp_manager: SftpManager) -> None:
     )
     # Register file filter strategies
     registry.register(FilterStrategyBase, "date_filter", DateFilterStrategyFactory())
+
+    # Register gating strategies
+    registry.register(GatingStrategy, "daily_gate", DailyGatingStrategyFactory())
+    registry.register(GatingStrategy, "interval_gate", IntervalGatingStrategyFactory())
 
 
 # ----------------------

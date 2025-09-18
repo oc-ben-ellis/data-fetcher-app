@@ -59,14 +59,14 @@ class StreamingHttpBundleLoader:
         try:
             # Make HTTP request
             url = str(bundle.request_meta.get("url", ""))
-            response = await self.http_manager.request(
-                self.http_config,
-                ctx.app_config,
-                "GET",
-                url,
-                headers={},
-                follow_redirects=self.follow_redirects,
-            )
+            async with await self.http_manager.get_connection(
+                self.http_config, ctx.app_config
+            ) as http:
+                response = await http.get(
+                    url,
+                    headers={},
+                    follow_redirects=self.follow_redirects,
+                )
 
             # Build immutable bundle_meta for the result (do not mutate request_meta)
             bundle_meta = {
@@ -108,12 +108,10 @@ class StreamingHttpBundleLoader:
                     related_urls = self._extract_related_urls(response)
                     for _i, related_url in enumerate(related_urls[: self.max_related]):
                         try:
-                            related_response = await self.http_manager.request(
-                                self.http_config,
-                                ctx.app_config,
-                                "GET",
-                                related_url,
-                            )
+                            async with await self.http_manager.get_connection(
+                                self.http_config, ctx.app_config
+                            ) as http:
+                                related_response = await http.get(related_url)
                             related_meta = {
                                 "url": related_url,
                                 "content_type": related_response.headers.get(
@@ -137,12 +135,15 @@ class StreamingHttpBundleLoader:
                             except (TypeError, ValueError):
                                 current = 0
                             bundle_meta["resources_count"] = current + 1
-                        except Exception as e:  # noqa: BLE001
+                        except Exception as e:
                             bid_logger.warning(
                                 "ERROR_FETCHING_RELATED_RESOURCE",
                                 related_url=related_url,
                                 error=str(e),
                             )
+                            raise RuntimeError(
+                                f"Failed to fetch related resource '{related_url}': {e}"
+                            ) from e
                 bid_logger.debug(
                     "SUCCESSFULLY_STREAMED_HTTP_RESPONSE_TO_STORAGE", url=url
                 )

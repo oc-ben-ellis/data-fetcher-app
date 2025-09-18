@@ -183,10 +183,10 @@ class PaginationHttpBundleLocator:
         await self._save_persistence_state(ctx)
         return urls
 
-    async def handle_url_processed(
+    async def handle_bundle_processed(
         self, request: RequestMeta, bundle_refs: list[BundleRef], ctx: FetchRunContext
     ) -> None:
-        """Handle when a URL has been processed and potentially generate next URLs."""
+        """Handle when a bundle has been processed and potentially generate next URLs."""
         # Mark as processed
         self._processed_urls.add(request["url"])
 
@@ -212,13 +212,13 @@ class PaginationHttpBundleLocator:
         # Save state after processing
         await self._save_persistence_state(ctx)
 
-    async def handle_url_error(
+    async def handle_bundle_error(
         self,
         request: RequestMeta,
         error: str,
         context: FetchRunContext,
     ) -> None:
-        """Handle when a URL processing fails."""
+        """Handle when a bundle processing fails."""
         await self._save_error_state(request, error, context)
         await self._save_persistence_state(context)
 
@@ -402,10 +402,10 @@ class SingleHttpBundleLocator:
         await self._save_persistence_state(ctx)
         return urls
 
-    async def handle_url_processed(
+    async def handle_bundle_processed(
         self, request: RequestMeta, bundle_refs: list[BundleRef], ctx: FetchRunContext
     ) -> None:
-        """Handle when a URL has been processed."""
+        """Handle when a bundle has been processed."""
         # Mark as processed
         self._processed_urls.add(request.url)
 
@@ -415,13 +415,13 @@ class SingleHttpBundleLocator:
         # Save state after processing
         await self._save_persistence_state(ctx)
 
-    async def handle_url_error(
+    async def handle_bundle_error(
         self,
         request: RequestMeta,
         error: str,
         context: FetchRunContext,  # noqa: ARG002
     ) -> None:
-        """Handle when a URL processing fails."""
+        """Handle when a bundle processing fails."""
         if not self.store:
             raise NoKeyValueStoreError
         store = self.store

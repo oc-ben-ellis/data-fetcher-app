@@ -5,7 +5,7 @@ RUN apk add --no-cache curl cargo libffi-dev postgresql-dev gcc musl-dev
 
 RUN pip install poetry
 
-WORKDIR "/code"
+WORKDIR "/app"
 
 # move poetry cache outside root's home directory
 # so virtualenvs are available to all users
@@ -24,7 +24,7 @@ COPY pyproject.toml ./
 # Allow missing wheels dir in devcontainer context; copy if present
 COPY .devcontainer/wheels/ /tmp/wheels/
 # Fix ownership of copied files
-RUN chown -R appuser:appuser /code /tmp/wheels
+RUN chown -R appuser:appuser /app /tmp/wheels
 # Install dependencies without lock file to avoid local repository references
 # Install local wheels first using poetry
 RUN poetry install --no-ansi --no-interaction --only=main --no-root
@@ -39,6 +39,10 @@ COPY ./ ./
 # Regenerate lock to reflect updated dependency pins, then install
 RUN poetry lock --no-ansi --no-interaction && \
     poetry install --no-ansi --no-interaction --only=main
+
+# Fix poetry cache permissions
+RUN chown -R appuser:appuser /opt/poetry-cache && \
+    chmod -R 755 /opt/poetry-cache
 
 USER appuser
 

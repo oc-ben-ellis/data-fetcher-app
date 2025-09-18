@@ -6,8 +6,6 @@ services:
     image: atmoz/sftp:alpine
     ports:
       - "${SFTP_PORT:-2222}:22"
-    volumes:
-      - ./data:/home/test/data
     command: test:test:1001:1001:data
     environment:
       - SFTP_USERS=test:test:1001:1001:data

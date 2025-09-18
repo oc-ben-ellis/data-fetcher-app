@@ -60,11 +60,41 @@ class FilterStrategyBase(ABC):
         """Return True if the data should be included, False otherwise."""
 
 
+# ----------------------
+# Gating strategies
+# ----------------------
+
+
+class GatingStrategy(ABC):
+    """Abstract base class for gating strategies.
+
+    Implementations should block until the gate allows execution.
+    """
+
+    @abstractmethod
+    async def wait_if_needed(self) -> None:  # pragma: no cover - interface
+        """Await until the strategy allows proceeding (no-op if allowed now)."""
+
+
+# Composite base for combining multiple gates
+class CompositeGatingStrategy(GatingStrategy):
+    """Composite that applies multiple gates in sequence (AND semantics)."""
+
+    def __init__(self, gates: list[GatingStrategy] | None = None) -> None:
+        self._gates: list[GatingStrategy] = list(gates or [])
+
+    async def wait_if_needed(self) -> None:
+        for gate in self._gates:
+            await gate.wait_if_needed()
+
+
 # Type aliases for common strategy types
 LoaderStrategyType = type[LoaderStrategy]
 LocatorStrategyType = type[LocatorStrategy]
 # Kept for backward compatibility where referenced, but prefer using FilterStrategyBase directly
 FilterStrategyType = type[FilterStrategyBase]
+# New: type alias for gating strategies
+GatingStrategyType = type[GatingStrategy]
 
 
 class FileSortStrategyBase(ABC):

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="4eb04387-beba-4dd4-9aa4-3365e293c42e" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/mocks/fr/test_cases/basic/expected/sample_output/_completed.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mocks/fr/test_cases/basic/expected/sample_output/_manifest.jsonl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mocks/fr/test_cases/basic/expected/sample_output/entreprises_sirene_V3.11_siren.metadata.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.devcontainer/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/.devcontainer/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/fr/test_cases/basic/expectation.py" beforeDir="false" afterPath="$PROJECT_DIR$/mocks/fr/test_cases/basic/expectation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/fr/test_cases/basic/expected/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/mocks/fr/test_cases/basic/expected/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/fr/test_cases/basic/expected/sample_output/bundle.meta" beforeDir="false" afterPath="$PROJECT_DIR$/mocks/fr/test_cases/basic/expected/sample_output/bundle.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/fr/test_cases/basic/expected/sample_output/entreprises_sirene_V3.11_siren.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/us_fl/config/config.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mocks/us_fl/config/config.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/us_fl/environment/cleanup.py" beforeDir="false" afterPath="$PROJECT_DIR$/mocks/us_fl/environment/cleanup.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/us_fl/environment/data/doc/Quarterly/Cor/cordata.zip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/us_fl/environment/data/doc/cor/20250829c.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/us_fl/environment/data/doc/cor/20250913c.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/us_fl/environment/data/doc/cor/20250915c.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/us_fl/environment/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/mocks/us_fl/environment/docker-compose.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/us_fl/environment/setup-mock-data.sh" beforeDir="false" afterPath="$PROJECT_DIR$/mocks/us_fl/environment/setup-mock-data.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mocks/us_fl/images/sftp/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/mocks/us_fl/images/sftp/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_fetcher_core/core.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_fetcher_core/core.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_fetcher_core/queue/serializers.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_fetcher_core/queue/serializers.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_fetcher_core/storage/file_storage.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_fetcher_core/storage/file_storage.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_fetcher_core/storage/streaming/tee_stream.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_fetcher_core/storage/streaming/tee_stream.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_fetcher_core/strategies/filter_factories.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_fetcher_core/strategies/filter_factories.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_fetcher_core/strategy_types.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_fetcher_core/strategy_types.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_fetcher_http/http_loader.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_fetcher_http/http_loader.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_fetcher_sftp/sftp_bundle_locators.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_fetcher_sftp/sftp_bundle_locators.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_fetcher_sftp/sftp_config.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_fetcher_sftp/sftp_config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_fetcher_sftp/sftp_loader.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_fetcher_sftp/sftp_loader.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_fetcher_sftp/sftp_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_fetcher_sftp/sftp_manager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_fetcher_sftp/strategy_factories.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_fetcher_sftp/strategy_factories.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/conftest.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/conftest.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_functional/test_recursive_functional.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_functional/test_recursive_functional.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 8
+}]]></component>
+  <component name="ProjectId" id="32rg3jzD3qSWiIY6yzgZuBMr3tA" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "bentmp",
+    "last_opened_file_path": "/media/ben-ellis/T7/wsldev/oc/oc/data-pipeline-config/services/fetcher",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-ce6832f46686-7b97d883f26b-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.25557.178" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="4eb04387-beba-4dd4-9aa4-3365e293c42e" name="Changes" comment="" />
+      <created>1758183908603</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1758183908603</updated>
+      <workItem from="1758183914354" duration="819000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

@@ -75,14 +75,14 @@ class HttpBundleLoader:
             )
 
             # Make HTTP request (authentication is handled by HttpManager)
-            response = await self.http_manager.request(
-                self.http_config,
-                ctx.app_config,
-                "GET",
-                url,
-                headers={},
-                follow_redirects=self.follow_redirects,
-            )
+            async with await self.http_manager.get_connection(
+                self.http_config, ctx.app_config
+            ) as http:
+                response = await http.get(
+                    url,
+                    headers={},
+                    follow_redirects=self.follow_redirects,
+                )
 
             logger.debug(
                 "RECEIVED_HTTP_RESPONSE",

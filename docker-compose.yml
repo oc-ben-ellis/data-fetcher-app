@@ -1,5 +1,4 @@
 services:
-  # DevContainer
   dev-container:
     build:
       context: .
@@ -8,6 +7,8 @@ services:
         BASE_IMAGE: alpine:3.22
         USER_UID: ${UID:-1000}
         USER_GID: ${GID:-1000}
+        # Must run `export DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)` to get this value
+        DOCKER_GID: ${DOCKER_GID:-999}
     init: true
     privileged: false
     cap_drop:
@@ -16,33 +17,37 @@ services:
       - label=disable
     volumes:
       - .:/code
-      - ./.devcontainer/wheels:/tmp/wheels:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - ${SSH_AUTH_SOCK}:/ssh-agent
+      - ${HOME}/.gnupg:/home/vscode/.gnupg
       - ${XDG_RUNTIME_DIR}/gnupg/S.gpg-agent:/gnupg/S.gpg-agent
-      - ${HOME}/.gitconfig:/home/appuser/.gitconfig:ro
+      - ${XDG_RUNTIME_DIR}/gnupg:/home/vscode/.gnupg-runtime
+      - ${HOME}/.gitconfig:/home/vscode/.gitconfig:ro
+      - ${HOME}/.ssh:/home/vscode/.ssh:ro 
     working_dir: /code
-    command: ["sleep", "infinity"]
     restart: unless-stopped
     environment:
       - DOCKER_BUILDKIT=1
       - BUILDKIT_PROGRESS=plain
       - SSH_AUTH_SOCK=/ssh-agent
       - GPG_AGENT_INFO=/gnupg/S.gpg-agent:0:1
-    user: appuser
+      - GPG_TTY=/dev/tty
+      - GNUPGHOME=/home/vscode/.gnupg
+    user: "vscode" 
     networks:
       - build-network
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  # Application image consumer
   app-container:
     build:
       context: .
       dockerfile: Dockerfile
+    init: true
+    privileged: false
     volumes:
-      - .:/code
-    working_dir: /code
+      - .:/app
+    working_dir: /app
     environment:
       - DOCKER_BUILDKIT=1
       - POETRY_VIRTUALENVS_CREATE=false
@@ -61,14 +66,11 @@ services:
       - OC_KV_STORE_REDIS_HOST=host.docker.internal
       - OC_KV_STORE_REDIS_PORT=${OC_KV_STORE_REDIS_PORT:-6379}
       - OC_LOGGING_LEVEL=DEBUG
+    user: "appuser"
     networks:
       - build-network
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
-volumes:
-  poetry-cache:
-
 
 networks:
   build-network:

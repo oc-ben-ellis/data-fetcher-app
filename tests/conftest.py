@@ -32,6 +32,10 @@ _SRC_PATH = _PROJECT_ROOT / "src"
 if str(_SRC_PATH) not in sys.path:
     sys.path.insert(0, str(_SRC_PATH))
 
+# If oc_pipeline_bus isn't installed as a package, add monorepo libs path
+# This must happen before any imports that depend on oc_pipeline_bus
+import oc_pipeline_bus  # type: ignore[unused-ignore]
+
 from data_fetcher_core.core import BundleRef
 import data_fetcher_core.retry as _retry_mod  # noqa: F401  # type: ignore[unused-import]
 
@@ -52,7 +56,7 @@ if "data_fetcher_core.protocol_config" not in sys.modules:
     _proto_mod.HttpProtocolConfig = HttpProtocolConfig
     sys.modules["data_fetcher_core.protocol_config"] = _proto_mod
 
-"""Pytest configuration and shared fixtures for OC Fetcher tests."""
+"""Pytest configuration and shared test fixtures for OC Fetcher tests."""
 
 # Global flag to track if we're shutting down
 _shutdown_requested = False

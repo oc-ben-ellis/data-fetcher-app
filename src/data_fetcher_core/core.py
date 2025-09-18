@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     # Imports used only for type checking to avoid runtime import side effects
     from collections.abc import Mapping  # noqa: I001
-    from oc_pipeline_bus.config import Annotated, strategy
+    from oc_pipeline_bus.config import Annotated
     from data_fetcher_core.strategy_types import (
         LoaderStrategy,
         LocatorStrategy,
@@ -22,9 +22,13 @@ if TYPE_CHECKING:
     from data_fetcher_core.core_config.config_factory import FetcherConfig
 
 # Import pipeline-bus config types
+from oc_pipeline_bus.config import Annotated
 from oc_pipeline_bus.identifiers import Bid
 
 from data_fetcher_core.exceptions import BundleRefValidationError
+
+# Import strategy types at runtime for proper type hints
+from data_fetcher_core.strategy_types import LoaderStrategy, LocatorStrategy
 
 
 @dataclass(init=False)
@@ -164,6 +168,8 @@ class ProtocolConfig(ABC):
             A string identifying the protocol type (e.g., 'http', 'sftp').
         """
 
+# Defined a constant here to stop formatter messing up the Annotated type hint
+strategy = "strategy"
 
 @dataclass
 class DataRegistryFetcherConfig:
@@ -171,6 +177,7 @@ class DataRegistryFetcherConfig:
 
     loader: Annotated[LoaderStrategy, strategy]
     locators: list[Annotated[LocatorStrategy, strategy]]
+
     concurrency: int = 10
     target_queue_size: int = 100
     # Optional fields for backward compatibility with storage hooks

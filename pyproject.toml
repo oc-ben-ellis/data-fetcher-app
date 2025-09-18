@@ -30,6 +30,10 @@ aiohttp = "^3.12.15"
 cairosvg = "^2.8.2"
 # openc-python-common = "*"
 # oc-pipeline-bus = "*"
+blake3 = "^1.0.6"
+environ-config = "23.2.0"
+opentelemetry-distro = "0.45b0"
+prometheus-client = "0.20.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.12.0"
